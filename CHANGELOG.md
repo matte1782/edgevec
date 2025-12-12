@@ -15,19 +15,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.2.0-alpha.2] - 2025-12-12
+## [0.2.0-alpha.2] - 2025-12-12 — HOTFIX
+
+**HOTFIX RELEASE** — Fixes critical packaging bug in v0.2.0-alpha.1.
 
 ### Fixed
-- **npm package missing snippets directory** — The v0.2.0-alpha.1 package was missing the `snippets/` directory containing IndexedDB storage JS code, causing import failures in Node.js. This hotfix adds the missing files.
+- **[CRITICAL] npm package missing snippets directory** — The v0.2.0-alpha.1 package was missing the `snippets/` directory containing IndexedDB storage JS code, causing complete import failures in Node.js. This hotfix adds the missing files. (Incident: INC-2025-12-12-001)
 
 ### Changed
 - Updated package.json `files` array to include `snippets` directory
 
+### Incident Reference
+- **Incident Report:** [docs/incidents/2025-12-12_alpha1_missing_snippets.md](docs/incidents/2025-12-12_alpha1_missing_snippets.md)
+- **Root Cause:** wasm-pack generated `snippets/` directory was not included in package.json files array
+- **Time to Resolution:** ~10 minutes
+
 ---
 
-## [0.2.0-alpha.1] - 2025-12-12 [DEPRECATED]
+## [0.2.0-alpha.1] - 2025-12-12 — DEPRECATED (DO NOT USE)
 
-> ⚠️ **DEPRECATED**: This version is missing the `snippets/` directory. Use v0.2.0-alpha.2 instead.
+> **CRITICAL BUG — DO NOT USE THIS VERSION**
+>
+> This version was published without the `snippets/` directory due to incomplete
+> `package.json` files array. All imports will fail with `ERR_MODULE_NOT_FOUND`.
+>
+> **Use v0.2.0-alpha.2 instead:** `npm install edgevec@0.2.0-alpha.2`
+>
+> See [Incident Report](docs/incidents/2025-12-12_alpha1_missing_snippets.md) for details.
 
 ### Added
 
