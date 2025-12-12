@@ -22,12 +22,12 @@
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ### Installation
 
 ```bash
-npm install @edgevec/core
+npm install edgevec
 ```
 
 **For Rust users:** To achieve optimal performance, ensure your `.cargo/config.toml` includes:
@@ -39,57 +39,46 @@ rustflags = ["-C", "target-cpu=native"]
 
 Without this configuration, performance will be 60-78% slower due to missing SIMD optimizations.
 
-### Browser Usage
+### Browser/Node.js Usage
 
 ```javascript
-import { EdgeVecClient } from '@edgevec/core';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 async function main() {
-    // 1. Create Index (auto-initializes WASM)
-    const client = await EdgeVecClient.create({ dimensions: 128 });
+    // 1. Initialize WASM (required once)
+    await init();
 
-    // 2. Insert Vectors (synchronous)
+    // 2. Create Config and Index
+    const config = new EdgeVecConfig(128);  // 128 dimensions
+    config.metric = 'cosine';  // Optional: 'l2', 'cosine', or 'dot'
+    const index = new EdgeVec(config);
+
+    // 3. Insert Vectors
     const vector = new Float32Array(128).fill(0.1);
-    const id = client.insert(vector);
+    const id = index.insert(vector);
     console.log(`Inserted vector with ID: ${id}`);
 
-    // 3. Search (synchronous)
+    // 4. Search
     const query = new Float32Array(128).fill(0.1);
-    const results = client.search(query, 10);
+    const results = index.search(query, 10);
     console.log("Results:", results);
+    // Results: [{ id: 0, score: 0.0 }, ...]
 
-    // 4. Save to IndexedDB
-    await client.save("my-vector-db");
+    // 5. Save to IndexedDB (browser) or file system
+    await index.save("my-vector-db");
 }
 
 main().catch(console.error);
 ```
 
-### Node.js Usage
+### Load Existing Index
 
 ```javascript
-import { EdgeVecClient } from '@edgevec/core';
+import init, { EdgeVec } from 'edgevec';
 
-// Create and use synchronously after initialization
-const client = await EdgeVecClient.create({
-    dimensions: 128,
-    metric: 'cosine' // Optional: 'l2', 'cosine', or 'dot'
-});
-
-// Insert vectors (synchronous)
-const vector1 = new Float32Array(128).fill(0.1);
-const vector2 = new Float32Array(128).fill(0.2);
-const id1 = client.insert(vector1);
-const id2 = client.insert(vector2);
-
-// Search (synchronous)
-const results = client.search(vector1, 10);
-console.log(`Found ${results.length} results`);
-console.log(`Top result: ID=${results[0].id}, distance=${results[0].distance}`);
-
-// Persistence
-await client.save("my-db");
-const loadedClient = await EdgeVecClient.load("my-db", { dimensions: 128 });
+await init();
+const index = await EdgeVec.load("my-vector-db");
+const results = index.search(queryVector, 10);
 ```
 
 ### Rust Usage
@@ -144,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - ✅ **Crash Recovery (WAL)** — Log-based replay
 - ✅ **Atomic Snapshots** — Safe background saving
 - ✅ **Browser Integration** — WASM Bindings + IndexedDB
-- ✅ **npm Package** — `@edgevec/core@0.1.0` published
+- ✅ **npm Package** — `edgevec@0.2.0-alpha.2` published
 
 **Development Progress:**
 - Phase 0: Environment Setup — ✅ COMPLETE
@@ -190,7 +179,7 @@ Measured using `index.memory_usage() + storage.memory_usage()` after building 10
 
 | Package | Size (Gzipped) | Target | Status |
 |:--------|:---------------|:-------|:-------|
-| `@edgevec/core@0.1.0` | **148 KB** | <500 KB | ✅ **70% under** |
+| `edgevec@0.2.0-alpha.2` | **148 KB** | <500 KB | ✅ **70% under** |
 
 ### Key Advantages
 

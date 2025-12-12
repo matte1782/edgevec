@@ -8,16 +8,16 @@
 
 ## Twitter/X Announcement
 
-**Character count:** ~380 (within limit)
+**Character count:** ~400 (within limit)
 
 ```
 🚀 EdgeVec v0.2.0-alpha.2 Released!
 
 High-performance vector search for Browser, Node.js, and Edge — 100% local, zero network latency.
 
-✨ 329µs search at 100k vectors (SQ8)
+✨ Sub-millisecond search at 100k vectors
 ✨ 148 KB bundle (WASM)
-✨ 3.6x memory reduction
+✨ 3.6x memory reduction with SQ8
 ✨ IndexedDB persistence
 
 📦 npm install edgevec
@@ -65,12 +65,14 @@ Tested on 768-dimensional vectors (typical embedding size), k=10 nearest neighbo
 ## Quick Start
 
 ```javascript
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 await init();
-const index = new EdgeVec({ dimensions: 768 });
+const config = new EdgeVecConfig(768);
+const index = new EdgeVec(config);
 index.insert(new Float32Array(768).fill(0.1));
 const results = index.search(query, 10);
+// results: [{ id: 0, score: 0.0 }, ...]
 ```
 
 ## Links
@@ -116,26 +118,32 @@ Just released **EdgeVec** — a vector database that runs entirely in your brows
 
 ## Performance
 
-- **329µs** search at 100k vectors
+- **Sub-millisecond** search at 100k vectors
 - **148 KB** gzipped bundle
 - **IndexedDB** for persistent storage
 
 ## Usage
 
 ```javascript
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 await init();
-const index = new EdgeVec({ dimensions: 768 });
+const config = new EdgeVecConfig(768);
+config.metric = 'cosine';  // Optional: 'l2', 'cosine', or 'dot'
+const index = new EdgeVec(config);
 
 // Insert vectors
 index.insert(new Float32Array(768).fill(0.1));
 
 // Search
 const results = index.search(queryVector, 10);
-// Returns: [{ id: 0, distance: 0.0 }, ...]
+// Returns: [{ id: 0, score: 0.0 }, ...]
 
-// Persist to IndexedDB (coming soon in JS wrapper)
+// Persist to IndexedDB
+await index.save('my-vectors');
+
+// Load later
+const loaded = await EdgeVec.load('my-vectors');
 ```
 
 ## Use Cases
@@ -159,21 +167,21 @@ This is an alpha release. Feedback welcome!
 ## LinkedIn Announcement
 
 ```markdown
-🚀 Excited to announce EdgeVec v0.2.0-alpha.2!
+Excited to announce EdgeVec v0.2.0-alpha.2!
 
 EdgeVec is a high-performance vector database that runs entirely in the browser, Node.js, or edge devices. Built in Rust with first-class WASM support.
 
 Key achievements:
-• Sub-millisecond search at 100k vectors
-• 148 KB bundle (70% under target)
-• 3.6x memory reduction with quantization
-• Zero network latency — 100% local
+- Sub-millisecond search at 100k vectors
+- 148 KB bundle (70% under target)
+- 3.6x memory reduction with quantization
+- Zero network latency — 100% local
 
 Perfect for:
-• Privacy-preserving search applications
-• Browser extensions
-• Offline-first apps
-• Edge computing
+- Privacy-preserving search applications
+- Browser extensions
+- Offline-first apps
+- Edge computing
 
 The project started as a research experiment to see if we could achieve server-grade vector search performance in the browser. The answer: yes.
 
@@ -201,7 +209,7 @@ Hi HN,
 I built EdgeVec, a vector database that runs entirely in the browser. It implements HNSW (Hierarchical Navigable Small World) graphs for approximate nearest neighbor search.
 
 Performance:
-- 329µs search at 100k vectors (768 dimensions, k=10)
+- Sub-millisecond search at 100k vectors (768 dimensions, k=10)
 - 148 KB gzipped bundle
 - 3.6x memory reduction with scalar quantization
 
@@ -274,12 +282,14 @@ Perfect for browser extensions, local-first apps, and privacy-preserving RAG.
 ## Try It
 
 ```javascript
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 await init();
-const index = new EdgeVec({ dimensions: 768 });
+const config = new EdgeVecConfig(768);
+const index = new EdgeVec(config);
 index.insert(new Float32Array(768).fill(0.1));
 const results = index.search(query, 10);
+// results: [{ id: 0, score: 0.0 }, ...]
 ```
 
 GitHub: https://github.com/matte1782/edgevec
