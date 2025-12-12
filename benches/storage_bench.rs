@@ -4,9 +4,9 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use edgevec::hnsw::HnswConfig;
+use edgevec::persistence::storage::file::FileBackend;
 use edgevec::persistence::wal::WalAppender;
 use edgevec::storage::VectorStorage;
-use std::fs::File;
 use tempfile::NamedTempFile;
 
 fn bench_storage_insert(c: &mut Criterion) {
@@ -47,8 +47,8 @@ fn bench_storage_insert(c: &mut Criterion) {
         // IO performance might degrade if file gets huge, but for microbenchmark it's probably fine.
         // We want to measure the sync overhead.
 
-        let file = File::create(&path).unwrap();
-        let wal = WalAppender::new(Box::new(file), 0);
+        let backend = FileBackend::new(&path);
+        let wal = WalAppender::new(Box::new(backend), 0);
         let mut storage = VectorStorage::new(&config, Some(wal));
 
         b.iter(|| {

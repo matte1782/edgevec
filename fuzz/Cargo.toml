@@ -69,3 +69,9 @@ name = "hnsw_insert"
 path = "fuzz_targets/hnsw_insert.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "dummy_harness"
+path = "fuzz_targets/dummy_harness.rs"
+test = false
+doc = false

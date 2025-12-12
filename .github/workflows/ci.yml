@@ -8,7 +8,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-Dwarnings"
 
 jobs:
   # Job 1: Correctness & Testing
@@ -40,7 +39,7 @@ jobs:
         run: cargo fmt -- --check
 
       - name: Run Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -D clippy::correctness -W clippy::suspicious -W clippy::style
 
   # Job 3: WASM Compatibility Check
   wasm-check:

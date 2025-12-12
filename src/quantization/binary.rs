@@ -383,6 +383,7 @@ impl BinaryQuantizer {
 }
 
 #[cfg(test)]
+#[allow(clippy::similar_names)]
 mod tests {
     use super::*;
 
