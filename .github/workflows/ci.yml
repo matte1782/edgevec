@@ -17,12 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        
+
       - name: Run Unit Tests
-        run: cd edgevec && cargo test --verbose
+        run: cargo test --verbose
 
   # Job 2: Code Quality
   lint:
@@ -30,17 +30,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
       - name: Check Formatting
-        run: cd edgevec && cargo fmt -- --check
+        run: cargo fmt -- --check
 
       - name: Run Clippy
-        run: cd edgevec && cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
   # Job 3: WASM Compatibility Check
   wasm-check:
@@ -48,14 +48,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust with WASM target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
       - name: Check WASM Build
-        run: cd edgevec && cargo check --target wasm32-unknown-unknown
+        run: cargo check --target wasm32-unknown-unknown
 
   # Job 4: Fuzz Harness Verification
   fuzz-check:
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Nightly Rust
         uses: dtolnay/rust-toolchain@nightly
 
@@ -71,5 +71,4 @@ jobs:
         run: cargo install cargo-fuzz
 
       - name: Build Fuzz Targets
-        run: cd edgevec && cargo +nightly fuzz build dummy_harness
-
+        run: cargo +nightly fuzz build dummy_harness
