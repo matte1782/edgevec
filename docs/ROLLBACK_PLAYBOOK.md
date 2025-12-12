@@ -174,9 +174,9 @@ Before every release:
 
 | Role | Contact | Authority |
 |:-----|:--------|:----------|
-| Maintainer | @[user] | Full rollback authority |
+| Maintainer | @matte1782 | Full rollback authority |
 | npm Account | edgevec | npm publish/unpublish |
-| GitHub Repo | [user]/edgevec | Release management |
+| GitHub Repo | matte1782/edgevec | Release management |
 
 ---
 

@@ -12,7 +12,7 @@ edition = "2021"
 rust-version = "1.70"
 description = "High-performance embedded vector database for Browser, Node, and Edge"
 license = "MIT"
-repository = "https://github.com/[user]/edgevec"
+repository = "https://github.com/matte1782/edgevec"
 keywords = ["vector", "database", "wasm", "hnsw", "similarity-search"]
 categories = ["database", "wasm", "algorithms"]
 

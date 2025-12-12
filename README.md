@@ -246,7 +246,7 @@ Measured using `index.memory_usage() + storage.memory_usage()` after building 10
 
 ## License
 
-MIT — See [LICENSE](https://github.com/anthropics/edgevec/blob/main/LICENSE)
+MIT — See [LICENSE](./LICENSE)
 
 ---
 
