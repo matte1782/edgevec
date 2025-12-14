@@ -1,0 +1,27 @@
+{
+  "name": "edgevec-competitive-benchmarks",
+  "version": "1.0.0",
+  "description": "Competitive benchmarks for EdgeVec WASM vector database",
+  "main": "harness.js",
+  "scripts": {
+    "bench": "node harness.js",
+    "bench:edgevec": "node harness.js --library=edgevec",
+    "bench:all": "node harness.js --all",
+    "generate-data": "node scripts/generate-sift.js"
+  },
+  "keywords": [
+    "vector-database",
+    "benchmark",
+    "wasm",
+    "hnsw"
+  ],
+  "author": "EdgeVec Team",
+  "license": "MIT",
+  "dependencies": {
+  },
+  "devDependencies": {
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

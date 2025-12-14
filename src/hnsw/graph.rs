@@ -7,6 +7,7 @@
 use super::config::HnswConfig;
 use super::neighbor::NeighborPool;
 use crate::storage::VectorStorage;
+use bytemuck::{Pod, Zeroable};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,10 @@ use thiserror::Error;
 /// # Invariants
 /// - IDs are never reused (monotonically increasing)
 /// - ID 0 is reserved (invalid sentinel)
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// # Safety
+/// Derives `Pod` and `Zeroable` for safe byte casting via bytemuck.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Pod, Zeroable)]
 #[repr(transparent)]
 pub struct VectorId(pub u64);
 
@@ -119,8 +123,14 @@ pub enum GraphError {
 /// - `neighbor_offset`: 4 bytes
 /// - `neighbor_len`: 2 bytes
 /// - `max_layer`: 1 byte
-/// - `pad`: 1 byte
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// - `pad`: 1 byte (explicit padding, always zero-initialized)
+///
+/// # Safety
+///
+/// Derives `Pod` and `Zeroable` for safe byte casting via bytemuck.
+/// The `#[repr(C)]` ensures deterministic layout for serialization.
+/// All fields are primitive types with no padding gaps.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Pod, Zeroable)]
 #[repr(C)]
 pub struct HnswNode {
     /// The vector ID this node represents
@@ -135,7 +145,7 @@ pub struct HnswNode {
     /// The maximum layer this node appears in
     pub max_layer: u8,
 
-    /// Padding for alignment
+    /// Explicit padding byte (always zero-initialized for Pod safety)
     pub pad: u8,
 }
 

@@ -203,33 +203,17 @@ impl Iterator for ChunkIter<'_> {
                         let end = self.node_index + nodes_to_copy;
                         let slice = &nodes[self.node_index..end];
 
-                        // SAFETY WARNING: POTENTIALLY_UNSOUND — This block has concerns.
+                        // Safe cast using bytemuck: HnswNode → [u8]
                         //
-                        // While casting `&[HnswNode]` → `&[u8]` is safer than the reverse
-                        // (the source is properly aligned Rust data, and u8 has alignment 1),
-                        // there are still issues:
+                        // This is safe because:
+                        // 1. HnswNode derives Pod (all fields are primitives, no padding gaps)
+                        // 2. Casting to u8 always succeeds (u8 has alignment 1)
+                        // 3. bytemuck verifies at compile time that HnswNode is Pod
                         //
-                        // 1. HARDCODED SIZE: Uses `16` instead of `size_of::<HnswNode>()`.
-                        //    If HnswNode layout changes, this becomes silently incorrect.
-                        //
-                        // 2. PADDING BYTES: Reading the `pad` field may read uninitialized
-                        //    memory if the struct was not zero-initialized. This is
-                        //    technically UB, though practically benign on most platforms.
-                        //
-                        // RESOLUTION: This will be replaced with `bytemuck::cast_slice()`
-                        // in task W13.2 after deriving `Pod` for `HnswNode`. See RFC-001
-                        // and `docs/audits/unsafe_audit_persistence.md` for details.
-                        //
-                        // INVARIANTS REQUIRED:
-                        // - `slice` is a valid `&[HnswNode]` reference (guaranteed by Rust)
-                        // - `size_of::<HnswNode>() == 16` (verified in audit)
-                        // - All `HnswNode` instances have `pad` field initialized
-                        unsafe {
-                            let ptr = slice.as_ptr().cast::<u8>();
-                            let len = nodes_to_copy * std::mem::size_of::<crate::hnsw::graph::HnswNode>();
-                            let byte_slice = std::slice::from_raw_parts(ptr, len);
-                            self.buffer.extend_from_slice(byte_slice);
-                        }
+                        // Fixed in: W13.2 (bytemuck integration)
+                        // See: docs/audits/unsafe_audit_persistence.md
+                        let byte_slice: &[u8] = bytemuck::cast_slice(slice);
+                        self.buffer.extend_from_slice(byte_slice);
 
                         self.node_index += nodes_to_copy;
                     }

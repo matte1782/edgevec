@@ -264,6 +264,13 @@ Measured using `index.memory_usage() + storage.memory_usage()` after building 10
 
 ---
 
+## Acknowledgments
+
+- Thanks to the **Reddit community** for identifying a potential alignment issue in the persistence layer, which led to improved safety via `bytemuck` in v0.2.1.
+- Thanks to the **Hacker News community** for feedback on competitive positioning and benchmarking.
+
+---
+
 ## License
 
 MIT — See [LICENSE](./LICENSE)

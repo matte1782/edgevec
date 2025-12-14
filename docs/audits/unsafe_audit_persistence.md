@@ -4,20 +4,34 @@
 **Date:** 2025-12-13
 **Scope:** `src/persistence/*.rs`
 **Task:** W13.1a
-**Status:** COMPLETE
+**Status:** COMPLETE — ISSUES FIXED IN W13.2
 
 ---
 
 ## Executive Summary
 
-The persistence module contains **2 unsafe blocks** that perform pointer casts between byte slices and `HnswNode` structs. Both blocks are classified as **UNSOUND** due to missing alignment verification.
+The persistence module **previously** contained 2 unsafe blocks that performed pointer casts between byte slices and `HnswNode` structs. **Both issues have been fixed in W13.2** by replacing unsafe casts with bytemuck safe operations.
 
-| File | Line | Operation | Classification | Risk Level |
-|:-----|:-----|:----------|:---------------|:-----------|
-| `snapshot.rs` | 236-239 | `&[u8]` → `&[HnswNode]` | **UNSOUND** | HIGH |
-| `chunking.rs` | 227-232 | `&[HnswNode]` → `&[u8]` | **POTENTIALLY_UNSOUND** | MEDIUM |
+| File | Original Line | Operation | Original Status | Current Status |
+|:-----|:--------------|:----------|:----------------|:---------------|
+| `snapshot.rs` | 236-239 | `&[u8]` → `&[HnswNode]` | **UNSOUND** | ✅ **FIXED** (W13.2) |
+| `chunking.rs` | 227-232 | `&[HnswNode]` → `&[u8]` | **POTENTIALLY_UNSOUND** | ✅ **FIXED** (W13.2) |
 
-**Recommendation:** Replace both unsafe blocks with `bytemuck::cast_slice` / `bytemuck::try_cast_slice` in W13.2.
+**Resolution:** Both unsafe blocks replaced with `bytemuck::cast_slice` / `bytemuck::try_cast_slice` in W13.2.
+
+### Fix Details
+
+| File | Fix Location | Fix Method |
+|:-----|:-------------|:-----------|
+| `snapshot.rs` | Lines 228-232 | `bytemuck::try_cast_slice()` with error handling |
+| `chunking.rs` | Lines 215-216 | `bytemuck::cast_slice()` (infallible for HnswNode→u8) |
+
+### Verification
+
+```bash
+# Zero unsafe blocks for pointer casts remain:
+grep -rn "unsafe {" src/persistence/  # Returns no matches
+```
 
 ---
 

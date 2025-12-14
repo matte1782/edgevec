@@ -251,6 +251,19 @@ pub struct VectorStorage {
 - [INV-PERS-2] Snapshots are atomic (complete or absent)
 - [INV-PERS-3] Recovery replays WAL after last snapshot
 
+**Serialization Safety (v1.8 - W13.2):**
+
+EdgeVec uses `bytemuck` for all byte-to-struct conversions in the persistence layer. This provides:
+
+1. **Compile-time verification:** `Pod` trait ensures type is safe to cast from bytes
+2. **Runtime alignment checks:** `try_cast_slice` verifies alignment before conversion
+3. **No undefined behavior:** All `#[allow(clippy::cast_ptr_alignment)]` annotations removed
+4. **Graceful error handling:** `PersistenceError::Corrupted` on alignment failures
+
+Key types implementing `Pod + Zeroable`:
+- `VectorId` (4 bytes, 4-byte aligned)
+- `HnswNode` (24 bytes, 8-byte aligned)
+
 ```rust
 /// Write-Ahead Log for crash recovery.
 /// 

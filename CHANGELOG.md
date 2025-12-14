@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned
+- Delete/update operations with tombstone-based deletion
+- P99 latency tracking in CI
+- ARM/NEON optimization verification
+- WASM bindings for batch insert
+
+---
+
+## [0.2.1] - 2025-12-14 — Safety Hardening Release
+
+**Focus:** Community feedback response — UB elimination and competitive positioning.
+
+### Security
+
+- **Fixed potential undefined behavior in persistence layer** — Replaced unsafe pointer casts with alignment-verified `bytemuck` operations. All `#[allow(clippy::cast_ptr_alignment)]` suppressions removed. Runtime alignment checks now active via `try_cast_slice`. Thanks to Reddit community feedback for identifying this issue. (W13.2)
+
 ### Added
+
+- **Competitive Benchmark Suite** — New benchmark infrastructure for comparing EdgeVec against WASM vector libraries (hnswlib-wasm, voy, usearch-wasm, vectra). See `docs/benchmarks/competitive_analysis.md`. (W13.3)
+
+- **Alignment Safety Tests** — 13 new tests validating Pod/Zeroable compliance and alignment safety. (W13.2)
+
 - **Batch Insert API** (`BatchInsertable` trait)
   - Single API call for bulk vector insertion
   - Progress callback support at ~10% intervals (<1% overhead)
@@ -15,12 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `BatchError` type with 5 error variants
   - Example: `examples/batch_insert.rs`
   - Benchmarks: `benches/batch_vs_sequential.rs`
-
-### Planned
-- Delete/update operations with tombstone-based deletion
-- P99 latency tracking in CI
-- ARM/NEON optimization verification
-- WASM bindings for batch insert
 
 ---
 

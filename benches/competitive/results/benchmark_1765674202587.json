@@ -1,0 +1,38 @@
+[
+  {
+    "library": "edgevec",
+    "timestamp": "2025-12-14T01:03:22.582Z",
+    "config": {
+      "dimensions": 128,
+      "vectorCount": 1000,
+      "queryCount": 100,
+      "k": 10,
+      "warmupRuns": 3,
+      "measurementRuns": 5,
+      "hnsw": {
+        "m": 16,
+        "efConstruction": 200,
+        "efSearch": 50
+      }
+    },
+    "insert": {
+      "mean_ms": "0.0000",
+      "p50_ms": "0.0000",
+      "p99_ms": "0.0001",
+      "total_count": 5
+    },
+    "search": {
+      "mean_ms": "0.0044",
+      "p50_ms": "0.0036",
+      "p99_ms": "0.0070",
+      "total_count": 5
+    },
+    "memory": {
+      "used_mb": "0.16"
+    },
+    "recall": {
+      "at_k": 10,
+      "percentage": "0.00"
+    }
+  }
+]

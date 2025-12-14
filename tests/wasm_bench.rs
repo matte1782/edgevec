@@ -28,8 +28,8 @@ fn test_insert_batch_100() {
     let start = Date::now();
 
     let ids: Uint32Array = edgevec
-        .insert_batch(vectors, count as usize)
-        .expect("insert_batch failed");
+        .insert_batch_flat(vectors, count as usize)
+        .expect("insert_batch_flat failed");
 
     let end = Date::now();
     let duration = end - start;

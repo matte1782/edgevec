@@ -6,6 +6,7 @@ use crate::persistence::storage::load_snapshot;
 use crate::persistence::{PersistenceError, StorageBackend};
 use crate::storage::VectorStorage;
 use bitvec::prelude::*;
+use bytemuck::try_cast_slice;
 use std::mem::size_of;
 
 /// Standard chunk size for snapshot streaming (1MB).
@@ -216,27 +217,28 @@ pub fn read_snapshot(
     let neighbors_len = neighbors_end.saturating_sub(nodes_len_bytes);
     let neighbors_bytes = &neighbors_rest[..std::cmp::min(neighbors_len, neighbors_rest.len())];
 
-    // Parse Nodes
+    // Parse Nodes using bytemuck for alignment-safe casting.
     //
-    // SAFETY WARNING: UNSOUND — This block is known to have undefined behavior.
-    // The pointer cast from `*const u8` to `*const HnswNode` does NOT verify
-    // alignment. `HnswNode` requires 8-byte alignment (due to VectorId(u64)),
-    // but `nodes_bytes` is an arbitrary byte slice with alignment 1.
+    // This replaces the previous unsafe pointer cast that had undefined behavior
+    // when alignment was not guaranteed. bytemuck::try_cast_slice verifies
+    // alignment at runtime and returns an error if misaligned.
     //
-    // This WILL cause UB on ARM and WASM strict mode if the slice happens
-    // to be misaligned. On x86_64 it may appear to work due to lenient
-    // alignment handling, but it is still technically undefined behavior.
-    //
-    // RESOLUTION: This will be replaced with `bytemuck::try_cast_slice()` in
-    // task W13.2, which verifies alignment at runtime. See RFC-001 and
-    // `docs/audits/unsafe_audit_persistence.md` for details.
-    //
-    // Tracked: https://github.com/[repo]/issues/XX (replace with actual issue)
-    #[allow(clippy::cast_ptr_alignment, clippy::ptr_as_ptr)]
-    let nodes: &[HnswNode] = unsafe {
-        let ptr = nodes_bytes.as_ptr() as *const HnswNode;
-        std::slice::from_raw_parts(ptr, vec_count)
-    };
+    // See: docs/audits/unsafe_audit_persistence.md for the original issue.
+    // Fixed in: W13.2 (bytemuck integration)
+    let nodes: &[HnswNode] = try_cast_slice(nodes_bytes).map_err(|e| {
+        PersistenceError::Corrupted(format!(
+            "HnswNode alignment error: {e:?}. Data may be corrupted or from incompatible platform."
+        ))
+    })?;
+
+    // Verify we got the expected number of nodes
+    if nodes.len() != vec_count {
+        return Err(PersistenceError::Corrupted(format!(
+            "Node count mismatch: expected {}, got {}",
+            vec_count,
+            nodes.len()
+        )));
+    }
 
     // Construct Index
     let mut index =
