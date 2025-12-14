@@ -112,10 +112,7 @@ impl BatchInsertResult {
 /// - Returns `Err(BatchError::EmptyBatch)` if the input array is empty.
 /// - Returns `Err(BatchError::InvalidVector)` if any vector contains NaN or Infinity.
 #[allow(clippy::cast_possible_truncation)]
-fn convert_js_vectors(
-    vectors: &Array,
-    start_id: u64,
-) -> Result<Vec<(u64, Vec<f32>)>, BatchError> {
+fn convert_js_vectors(vectors: &Array, start_id: u64) -> Result<Vec<(u64, Vec<f32>)>, BatchError> {
     let len = vectors.length() as usize;
 
     if len == 0 {
@@ -266,7 +263,10 @@ mod tests {
         let ids1 = result.ids();
         let ids2 = result.ids();
 
-        assert_eq!(ids1, ids2, "Multiple calls to ids() should return same values");
+        assert_eq!(
+            ids1, ids2,
+            "Multiple calls to ids() should return same values"
+        );
         assert_eq!(ids1, ids, "ids() should return cloned data");
     }
 
@@ -369,7 +369,10 @@ mod tests {
             reason: "contains NaN".to_string(),
         };
         let msg = format!("{}", error);
-        assert!(msg.contains("7"), "InvalidVector error should contain vector_id");
+        assert!(
+            msg.contains("7"),
+            "InvalidVector error should contain vector_id"
+        );
         assert!(
             msg.contains("NaN"),
             "InvalidVector error should contain reason"
@@ -383,8 +386,8 @@ mod tests {
     #[test]
     fn test_capacity_exceeded_error() {
         let error = BatchError::CapacityExceeded {
-            current: 100000,
-            max: 100000,
+            current: 100_000,
+            max: 100_000,
         };
         let msg = format!("{}", error);
         assert!(

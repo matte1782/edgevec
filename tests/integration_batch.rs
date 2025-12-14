@@ -21,9 +21,7 @@ fn generate_deterministic_vectors(count: usize, dimensions: usize) -> Vec<(u64, 
     (1..=count)
         .map(|i| {
             // Create a vector where component j = sin(i + j) for variety
-            let vector: Vec<f32> = (0..dimensions)
-                .map(|j| ((i + j) as f32).sin())
-                .collect();
+            let vector: Vec<f32> = (0..dimensions).map(|j| ((i + j) as f32).sin()).collect();
             (i as u64, vector)
         })
         .collect()
@@ -77,11 +75,7 @@ fn test_batch_insert_vectors_are_searchable() {
     let vectors = generate_deterministic_vectors(count, 64);
 
     // Store copies of first few vectors for search verification
-    let query_vectors: Vec<Vec<f32>> = vectors
-        .iter()
-        .take(10)
-        .map(|(_, v)| normalize(v))
-        .collect();
+    let query_vectors: Vec<Vec<f32>> = vectors.iter().take(10).map(|(_, v)| normalize(v)).collect();
 
     let result = index.batch_insert(vectors, &mut storage, None::<fn(usize, usize)>);
     assert!(result.is_ok());
@@ -98,10 +92,7 @@ fn test_batch_insert_vectors_are_searchable() {
             found_count += 1;
         }
         // Just verify search doesn't panic and returns results
-        assert!(
-            results.len() <= 1,
-            "Should return at most 1 result for k=1"
-        );
+        assert!(results.len() <= 1, "Should return at most 1 result for k=1");
     }
 
     assert!(
@@ -141,11 +132,7 @@ fn test_batch_insert_recall_quality() {
     }
 
     let recall = hits as f32 / num_queries as f32;
-    assert!(
-        recall >= 0.90,
-        "Recall should be >= 0.90, got {}",
-        recall
-    );
+    assert!(recall >= 0.90, "Recall should be >= 0.90, got {}", recall);
 
     println!("Recall@10: {:.2} ({}/{})", recall, hits, num_queries);
 }
@@ -160,11 +147,15 @@ fn test_batch_insert_with_progress_10k() {
     let mut last_current = 0;
     let mut final_total = 0;
 
-    let result = index.batch_insert(vectors, &mut storage, Some(|current, total| {
-        progress_updates += 1;
-        last_current = current;
-        final_total = total;
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(|current, total| {
+            progress_updates += 1;
+            last_current = current;
+            final_total = total;
+        }),
+    );
 
     assert!(result.is_ok());
     assert_eq!(index.node_count(), 10_000);
@@ -240,11 +231,15 @@ fn test_batch_insert_100k_vectors() {
     let vectors = generate_deterministic_vectors(100_000, 64);
 
     let start = Instant::now();
-    let result = index.batch_insert(vectors, &mut storage, Some(|current, total| {
-        if current % 10_000 == 0 || current == total {
-            println!("Progress: {}/{}", current, total);
-        }
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(|current, total| {
+            if current % 10_000 == 0 || current == total {
+                println!("Progress: {}/{}", current, total);
+            }
+        }),
+    );
     let elapsed = start.elapsed();
 
     assert!(result.is_ok());

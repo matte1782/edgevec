@@ -92,17 +92,14 @@ fn test_batch_insert_sequential_batches() {
     let (mut index, mut storage) = create_test_env(32);
 
     // First batch
-    let vectors1: Vec<(u64, Vec<f32>)> = (1..=50)
-        .map(|i| (i as u64, vec![i as f32; 32]))
-        .collect();
+    let vectors1: Vec<(u64, Vec<f32>)> = (1..=50).map(|i| (i as u64, vec![i as f32; 32])).collect();
     let result1 = index.batch_insert(vectors1, &mut storage, None::<fn(usize, usize)>);
     assert!(result1.is_ok());
     assert_eq!(index.node_count(), 50);
 
     // Second batch with different IDs
-    let vectors2: Vec<(u64, Vec<f32>)> = (51..=100)
-        .map(|i| (i as u64, vec![i as f32; 32]))
-        .collect();
+    let vectors2: Vec<(u64, Vec<f32>)> =
+        (51..=100).map(|i| (i as u64, vec![i as f32; 32])).collect();
     let result2 = index.batch_insert(vectors2, &mut storage, None::<fn(usize, usize)>);
     assert!(result2.is_ok());
     assert_eq!(index.node_count(), 100);
@@ -206,13 +203,13 @@ fn test_batch_insert_mixed_valid_invalid() {
     // Mix of valid and various invalid vectors
     let (mut index, mut storage) = create_test_env(4);
     let vectors = vec![
-        (1u64, vec![1.0, 2.0, 3.0, 4.0]),            // Valid
-        (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]),       // NaN - skip
-        (3u64, vec![3.0, 3.0, 3.0]),                 // Wrong dim - skip
-        (1u64, vec![4.0, 4.0, 4.0, 4.0]),            // Duplicate - skip
-        (0u64, vec![5.0, 5.0, 5.0, 5.0]),            // Reserved ID - skip
-        (4u64, vec![f32::INFINITY, 6.0, 6.0, 6.0]),  // Infinity - skip
-        (5u64, vec![7.0, 7.0, 7.0, 7.0]),            // Valid
+        (1u64, vec![1.0, 2.0, 3.0, 4.0]),           // Valid
+        (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]),      // NaN - skip
+        (3u64, vec![3.0, 3.0, 3.0]),                // Wrong dim - skip
+        (1u64, vec![4.0, 4.0, 4.0, 4.0]),           // Duplicate - skip
+        (0u64, vec![5.0, 5.0, 5.0, 5.0]),           // Reserved ID - skip
+        (4u64, vec![f32::INFINITY, 6.0, 6.0, 6.0]), // Infinity - skip
+        (5u64, vec![7.0, 7.0, 7.0, 7.0]),           // Valid
     ];
 
     let result = index.batch_insert(vectors, &mut storage, None::<fn(usize, usize)>);
@@ -228,9 +225,9 @@ fn test_batch_insert_all_invalid_returns_empty() {
     // All vectors are invalid - should return empty success
     let (mut index, mut storage) = create_test_env(4);
     let vectors = vec![
-        (0u64, vec![1.0, 2.0, 3.0, 4.0]),       // Reserved ID
-        (1u64, vec![f32::NAN, 2.0, 3.0, 4.0]),  // NaN
-        (2u64, vec![1.0, 2.0]),                 // Wrong dim (after first)
+        (0u64, vec![1.0, 2.0, 3.0, 4.0]),      // Reserved ID
+        (1u64, vec![f32::NAN, 2.0, 3.0, 4.0]), // NaN
+        (2u64, vec![1.0, 2.0]),                // Wrong dim (after first)
     ];
 
     // Note: First vector has wrong dimension check skipped since ID=0 is skipped first
@@ -269,12 +266,7 @@ fn test_batch_insert_returns_assigned_ids() {
     assert_eq!(ids.len(), 3);
     // IDs are assigned by the insert method, may be sequential
     for (i, id) in ids.iter().enumerate() {
-        assert!(
-            *id > 0,
-            "ID {} at position {} should be positive",
-            id,
-            i
-        );
+        assert!(*id > 0, "ID {} at position {} should be positive", id, i);
     }
 }
 
@@ -283,9 +275,9 @@ fn test_batch_insert_partial_success_returns_partial_ids() {
     // When some vectors fail, only successful IDs returned
     let (mut index, mut storage) = create_test_env(4);
     let vectors = vec![
-        (1u64, vec![1.0, 2.0, 3.0, 4.0]),       // Valid
-        (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]),  // Invalid
-        (3u64, vec![3.0, 3.0, 3.0, 3.0]),       // Valid
+        (1u64, vec![1.0, 2.0, 3.0, 4.0]),      // Valid
+        (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]), // Invalid
+        (3u64, vec![3.0, 3.0, 3.0, 3.0]),      // Valid
     ];
 
     let result = index.batch_insert(vectors, &mut storage, None::<fn(usize, usize)>);

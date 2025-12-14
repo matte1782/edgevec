@@ -34,11 +34,15 @@ fn main() -> Result<(), BatchError> {
     // 3. Batch insert with progress tracking
     println!("\nInserting vectors with progress tracking...");
 
-    let ids = index.batch_insert(vectors, &mut storage, Some(|inserted, total| {
-        // Progress callback is called at ~10% intervals
-        let percent = (inserted as f32 / total as f32) * 100.0;
-        println!("  Progress: {}/{} ({:.0}%)", inserted, total, percent);
-    }))?;
+    let ids = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(|inserted, total| {
+            // Progress callback is called at ~10% intervals
+            let percent = (inserted as f32 / total as f32) * 100.0;
+            println!("  Progress: {}/{} ({:.0}%)", inserted, total, percent);
+        }),
+    )?;
 
     println!("\nSuccessfully inserted {} vectors", ids.len());
     println!("Index now contains {} nodes", index.node_count());
@@ -71,7 +75,12 @@ fn main() -> Result<(), BatchError> {
 
     println!("Top 5 nearest neighbors:");
     for (i, result) in results.iter().enumerate() {
-        println!("  {}. ID: {}, Distance: {:.4}", i + 1, result.vector_id.0, result.distance);
+        println!(
+            "  {}. ID: {}, Distance: {:.4}",
+            i + 1,
+            result.vector_id.0,
+            result.distance
+        );
     }
 
     // 6. Demonstrate error handling with best-effort semantics

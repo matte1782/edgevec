@@ -73,10 +73,7 @@ fn test_error_duplicate_id_skipped_not_error() {
     // BatchError::DuplicateId exists but duplicates are skipped, not errors
     // Verify the error type exists and can be constructed
     let error = BatchError::DuplicateId { vector_id: 123 };
-    assert_eq!(
-        format!("{}", error),
-        "Duplicate vector ID: 123"
-    );
+    assert_eq!(format!("{}", error), "Duplicate vector ID: 123");
 }
 
 #[test]
@@ -86,10 +83,7 @@ fn test_error_invalid_vector_skipped_not_error() {
         vector_id: 456,
         reason: "contains NaN".to_string(),
     };
-    assert_eq!(
-        format!("{}", error),
-        "Invalid vector 456: contains NaN"
-    );
+    assert_eq!(format!("{}", error), "Invalid vector 456: contains NaN");
 }
 
 #[test]
@@ -153,7 +147,9 @@ fn test_error_messages_human_readable() {
             BatchError::EmptyBatch => {
                 assert!(msg.contains("empty") || msg.contains("Empty"));
             }
-            BatchError::DimensionMismatch { expected, actual, .. } => {
+            BatchError::DimensionMismatch {
+                expected, actual, ..
+            } => {
                 assert!(msg.contains(&expected.to_string()));
                 assert!(msg.contains(&actual.to_string()));
             }

@@ -1015,15 +1015,18 @@ mod tests {
         #[test]
         fn test_batch_insert_progress_callback_called() {
             let (mut index, mut storage) = create_test_index_and_storage(4);
-            let vectors: Vec<(u64, Vec<f32>)> = (1..=10)
-                .map(|i| (i as u64, vec![i as f32; 4]))
-                .collect();
+            let vectors: Vec<(u64, Vec<f32>)> =
+                (1..=10).map(|i| (i as u64, vec![i as f32; 4])).collect();
 
             let mut progress_calls: Vec<(usize, usize)> = vec![];
 
-            let result = index.batch_insert(vectors, &mut storage, Some(|current, total| {
-                progress_calls.push((current, total));
-            }));
+            let result = index.batch_insert(
+                vectors,
+                &mut storage,
+                Some(|current, total| {
+                    progress_calls.push((current, total));
+                }),
+            );
 
             assert!(result.is_ok());
             // [M2 fix] Verify all 10 nodes inserted
@@ -1047,9 +1050,13 @@ mod tests {
 
             let mut progress_calls: Vec<(usize, usize)> = vec![];
 
-            let result = index.batch_insert(vectors, &mut storage, Some(|current, total| {
-                progress_calls.push((current, total));
-            }));
+            let result = index.batch_insert(
+                vectors,
+                &mut storage,
+                Some(|current, total| {
+                    progress_calls.push((current, total));
+                }),
+            );
 
             assert!(result.is_ok());
             // [M2 fix] Verify 1 node inserted
@@ -1066,12 +1073,12 @@ mod tests {
             let (mut index, mut storage) = create_test_index_and_storage(4);
             // Mix of valid and invalid vectors
             let vectors = vec![
-                (1u64, vec![1.0, 2.0, 3.0, 4.0]),       // Valid
-                (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]),  // NaN - skip
-                (3u64, vec![3.0, 3.0, 3.0]),            // Wrong dim - skip
-                (1u64, vec![4.0, 4.0, 4.0, 4.0]),       // Duplicate - skip
-                (0u64, vec![5.0, 5.0, 5.0, 5.0]),       // Reserved ID - skip
-                (4u64, vec![6.0, 6.0, 6.0, 6.0]),       // Valid
+                (1u64, vec![1.0, 2.0, 3.0, 4.0]),      // Valid
+                (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]), // NaN - skip
+                (3u64, vec![3.0, 3.0, 3.0]),           // Wrong dim - skip
+                (1u64, vec![4.0, 4.0, 4.0, 4.0]),      // Duplicate - skip
+                (0u64, vec![5.0, 5.0, 5.0, 5.0]),      // Reserved ID - skip
+                (4u64, vec![6.0, 6.0, 6.0, 6.0]),      // Valid
             ];
 
             let result = index.batch_insert(vectors, &mut storage, None::<fn(usize, usize)>);

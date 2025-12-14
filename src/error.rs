@@ -99,7 +99,7 @@ pub enum BatchError {
     #[error("Duplicate vector ID: {vector_id}")]
     DuplicateId {
         /// Duplicate vector ID
-        vector_id: u64
+        vector_id: u64,
     },
 
     /// Vector contains invalid floating-point values (NaN, Infinity).
@@ -108,7 +108,7 @@ pub enum BatchError {
         /// ID of the invalid vector
         vector_id: u64,
         /// Description of the invalid value
-        reason: String
+        reason: String,
     },
 
     /// Index has reached maximum capacity.
@@ -117,14 +117,14 @@ pub enum BatchError {
         /// Current number of vectors
         current: usize,
         /// Maximum allowed vectors
-        max: usize
+        max: usize,
     },
 
     /// Internal HNSW invariant violated during insertion.
     #[error("Internal error: {message}")]
     InternalError {
         /// Description of the violated invariant
-        message: String
+        message: String,
     },
 }
 

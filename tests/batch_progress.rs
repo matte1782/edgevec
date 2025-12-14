@@ -40,9 +40,13 @@ fn test_progress_callback_invoked_at_zero_percent() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();
@@ -59,9 +63,13 @@ fn test_progress_callback_invoked_at_100_percent() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();
@@ -79,9 +87,13 @@ fn test_progress_callback_invoked_at_intermediate_percentages() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();
@@ -100,7 +112,9 @@ fn test_progress_callback_invoked_at_intermediate_percentages() {
     assert_eq!(recorded.last().unwrap().0, 100, "Last should be at 100%");
 
     // Check intermediate calls exist
-    let has_intermediate = recorded.iter().any(|(current, _)| *current > 0 && *current < 100);
+    let has_intermediate = recorded
+        .iter()
+        .any(|(current, _)| *current > 0 && *current < 100);
     assert!(has_intermediate, "Should have intermediate progress calls");
 }
 
@@ -129,10 +143,14 @@ fn test_progress_callback_state_captured() {
     let mut sum = 0usize;
     let mut call_count = 0usize;
 
-    let result = index.batch_insert(vectors, &mut storage, Some(|current, _total| {
-        sum += current;
-        call_count += 1;
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(|current, _total| {
+            sum += current;
+            call_count += 1;
+        }),
+    );
 
     assert!(result.is_ok());
     assert!(call_count > 0, "Callback should have been called");
@@ -154,15 +172,22 @@ fn test_progress_callback_single_vector() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();
 
     // Should have at least 2 calls: 0% and 100%
-    assert!(recorded.len() >= 2, "Single vector should have at least 2 calls");
+    assert!(
+        recorded.len() >= 2,
+        "Single vector should have at least 2 calls"
+    );
     assert!(recorded.contains(&(0, 1)), "Should have (0, 1) call");
     assert!(recorded.contains(&(1, 1)), "Should have (1, 1) call");
 }
@@ -176,13 +201,20 @@ fn test_progress_callback_empty_batch() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();
-    assert!(recorded.is_empty(), "Empty batch should not trigger callbacks");
+    assert!(
+        recorded.is_empty(),
+        "Empty batch should not trigger callbacks"
+    );
 }
 
 #[test]
@@ -190,17 +222,21 @@ fn test_progress_callback_with_skipped_vectors() {
     // Progress should reflect attempted vectors, not just successful ones
     let (mut index, mut storage) = create_test_env(4);
     let vectors = vec![
-        (1u64, vec![1.0, 2.0, 3.0, 4.0]),       // Valid
-        (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]),  // Invalid - skipped
-        (3u64, vec![3.0, 3.0, 3.0, 3.0]),       // Valid
+        (1u64, vec![1.0, 2.0, 3.0, 4.0]),      // Valid
+        (2u64, vec![f32::NAN, 2.0, 3.0, 4.0]), // Invalid - skipped
+        (3u64, vec![3.0, 3.0, 3.0, 3.0]),      // Valid
     ];
 
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let ids = result.unwrap();
@@ -223,9 +259,13 @@ fn test_progress_callback_large_batch() {
 
     let mut call_count = 0usize;
 
-    let result = index.batch_insert(vectors, &mut storage, Some(|_current, _total| {
-        call_count += 1;
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(|_current, _total| {
+            call_count += 1;
+        }),
+    );
 
     assert!(result.is_ok());
     assert_eq!(index.node_count(), 1000);
@@ -256,9 +296,13 @@ fn test_progress_current_never_exceeds_total() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();
@@ -282,9 +326,13 @@ fn test_progress_total_is_consistent() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();
@@ -306,9 +354,13 @@ fn test_progress_current_is_monotonic_for_successful() {
     let calls: Rc<RefCell<Vec<(usize, usize)>>> = Rc::new(RefCell::new(Vec::new()));
     let calls_clone = calls.clone();
 
-    let result = index.batch_insert(vectors, &mut storage, Some(move |current, total| {
-        calls_clone.borrow_mut().push((current, total));
-    }));
+    let result = index.batch_insert(
+        vectors,
+        &mut storage,
+        Some(move |current, total| {
+            calls_clone.borrow_mut().push((current, total));
+        }),
+    );
 
     assert!(result.is_ok());
     let recorded = calls.borrow();

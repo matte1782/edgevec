@@ -169,11 +169,8 @@ fn bench_comparison(c: &mut Criterion) {
                 let mut storage = VectorStorage::new(&config, None);
                 let mut index = HnswIndex::new(config, &storage).unwrap();
 
-                let result = index.batch_insert(
-                    batch_vectors,
-                    &mut storage,
-                    None::<fn(usize, usize)>,
-                );
+                let result =
+                    index.batch_insert(batch_vectors, &mut storage, None::<fn(usize, usize)>);
                 black_box(result)
             },
             BatchSize::SmallInput,
@@ -202,9 +199,13 @@ fn bench_memory_overhead(c: &mut Criterion) {
                 let mut storage = VectorStorage::new(&config, None);
                 let mut index = HnswIndex::new(config, &storage).unwrap();
 
-                let result = index.batch_insert(batch_vectors, &mut storage, Some(|_c, _t| {
-                    // Empty callback to measure overhead
-                }));
+                let result = index.batch_insert(
+                    batch_vectors,
+                    &mut storage,
+                    Some(|_c, _t| {
+                        // Empty callback to measure overhead
+                    }),
+                );
                 black_box(result)
             },
             BatchSize::SmallInput,
@@ -220,11 +221,8 @@ fn bench_memory_overhead(c: &mut Criterion) {
                 let mut storage = VectorStorage::new(&config, None);
                 let mut index = HnswIndex::new(config, &storage).unwrap();
 
-                let result = index.batch_insert(
-                    batch_vectors,
-                    &mut storage,
-                    None::<fn(usize, usize)>,
-                );
+                let result =
+                    index.batch_insert(batch_vectors, &mut storage, None::<fn(usize, usize)>);
                 black_box(result)
             },
             BatchSize::SmallInput,
