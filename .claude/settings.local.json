@@ -10,7 +10,15 @@
       "Bash(cargo doc:*)",
       "Bash(npm pack:*)",
       "Bash(echo:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(cargo +nightly check:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo +nightly clippy:*)",
+      "Bash(python:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(rustup run nightly cargo miri test:*)",
+      "Bash(rustup component add:*)"
     ]
   }
 }

@@ -2,6 +2,17 @@
 //!
 //! This module provides platform-specific SIMD implementations.
 //! They are gated by `cfg` flags and feature detection.
+//!
+//! # Safety
+//!
+//! This module uses intentional pointer casts for SIMD operations.
+//! The `_mm_loadu_*` intrinsics handle unaligned loads safely.
+
+// SIMD code requires intentional pointer casts and alignment handling.
+// These lints are disabled at module level as they are false positives for SIMD code.
+#![allow(clippy::cast_ptr_alignment)]
+#![allow(clippy::ptr_as_ptr)]
+#![allow(clippy::missing_panics_doc)]
 
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 /// WASM SIMD implementations.
@@ -574,8 +585,11 @@ pub mod x86 {
         let mut sum = hsum256_epi32_avx(sum256);
 
         while i < n {
-            let diff = (*a.get_unchecked(i) as i32) - (*b.get_unchecked(i) as i32);
-            sum += (diff * diff) as u32;
+            let diff = i32::from(*a.get_unchecked(i)) - i32::from(*b.get_unchecked(i));
+            // SAFETY: diff*diff is always non-negative
+            #[allow(clippy::cast_sign_loss)]
+            let sq = (diff * diff) as u32;
+            sum += sq;
             i += 1;
         }
         sum
@@ -697,7 +711,7 @@ pub mod x86 {
         let mut sum = hsum256_epi32_avx(sum256);
 
         while i < n {
-            sum += (*a.get_unchecked(i) as u32) * (*b.get_unchecked(i) as u32);
+            sum += u32::from(*a.get_unchecked(i)) * u32::from(*b.get_unchecked(i));
             i += 1;
         }
         sum
@@ -789,7 +803,11 @@ pub mod x86 {
         let v64 = _mm_add_epi32(v128, _mm_shuffle_epi32(v128, 0x4E)); // Swap high/low 64
         let v32 = _mm_add_epi32(v64, _mm_shuffle_epi32(v64, 0xB1)); // Swap adjacent 32
 
-        _mm_cvtsi128_si32(v32) as u32
+        // SAFETY: Sum of u32 values, result is always positive.
+        // _mm_cvtsi128_si32 returns i32 but our data is logically u32.
+        #[allow(clippy::cast_sign_loss)]
+        let result = _mm_cvtsi128_si32(v32) as u32;
+        result
     }
 
     #[cfg(test)]

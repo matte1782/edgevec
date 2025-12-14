@@ -16,62 +16,67 @@ serde = { version = "1.0", features = ["derive"] }
 [dependencies.edgevec]
 path = ".."
 
+# ============================================================================
+# FUZZ TARGETS — Reorganized into corpus-based hierarchy (W10.1)
+# Each target is in its own subdirectory: fuzz_targets/<name>/target.rs
+# ============================================================================
+
 [[bin]]
-name = "persistence_load"
-path = "fuzz_targets/persistence_load.rs"
+name = "dummy_harness"
+path = "fuzz_targets/dummy_harness/target.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "quantization"
+path = "fuzz_targets/quantization/target.rs"
 test = false
 doc = false
 
 [[bin]]
 name = "graph_ops"
-path = "fuzz_targets/graph_ops.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "fuzz_quantization"
-path = "fuzz_targets/fuzz_quantization.rs"
+path = "fuzz_targets/graph_ops/target.rs"
 test = false
 doc = false
 
 [[bin]]
 name = "header_parse"
-path = "fuzz_targets/header_parse.rs"
+path = "fuzz_targets/header_parse/target.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "search_robustness"
-path = "fuzz_targets/search_robustness.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "wal_replay"
-path = "fuzz_targets/wal_replay.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "hnsw_config_init"
-path = "fuzz_targets/hnsw_config_init.rs"
-test = false
-doc = false
-
-[[bin]]
-name = "hnsw_search"
-path = "fuzz_targets/hnsw_search.rs"
+name = "hnsw_config"
+path = "fuzz_targets/hnsw_config/target.rs"
 test = false
 doc = false
 
 [[bin]]
 name = "hnsw_insert"
-path = "fuzz_targets/hnsw_insert.rs"
+path = "fuzz_targets/hnsw_insert/target.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "dummy_harness"
-path = "fuzz_targets/dummy_harness.rs"
+name = "hnsw_search"
+path = "fuzz_targets/hnsw_search/target.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "persistence"
+path = "fuzz_targets/persistence/target.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "search_robustness"
+path = "fuzz_targets/search_robustness/target.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "wal_replay"
+path = "fuzz_targets/wal_replay/target.rs"
 test = false
 doc = false

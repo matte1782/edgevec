@@ -1,0 +1,27 @@
+
+Whatever this is, it looks good on the surface.... but looks like it has a lot of AI generated code. I have nothing against it, but they tend to be either fundamentally flawed or filled with very subtle bugs and issues. Taking a deeper look anyway, because why not O.O
+
+
+
+Upvoto
+1
+
+Downvoto
+
+Rispondi
+
+Premio
+
+Condividi
+
+Consistent_Milk4660
+•
+2 h fa
+Okay so I took a look, and started with unsafe blocks. I think this could be a potential UB situation here that you could easily fix by adding some guardrails. I would probably just consider a crate like bytemuck to check alignment.
+
+    // Parse Nodes
+    // SAFETY: HnswNode is repr(C)
+    let nodes: &[HnswNode] = unsafe {
+        let ptr = nodes_bytes.as_ptr() as *const HnswNode;
+        std::slice::from_raw_parts(ptr, vec_count)
+    };

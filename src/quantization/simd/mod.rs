@@ -61,6 +61,7 @@ pub mod portable;
 /// assert_eq!(distance, 768);
 /// ```
 #[inline]
+#[must_use]
 pub fn hamming_distance(a: &[u8; 96], b: &[u8; 96]) -> u32 {
     #[cfg(target_arch = "x86_64")]
     {
@@ -94,6 +95,7 @@ pub fn hamming_distance(a: &[u8; 96], b: &[u8; 96]) -> u32 {
 /// - Testing: Verify SIMD correctness against portable baseline
 /// - Platforms: Use when SIMD is unavailable or disabled
 #[inline]
+#[must_use]
 pub fn hamming_distance_portable(a: &[u8; 96], b: &[u8; 96]) -> u32 {
     portable::hamming_distance_portable(a, b)
 }

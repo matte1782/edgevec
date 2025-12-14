@@ -1,0 +1,1 @@
+Bringing HNSW graphs to the browser is an interesting approach. The 3.6x memory reduction through quantization is significant. Curious how this compares to other in-browser vector libraries in terms of search latency vs memory trade-offs.

@@ -1,4 +1,4 @@
-import { IndexedDbBackend } from './snippets/edgevec-5ef0ebc91f255dc3/src/js/storage.js';
+import { IndexedDbBackend } from './snippets/edgevec-3900ce8b80cc807b/src/js/storage.js';
 
 let wasm;
 
@@ -37,9 +37,22 @@ function getArrayU32FromWasm0(ptr, len) {
     return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
 }
 
+function getArrayU64FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getBigUint64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
+}
+
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+}
+
+let cachedBigUint64ArrayMemory0 = null;
+function getBigUint64ArrayMemory0() {
+    if (cachedBigUint64ArrayMemory0 === null || cachedBigUint64ArrayMemory0.byteLength === 0) {
+        cachedBigUint64ArrayMemory0 = new BigUint64Array(wasm.memory.buffer);
+    }
+    return cachedBigUint64ArrayMemory0;
 }
 
 let cachedDataViewMemory0 = null;
@@ -198,13 +211,21 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_235(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_235(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_270(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_270(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_435(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_435(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_470(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_470(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
+
+const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_batchinsertconfig_free(ptr >>> 0, 1));
+
+const BatchInsertResultFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_batchinsertresult_free(ptr >>> 0, 1));
 
 const EdgeVecFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -217,6 +238,112 @@ const EdgeVecConfigFinalization = (typeof FinalizationRegistry === 'undefined')
 const PersistenceIteratorFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_persistenceiterator_free(ptr >>> 0, 1));
+
+/**
+ * Configuration options for batch insert operations (WASM).
+ *
+ * This struct mirrors the TypeScript `BatchInsertConfig` interface
+ * defined in `wasm/batch_types.ts`.
+ */
+export class BatchInsertConfig {
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        BatchInsertConfigFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_batchinsertconfig_free(ptr, 0);
+    }
+    /**
+     * Returns whether dimension validation is enabled.
+     * @returns {boolean}
+     */
+    get validateDimensions() {
+        const ret = wasm.batchinsertconfig_validateDimensions(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Sets whether to validate vector dimensions before insertion.
+     * @param {boolean} value
+     */
+    set validateDimensions(value) {
+        wasm.batchinsertconfig_set_validateDimensions(this.__wbg_ptr, value);
+    }
+    /**
+     * Creates a new `BatchInsertConfig` with default settings.
+     *
+     * Default: `validate_dimensions = true`
+     */
+    constructor() {
+        const ret = wasm.batchinsertconfig_new();
+        this.__wbg_ptr = ret >>> 0;
+        BatchInsertConfigFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+}
+if (Symbol.dispose) BatchInsertConfig.prototype[Symbol.dispose] = BatchInsertConfig.prototype.free;
+
+/**
+ * Result of a batch insert operation (WASM).
+ *
+ * This struct mirrors the TypeScript `BatchInsertResult` interface
+ * defined in `wasm/batch_types.ts`.
+ */
+export class BatchInsertResult {
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(BatchInsertResult.prototype);
+        obj.__wbg_ptr = ptr;
+        BatchInsertResultFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        BatchInsertResultFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_batchinsertresult_free(ptr, 0);
+    }
+    /**
+     * Returns a copy of the IDs of successfully inserted vectors.
+     * @returns {BigUint64Array}
+     */
+    get ids() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.batchinsertresult_ids(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var v1 = getArrayU64FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export2(r0, r1 * 8, 8);
+            return v1;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Returns the total number of vectors attempted (input array length).
+     * @returns {number}
+     */
+    get total() {
+        const ret = wasm.batchinsertresult_total(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Returns the number of vectors successfully inserted.
+     * @returns {number}
+     */
+    get inserted() {
+        const ret = wasm.batchinsertresult_inserted(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+}
+if (Symbol.dispose) BatchInsertResult.prototype[Symbol.dispose] = BatchInsertResult.prototype.free;
 
 /**
  * The main EdgeVec database handle.
@@ -318,7 +445,63 @@ export class EdgeVec {
         return PersistenceIterator.__wrap(ret);
     }
     /**
-     * Inserts a batch of vectors into the index.
+     * Inserts multiple vectors using the new batch API (W12.3).
+     *
+     * This method follows the API design from `WASM_BATCH_API.md`:
+     * - Input: Array of Float32Array (each array is one vector)
+     * - Output: BatchInsertResult with inserted count, total, and IDs
+     * - Error codes: EMPTY_BATCH, DIMENSION_MISMATCH, DUPLICATE_ID, etc.
+     *
+     * # Arguments
+     *
+     * * `vectors` - JS Array of Float32Array vectors to insert (1 to 100,000)
+     * * `config` - Optional BatchInsertConfig (default: validateDimensions = true)
+     *
+     * # Returns
+     *
+     * `BatchInsertResult` containing:
+     * - `inserted`: Number of vectors successfully inserted
+     * - `total`: Total vectors attempted (input array length)
+     * - `ids`: Array of IDs for inserted vectors
+     *
+     * # Errors
+     *
+     * Returns a JS error object with `code` property:
+     * - `EMPTY_BATCH`: Input array is empty
+     * - `DIMENSION_MISMATCH`: Vector dimensions don't match index
+     * - `DUPLICATE_ID`: Vector ID already exists
+     * - `INVALID_VECTOR`: Vector contains NaN or Infinity
+     * - `CAPACITY_EXCEEDED`: Batch exceeds max capacity
+     * - `INTERNAL_ERROR`: Internal HNSW error
+     * @param {Array<any>} vectors
+     * @param {BatchInsertConfig | null} [config]
+     * @returns {BatchInsertResult}
+     */
+    insertBatch(vectors, config) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            let ptr0 = 0;
+            if (!isLikeNone(config)) {
+                _assertClass(config, BatchInsertConfig);
+                ptr0 = config.__destroy_into_raw();
+            }
+            wasm.edgevec_insertBatch(retptr, this.__wbg_ptr, addHeapObject(vectors), ptr0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return BatchInsertResult.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Inserts a batch of vectors into the index (flat array format).
+     *
+     * **Note:** This is the legacy API. For the new API, use `insertBatch` which
+     * accepts an Array of Float32Array.
      *
      * # Arguments
      *
@@ -336,10 +519,10 @@ export class EdgeVec {
      * @param {number} count
      * @returns {Uint32Array}
      */
-    insert_batch(vectors, count) {
+    insertBatchFlat(vectors, count) {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.edgevec_insert_batch(retptr, this.__wbg_ptr, addHeapObject(vectors), count);
+            wasm.edgevec_insertBatchFlat(retptr, this.__wbg_ptr, addHeapObject(vectors), count);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
@@ -662,6 +845,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_error_7bc7d576a6aaf855 = function(arg0) {
         console.error(getObject(arg0));
     };
+    imports.wbg.__wbg_get_6b7bd52aca3f9671 = function(arg0, arg1) {
+        const ret = getObject(arg0)[arg1 >>> 0];
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_info_ce6bcc489c22f6f0 = function(arg0) {
         console.info(getObject(arg0));
     };
@@ -670,6 +857,10 @@ function __wbg_get_imports() {
         return ret;
     };
     imports.wbg.__wbg_length_86ce4877baf913bb = function(arg0) {
+        const ret = getObject(arg0).length;
+        return ret;
+    };
+    imports.wbg.__wbg_length_d45040a40c570362 = function(arg0) {
         const ret = getObject(arg0).length;
         return ret;
     };
@@ -695,7 +886,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_435(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_470(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -735,7 +926,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_queueMicrotask_fca69f5bfad613a5 = function(arg0) {
         queueMicrotask(getObject(arg0));
     };
-    imports.wbg.__wbg_read_713e0a7ffa629d01 = function() { return handleError(function (arg0, arg1) {
+    imports.wbg.__wbg_read_4016394bb14db0bb = function() { return handleError(function (arg0, arg1) {
         const ret = IndexedDbBackend.read(getStringFromWasm0(arg0, arg1));
         return addHeapObject(ret);
     }, arguments) };
@@ -784,7 +975,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_warn_6e567d0d926ff881 = function(arg0) {
         console.warn(getObject(arg0));
     };
-    imports.wbg.__wbg_write_bfb6bc105abfca01 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
+    imports.wbg.__wbg_write_5dbdffa9542cb272 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
         const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getArrayU8FromWasm0(arg2, arg3));
         return addHeapObject(ret);
     }, arguments) };
@@ -793,9 +984,9 @@ function __wbg_get_imports() {
         const ret = getStringFromWasm0(arg0, arg1);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_cast_257c51b8abf9285e = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 57, function: Function { arguments: [Externref], shim_idx: 58, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_228, __wasm_bindgen_func_elem_235);
+    imports.wbg.__wbindgen_cast_8eb6fd44e7238d11 = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 62, function: Function { arguments: [Externref], shim_idx: 63, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_263, __wasm_bindgen_func_elem_270);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {
@@ -817,6 +1008,7 @@ function __wbg_get_imports() {
 function __wbg_finalize_init(instance, module) {
     wasm = instance.exports;
     __wbg_init.__wbindgen_wasm_module = module;
+    cachedBigUint64ArrayMemory0 = null;
     cachedDataViewMemory0 = null;
     cachedFloat32ArrayMemory0 = null;
     cachedUint32ArrayMemory0 = null;

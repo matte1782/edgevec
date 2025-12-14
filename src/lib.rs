@@ -97,6 +97,9 @@ pub mod persistence;
 /// Unified error handling.
 pub mod error;
 
+/// Batch insertion API.
+pub mod batch;
+
 /// HNSW Graph implementation.
 pub mod hnsw;
 
@@ -112,6 +115,8 @@ pub mod wasm;
 /// Quantization support.
 pub mod quantization;
 
+pub use batch::BatchInsertable;
+pub use error::BatchError;
 pub use hnsw::{HnswConfig, HnswIndex, SearchResult};
 pub use metric::Metric;
 pub use persistence::ChunkedWriter;

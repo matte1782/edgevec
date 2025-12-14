@@ -12,7 +12,10 @@ use std::sync::{
 };
 use wasm_bindgen::prelude::*;
 
+mod batch;
 mod iterator;
+
+pub use batch::{BatchInsertConfig, BatchInsertResult};
 pub use iterator::PersistenceIterator;
 
 /// Interface to the JavaScript IndexedDB backend.
@@ -235,7 +238,10 @@ impl EdgeVec {
         Ok(id.0 as u32)
     }
 
-    /// Inserts a batch of vectors into the index.
+    /// Inserts a batch of vectors into the index (flat array format).
+    ///
+    /// **Note:** This is the legacy API. For the new API, use `insertBatch` which
+    /// accepts an Array of Float32Array.
     ///
     /// # Arguments
     ///
@@ -249,10 +255,10 @@ impl EdgeVec {
     /// # Errors
     ///
     /// Returns error if dimensions mismatch, vector contains NaNs, or ID overflows.
-    #[wasm_bindgen]
+    #[wasm_bindgen(js_name = insertBatchFlat)]
     #[allow(clippy::needless_pass_by_value)]
     #[allow(clippy::cast_possible_truncation)]
-    pub fn insert_batch(
+    pub fn insert_batch_flat(
         &mut self,
         vectors: Float32Array,
         count: usize,
@@ -302,6 +308,43 @@ impl EdgeVec {
         }
 
         Ok(Uint32Array::from(&ids[..]))
+    }
+
+    /// Inserts multiple vectors using the new batch API (W12.3).
+    ///
+    /// This method follows the API design from `WASM_BATCH_API.md`:
+    /// - Input: Array of Float32Array (each array is one vector)
+    /// - Output: BatchInsertResult with inserted count, total, and IDs
+    /// - Error codes: EMPTY_BATCH, DIMENSION_MISMATCH, DUPLICATE_ID, etc.
+    ///
+    /// # Arguments
+    ///
+    /// * `vectors` - JS Array of Float32Array vectors to insert (1 to 100,000)
+    /// * `config` - Optional BatchInsertConfig (default: validateDimensions = true)
+    ///
+    /// # Returns
+    ///
+    /// `BatchInsertResult` containing:
+    /// - `inserted`: Number of vectors successfully inserted
+    /// - `total`: Total vectors attempted (input array length)
+    /// - `ids`: Array of IDs for inserted vectors
+    ///
+    /// # Errors
+    ///
+    /// Returns a JS error object with `code` property:
+    /// - `EMPTY_BATCH`: Input array is empty
+    /// - `DIMENSION_MISMATCH`: Vector dimensions don't match index
+    /// - `DUPLICATE_ID`: Vector ID already exists
+    /// - `INVALID_VECTOR`: Vector contains NaN or Infinity
+    /// - `CAPACITY_EXCEEDED`: Batch exceeds max capacity
+    /// - `INTERNAL_ERROR`: Internal HNSW error
+    #[wasm_bindgen(js_name = insertBatch)]
+    pub fn insert_batch_v2(
+        &mut self,
+        vectors: Array,
+        config: Option<batch::BatchInsertConfig>,
+    ) -> Result<batch::BatchInsertResult, JsValue> {
+        batch::insert_batch_impl(self, vectors, config)
     }
 
     /// Searches for nearest neighbors.

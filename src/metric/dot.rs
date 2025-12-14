@@ -25,33 +25,25 @@ impl Metric<f32> for DotProduct {
                  if a.len() < 256 {
                      let mut sum = 0.0;
                      for (x, y) in a.iter().zip(b.iter()) {
-                         if x.is_nan() || y.is_nan() {
-                             panic!("NaN detected in input");
-                         }
+                         assert!(!(x.is_nan() || y.is_nan()), "NaN detected in input");
                          sum += x * y;
                      }
                      return sum;
                 }
                 let result = super::simd::wasm::dot_product(a, b);
-                if result.is_nan() {
-                    panic!("NaN detected in input");
-                }
+                assert!(!result.is_nan(), "NaN detected in input");
                 result
             } else if #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))] {
                  if a.len() < 256 {
                      let mut sum = 0.0;
                      for (x, y) in a.iter().zip(b.iter()) {
-                         if x.is_nan() || y.is_nan() {
-                             panic!("NaN detected in input");
-                         }
+                         assert!(!(x.is_nan() || y.is_nan()), "NaN detected in input");
                          sum += x * y;
                      }
                      return sum;
                 }
                 let result = super::simd::x86::dot_product(a, b);
-                if result.is_nan() {
-                    panic!("NaN detected in input");
-                }
+                assert!(!result.is_nan(), "NaN detected in input");
                 result
             } else {
                 let mut sum = 0.0;

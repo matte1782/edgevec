@@ -1,6 +1,39 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export class BatchInsertConfig {
+  free(): void;
+  [Symbol.dispose](): void;
+  /**
+   * Creates a new `BatchInsertConfig` with default settings.
+   *
+   * Default: `validate_dimensions = true`
+   */
+  constructor();
+  /**
+   * Returns whether dimension validation is enabled.
+   */
+  validateDimensions: boolean;
+}
+
+export class BatchInsertResult {
+  private constructor();
+  free(): void;
+  [Symbol.dispose](): void;
+  /**
+   * Returns a copy of the IDs of successfully inserted vectors.
+   */
+  readonly ids: BigUint64Array;
+  /**
+   * Returns the total number of vectors attempted (input array length).
+   */
+  readonly total: number;
+  /**
+   * Returns the number of vectors successfully inserted.
+   */
+  readonly inserted: number;
+}
+
 export class EdgeVec {
   free(): void;
   [Symbol.dispose](): void;
@@ -54,7 +87,41 @@ export class EdgeVec {
    */
   save_stream(chunk_size?: number | null): PersistenceIterator;
   /**
-   * Inserts a batch of vectors into the index.
+   * Inserts multiple vectors using the new batch API (W12.3).
+   *
+   * This method follows the API design from `WASM_BATCH_API.md`:
+   * - Input: Array of Float32Array (each array is one vector)
+   * - Output: BatchInsertResult with inserted count, total, and IDs
+   * - Error codes: EMPTY_BATCH, DIMENSION_MISMATCH, DUPLICATE_ID, etc.
+   *
+   * # Arguments
+   *
+   * * `vectors` - JS Array of Float32Array vectors to insert (1 to 100,000)
+   * * `config` - Optional BatchInsertConfig (default: validateDimensions = true)
+   *
+   * # Returns
+   *
+   * `BatchInsertResult` containing:
+   * - `inserted`: Number of vectors successfully inserted
+   * - `total`: Total vectors attempted (input array length)
+   * - `ids`: Array of IDs for inserted vectors
+   *
+   * # Errors
+   *
+   * Returns a JS error object with `code` property:
+   * - `EMPTY_BATCH`: Input array is empty
+   * - `DIMENSION_MISMATCH`: Vector dimensions don't match index
+   * - `DUPLICATE_ID`: Vector ID already exists
+   * - `INVALID_VECTOR`: Vector contains NaN or Infinity
+   * - `CAPACITY_EXCEEDED`: Batch exceeds max capacity
+   * - `INTERNAL_ERROR`: Internal HNSW error
+   */
+  insertBatch(vectors: Array<any>, config?: BatchInsertConfig | null): BatchInsertResult;
+  /**
+   * Inserts a batch of vectors into the index (flat array format).
+   *
+   * **Note:** This is the legacy API. For the new API, use `insertBatch` which
+   * accepts an Array of Float32Array.
    *
    * # Arguments
    *
@@ -69,7 +136,7 @@ export class EdgeVec {
    *
    * Returns error if dimensions mismatch, vector contains NaNs, or ID overflows.
    */
-  insert_batch(vectors: Float32Array, count: number): Uint32Array;
+  insertBatchFlat(vectors: Float32Array, count: number): Uint32Array;
   /**
    * Creates a new EdgeVec database.
    *
@@ -174,13 +241,22 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly __wbg_batchinsertconfig_free: (a: number, b: number) => void;
+  readonly __wbg_batchinsertresult_free: (a: number, b: number) => void;
   readonly __wbg_edgevec_free: (a: number, b: number) => void;
   readonly __wbg_edgevecconfig_free: (a: number, b: number) => void;
   readonly __wbg_get_edgevecconfig_dimensions: (a: number) => number;
   readonly __wbg_persistenceiterator_free: (a: number, b: number) => void;
   readonly __wbg_set_edgevecconfig_dimensions: (a: number, b: number) => void;
+  readonly batchinsertconfig_new: () => number;
+  readonly batchinsertconfig_set_validateDimensions: (a: number, b: number) => void;
+  readonly batchinsertconfig_validateDimensions: (a: number) => number;
+  readonly batchinsertresult_ids: (a: number, b: number) => void;
+  readonly batchinsertresult_inserted: (a: number) => number;
+  readonly batchinsertresult_total: (a: number) => number;
   readonly edgevec_insert: (a: number, b: number, c: number) => void;
-  readonly edgevec_insert_batch: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_insertBatch: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_insertBatchFlat: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_load: (a: number, b: number) => number;
   readonly edgevec_new: (a: number, b: number) => void;
   readonly edgevec_save: (a: number, b: number, c: number) => number;
@@ -194,9 +270,9 @@ export interface InitOutput {
   readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
   readonly persistenceiterator_next_chunk: (a: number) => number;
   readonly init_logging: () => void;
-  readonly __wasm_bindgen_func_elem_235: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_228: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_435: (a: number, b: number, c: number, d: number) => void;
+  readonly __wasm_bindgen_func_elem_270: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_263: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_470: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number) => void;
   readonly __wbindgen_export2: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export3: (a: number, b: number) => number;

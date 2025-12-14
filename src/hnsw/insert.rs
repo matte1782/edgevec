@@ -289,6 +289,9 @@ impl HnswIndex {
                         VectorProvider::get_quantized_vector(storage, r_node.vector_id)
                             .ok_or_else(|| GraphError::Storage("Missing quantized data".into()))?;
 
+                    // SAFETY: u32 -> f32 precision loss is acceptable for distance comparison.
+                    // Max u32 is ~4e9, well within f32's representation range (~3.4e38).
+                    #[allow(clippy::cast_precision_loss)]
                     let dist_c_r = l2_squared_u8(c_q_vec, r_q_vec) as f32;
 
                     if dist_c_r < dist_q_c {
@@ -416,6 +419,8 @@ impl HnswIndex {
                         VectorProvider::get_quantized_vector(storage, n_node.vector_id)
                             .ok_or_else(|| GraphError::Storage("Missing quantized data".into()))?;
 
+                    // SAFETY: u32 -> f32 precision loss is acceptable for distance comparison.
+                    #[allow(clippy::cast_precision_loss)]
                     let dist = l2_squared_u8(source_q_vec, n_q_vec) as f32;
                     ctx.scratch.push(Candidate {
                         distance: dist,

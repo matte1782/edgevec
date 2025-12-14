@@ -1,0 +1,57 @@
+digraph Week10Dependencies {
+    // Graph styling
+    rankdir=LR;
+    node [shape=box, style="rounded,filled", fillcolor=lightblue, fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    // Legend
+    subgraph cluster_legend {
+        label="Legend";
+        style=dashed;
+
+        legend_p0 [label="P0: Critical Path", fillcolor=red, fontcolor=white];
+        legend_p1 [label="P1: High Priority", fillcolor=orange];
+        legend_p2 [label="P2: Medium Priority", fillcolor=yellow];
+    }
+
+    // Week 10 Tasks
+    W10_1 [label="W10.1: Restructure Fuzz Targets\n(6h → 18h)\nP0", fillcolor=red, fontcolor=white, style="rounded,filled,bold"];
+
+    W10_2a [label="W10.2a: Fix fuzz_hamming\n(6h → 18h)\nP0", fillcolor=red, fontcolor=white, style="rounded,filled,bold"];
+    W10_2b [label="W10.2b: Fix fuzz_encoder\n(6h → 18h)\nP0", fillcolor=red, fontcolor=white, style="rounded,filled,bold"];
+    W10_2c [label="W10.2c: Fix fuzz_quantizer\n(6h → 18h)\nP0", fillcolor=red, fontcolor=white, style="rounded,filled,bold"];
+    W10_2d [label="W10.2d: Add Assertions\n(6h → 18h)\nP0", fillcolor=red, fontcolor=white, style="rounded,filled,bold"];
+
+    W10_3 [label="W10.3: Refactor fuzz_hnsw\n(12h → 36h)\nP0", fillcolor=red, fontcolor=white, style="rounded,filled,bold"];
+    W10_4 [label="W10.4: HNSW Property Tests\n(18h → 54h)\nP1", fillcolor=orange, style="rounded,filled,bold"];
+
+    W10_5 [label="W10.5: Design Batch Insert API\n(4h → 12h)\nP1", fillcolor=orange];
+    W10_8 [label="W10.8: Benchmark Validation\n(12h → 36h)\nP1", fillcolor=orange];
+
+    // Critical Path (bold red arrows)
+    W10_1 -> W10_2a [label="corpus structure", color=red, penwidth=3.0];
+    W10_2a -> W10_2b [label="hamming tests pass", color=red, penwidth=3.0];
+    W10_2b -> W10_2c [label="encoder tests pass", color=red, penwidth=3.0];
+    W10_2c -> W10_2d [label="quantizer tests pass", color=red, penwidth=3.0];
+    W10_2d -> W10_3 [label="all assertions added", color=red, penwidth=3.0];
+    W10_3 -> W10_4 [label="hnsw tests fixed", color=red, penwidth=3.0];
+
+    // Parallel paths
+    W10_3 -> W10_8 [label="fuzz infrastructure", color=blue, penwidth=1.5, style=dashed];
+
+    // W10.5 has NO dependencies (runs in parallel)
+    // No incoming edges
+
+    // Week 11 dependencies (shown as dashed out-of-scope)
+    W11_1 [label="W11.1: Implement Batch Insert\n(16h → 48h)\nDeferred", fillcolor=gray, style="rounded,dashed"];
+    W11_2 [label="W11.2: Batch Benchmarks\n(12h → 36h)\nDeferred", fillcolor=gray, style="rounded,dashed"];
+
+    W10_5 -> W11_1 [label="RFC document", style=dashed];
+    W11_1 -> W11_2 [label="implementation", style=dashed];
+
+    // Critical Path Annotation
+    {rank=same; W10_1; W10_2a;}
+    {rank=same; W10_2b; W10_2c;}
+    {rank=same; W10_2d; W10_3;}
+    {rank=same; W10_4; W10_8;}
+}

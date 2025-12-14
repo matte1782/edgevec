@@ -136,6 +136,10 @@ impl VectorStorage {
     /// # Errors
     ///
     /// Returns `StorageError` if dimensions mismatch or WAL write fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if quantizer is `None` in `QuantizedU8` storage mode (logic error).
     pub fn insert(&mut self, vector: &[f32]) -> Result<VectorId, StorageError> {
         // Step 1: Validate dimensions
         // Check for overflow or mismatch
@@ -214,6 +218,12 @@ impl VectorStorage {
     /// # Returns
     ///
     /// The new `VectorId` or `StorageError`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::DimensionMismatch` if `data.len()` doesn't match
+    /// the configured dimensions. Returns `StorageError::Corrupted` if storage
+    /// is not in quantized mode.
     pub fn insert_quantized(&mut self, data: &[u8]) -> Result<VectorId, StorageError> {
         // Step 1: Validate dimensions
         if let Ok(len) = u32::try_from(data.len()) {
@@ -277,6 +287,7 @@ impl VectorStorage {
     /// # Panics
     ///
     /// Panics if internal byte conversions fail (guaranteed safe by length checks).
+    #[allow(clippy::needless_pass_by_value)]
     pub fn recover(
         backend: Box<dyn StorageBackend>,
         config: &HnswConfig,
@@ -447,15 +458,17 @@ impl VectorStorage {
 
         match &self.config {
             StorageType::Float32 => {
-                if self.data_f32.is_empty() {
-                    panic!("get_vector called on storage without f32 data");
-                }
+                assert!(
+                    !self.data_f32.is_empty(),
+                    "get_vector called on storage without f32 data"
+                );
                 Cow::Borrowed(&self.data_f32[start..start + dim])
             }
             StorageType::QuantizedU8(_) => {
-                if self.quantized_data.is_empty() {
-                    panic!("get_vector called on storage without quantized data");
-                }
+                assert!(
+                    !self.quantized_data.is_empty(),
+                    "get_vector called on storage without quantized data"
+                );
                 let q_data = &self.quantized_data[start..start + dim];
                 let q = self
                     .quantizer
@@ -482,9 +495,10 @@ impl VectorStorage {
         let dim = self.dimensions as usize;
         let start = idx * dim;
 
-        if self.quantized_data.is_empty() {
-            panic!("get_quantized_vector called on storage without quantized data");
-        }
+        assert!(
+            !self.quantized_data.is_empty(),
+            "get_quantized_vector called on storage without quantized data"
+        );
         &self.quantized_data[start..start + dim]
     }
 

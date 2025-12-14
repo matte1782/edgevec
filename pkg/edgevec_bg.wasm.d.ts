@@ -1,13 +1,22 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const __wbg_batchinsertconfig_free: (a: number, b: number) => void;
+export const __wbg_batchinsertresult_free: (a: number, b: number) => void;
 export const __wbg_edgevec_free: (a: number, b: number) => void;
 export const __wbg_edgevecconfig_free: (a: number, b: number) => void;
 export const __wbg_get_edgevecconfig_dimensions: (a: number) => number;
 export const __wbg_persistenceiterator_free: (a: number, b: number) => void;
 export const __wbg_set_edgevecconfig_dimensions: (a: number, b: number) => void;
+export const batchinsertconfig_new: () => number;
+export const batchinsertconfig_set_validateDimensions: (a: number, b: number) => void;
+export const batchinsertconfig_validateDimensions: (a: number) => number;
+export const batchinsertresult_ids: (a: number, b: number) => void;
+export const batchinsertresult_inserted: (a: number) => number;
+export const batchinsertresult_total: (a: number) => number;
 export const edgevec_insert: (a: number, b: number, c: number) => void;
-export const edgevec_insert_batch: (a: number, b: number, c: number, d: number) => void;
+export const edgevec_insertBatch: (a: number, b: number, c: number, d: number) => void;
+export const edgevec_insertBatchFlat: (a: number, b: number, c: number, d: number) => void;
 export const edgevec_load: (a: number, b: number) => number;
 export const edgevec_new: (a: number, b: number) => void;
 export const edgevec_save: (a: number, b: number, c: number) => number;
@@ -21,9 +30,9 @@ export const edgevecconfig_set_m0: (a: number, b: number) => void;
 export const edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
 export const persistenceiterator_next_chunk: (a: number) => number;
 export const init_logging: () => void;
-export const __wasm_bindgen_func_elem_235: (a: number, b: number, c: number) => void;
-export const __wasm_bindgen_func_elem_228: (a: number, b: number) => void;
-export const __wasm_bindgen_func_elem_435: (a: number, b: number, c: number, d: number) => void;
+export const __wasm_bindgen_func_elem_270: (a: number, b: number, c: number) => void;
+export const __wasm_bindgen_func_elem_263: (a: number, b: number) => void;
+export const __wasm_bindgen_func_elem_470: (a: number, b: number, c: number, d: number) => void;
 export const __wbindgen_export: (a: number) => void;
 export const __wbindgen_export2: (a: number, b: number, c: number) => void;
 export const __wbindgen_export3: (a: number, b: number) => number;

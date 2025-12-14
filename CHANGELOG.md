@@ -7,11 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Batch Insert API** (`BatchInsertable` trait)
+  - Single API call for bulk vector insertion
+  - Progress callback support at ~10% intervals (<1% overhead)
+  - Best-effort semantics (partial success on non-fatal errors)
+  - `BatchError` type with 5 error variants
+  - Example: `examples/batch_insert.rs`
+  - Benchmarks: `benches/batch_vs_sequential.rs`
+
 ### Planned
-- Bulk insert API for faster batch operations
 - Delete/update operations with tombstone-based deletion
 - P99 latency tracking in CI
 - ARM/NEON optimization verification
+- WASM bindings for batch insert
 
 ---
 

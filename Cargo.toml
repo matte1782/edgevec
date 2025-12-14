@@ -119,6 +119,17 @@ harness = false
 name = "bench_quantization"
 harness = false
 
+[[bench]]
+name = "validation"
+harness = false
+
+[[bench]]
+name = "batch_vs_sequential"
+harness = false
+
+[[example]]
+name = "batch_insert"
+
 # =============================================================================
 # FUTURE DEPENDENCIES (Not in Day 1 scope)
 # =============================================================================

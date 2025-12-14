@@ -112,6 +112,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Batch Insert (Rust)
+
+For inserting many vectors efficiently, use the batch insert API:
+
+```rust,no_run
+use edgevec::{HnswConfig, HnswIndex, VectorStorage};
+use edgevec::batch::BatchInsertable;
+use edgevec::error::BatchError;
+
+fn main() -> Result<(), BatchError> {
+    let config = HnswConfig::new(128);
+    let mut storage = VectorStorage::new(&config, None);
+    let mut index = HnswIndex::new(config, &storage).unwrap();
+
+    // Prepare vectors as (id, data) tuples
+    let vectors: Vec<(u64, Vec<f32>)> = (1..=1000)
+        .map(|i| (i as u64, vec![i as f32; 128]))
+        .collect();
+
+    // Batch insert with progress tracking
+    let ids = index.batch_insert(vectors, &mut storage, Some(|inserted, total| {
+        println!("Progress: {}/{}", inserted, total);
+    }))?;
+
+    println!("Inserted {} vectors", ids.len());
+    Ok(())
+}
+```
+
+**Features:** Progress tracking, best-effort semantics, and unified error handling.
+
 ---
 
 ## Development Status
@@ -143,13 +174,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - Phase 4: WASM Integration — ✅ COMPLETE
 - Phase 5: Alpha Release — ✅ **READY**
 
-### What's Next (v0.2.0)
+### What's Next (v0.3.0)
 
-1. **Batch Loader** — Bulk insertion API for faster index building
-2. **P99 Tracking** — Latency distribution metrics in CI
-3. **SIMD Detection** — Runtime detection and warnings
-4. **Cross-Platform** — ARM/NEON optimization verification
-5. **Performance Monitoring** — Telemetry for real-world usage
+1. **P99 Tracking** — Latency distribution metrics in CI
+2. **SIMD Detection** — Runtime detection and warnings
+3. **Cross-Platform** — ARM/NEON optimization verification
+4. **Performance Monitoring** — Telemetry for real-world usage
+5. **WASM Batch Insert** — Browser bindings for batch API
 
 ---
 

@@ -203,19 +203,30 @@ impl Iterator for ChunkIter<'_> {
                         let end = self.node_index + nodes_to_copy;
                         let slice = &nodes[self.node_index..end];
 
-                        // We can cast slice if HnswNode is Pod.
-                        // HnswNode contains VectorId(u64) etc.
-                        // Let's verify if we can use bytemuck or manual copy.
-                        // HnswNode is `#[repr(C)]` in graph.rs.
-                        // However, to use `bytemuck::cast_slice`, it needs `unsafe impl Pod`.
-                        // Since we cannot easily add that to `graph.rs` without modifying it,
-                        // we'll do manual serialization or use unsafe cast since we know layout is C.
-
-                        // SAFETY: HnswNode is #[repr(C)] with fixed layout 16 bytes.
-                        // It contains simple primitives (u64, u32, u16, u8).
+                        // SAFETY WARNING: POTENTIALLY_UNSOUND — This block has concerns.
+                        //
+                        // While casting `&[HnswNode]` → `&[u8]` is safer than the reverse
+                        // (the source is properly aligned Rust data, and u8 has alignment 1),
+                        // there are still issues:
+                        //
+                        // 1. HARDCODED SIZE: Uses `16` instead of `size_of::<HnswNode>()`.
+                        //    If HnswNode layout changes, this becomes silently incorrect.
+                        //
+                        // 2. PADDING BYTES: Reading the `pad` field may read uninitialized
+                        //    memory if the struct was not zero-initialized. This is
+                        //    technically UB, though practically benign on most platforms.
+                        //
+                        // RESOLUTION: This will be replaced with `bytemuck::cast_slice()`
+                        // in task W13.2 after deriving `Pod` for `HnswNode`. See RFC-001
+                        // and `docs/audits/unsafe_audit_persistence.md` for details.
+                        //
+                        // INVARIANTS REQUIRED:
+                        // - `slice` is a valid `&[HnswNode]` reference (guaranteed by Rust)
+                        // - `size_of::<HnswNode>() == 16` (verified in audit)
+                        // - All `HnswNode` instances have `pad` field initialized
                         unsafe {
                             let ptr = slice.as_ptr().cast::<u8>();
-                            let len = nodes_to_copy * 16; // 16 bytes per node
+                            let len = nodes_to_copy * std::mem::size_of::<crate::hnsw::graph::HnswNode>();
                             let byte_slice = std::slice::from_raw_parts(ptr, len);
                             self.buffer.extend_from_slice(byte_slice);
                         }

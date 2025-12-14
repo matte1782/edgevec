@@ -47,6 +47,7 @@
 /// assert_eq!(distance, 768); // All bits differ
 /// ```
 #[inline]
+#[must_use]
 pub fn hamming_distance_portable(a: &[u8; 96], b: &[u8; 96]) -> u32 {
     let mut distance = 0u32;
 

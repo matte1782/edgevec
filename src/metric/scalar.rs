@@ -6,13 +6,17 @@
 ///
 /// Panics if `a` and `b` have different lengths.
 #[inline]
+#[must_use]
 pub fn l2_squared_u8(a: &[u8], b: &[u8]) -> u32 {
     assert_eq!(a.len(), b.len());
     let mut sum: u32 = 0;
     for i in 0..a.len() {
         // Safe upcast to i32 to avoid overflow during subtraction
-        let diff = (a[i] as i32) - (b[i] as i32);
-        sum += (diff * diff) as u32;
+        let diff = i32::from(a[i]) - i32::from(b[i]);
+        // SAFETY: diff*diff is always non-negative, so cast to u32 is safe
+        #[allow(clippy::cast_sign_loss)]
+        let sq = (diff * diff) as u32;
+        sum += sq;
     }
     sum
 }
@@ -23,11 +27,12 @@ pub fn l2_squared_u8(a: &[u8], b: &[u8]) -> u32 {
 ///
 /// Panics if `a` and `b` have different lengths.
 #[inline]
+#[must_use]
 pub fn dot_product_u8(a: &[u8], b: &[u8]) -> u32 {
     assert_eq!(a.len(), b.len());
     let mut sum: u32 = 0;
     for i in 0..a.len() {
-        sum += (a[i] as u32) * (b[i] as u32);
+        sum += u32::from(a[i]) * u32::from(b[i]);
     }
     sum
 }

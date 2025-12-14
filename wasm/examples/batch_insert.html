@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeVec | Batch Insert Benchmark</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a0f' width='100' height='100'/><polygon fill='%2300ffff' points='50,10 90,30 90,70 50,90 10,70 10,30'/><polygon fill='%230a0a0f' points='50,25 75,37 75,63 50,75 25,63 25,37'/><circle fill='%23ff00ff' cx='50' cy='50' r='8'/></svg>">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           CYBERPUNK THEME - EdgeVec Demo
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a24;
+            --cyan: #00ffff;
+            --cyan-dim: #00aaaa;
+            --magenta: #ff00ff;
+            --magenta-dim: #aa00aa;
+            --purple: #9945ff;
+            --yellow: #ffff00;
+            --green: #00ff88;
+            --red: #ff3366;
+            --white: #e0e0e0;
+            --gray: #666680;
+            --border: #2a2a3a;
+            --glow-cyan: 0 0 20px rgba(0, 255, 255, 0.3);
+            --glow-magenta: 0 0 20px rgba(255, 0, 255, 0.3);
+            --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', monospace;
+            background: var(--bg-primary);
+            color: var(--white);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Background Grid Effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           HEADER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            position: relative;
+        }
+
+        .logo-icon svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(var(--glow-cyan));
+        }
+
+        .logo-text {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--magenta) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 2px;
+        }
+
+        .logo-version {
+            font-size: 10px;
+            color: var(--gray);
+            background: var(--bg-tertiary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .header-info {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-label {
+            color: var(--gray);
+        }
+
+        .info-value {
+            color: var(--cyan);
+        }
+
+        .info-value.supported {
+            color: var(--green);
+        }
+
+        .info-value.error {
+            color: var(--red);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN LAYOUT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 40px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 30px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CONTROL PANEL
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .control-panel {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            height: fit-content;
+            position: sticky;
+            top: 30px;
+        }
+
+        .panel-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--magenta);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--gray);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .control-input {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px 14px;
+            color: var(--white);
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .control-input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .control-hint {
+            font-size: 10px;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+
+        /* Preset Buttons */
+        .presets {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .preset-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 10px;
+            color: var(--white);
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .preset-btn:hover {
+            border-color: var(--cyan);
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .preset-btn .preset-name {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .preset-btn .preset-config {
+            font-size: 10px;
+            color: var(--gray);
+        }
+
+        /* Action Buttons */
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid;
+            border-radius: 4px;
+            padding: 14px 20px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--cyan);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-secondary {
+            border-color: var(--gray);
+            color: var(--gray);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            border-color: var(--white);
+            color: var(--white);
+        }
+
+        .btn-compare {
+            border-color: var(--magenta);
+            color: var(--magenta);
+        }
+
+        .btn-compare:hover:not(:disabled) {
+            background: var(--magenta);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-magenta);
+        }
+
+        .btn-error {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .btn-error:hover:not(:disabled) {
+            background: var(--red);
+            color: var(--bg-primary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESULTS AREA
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .results-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: none;
+        }
+
+        .status-bar.visible {
+            display: block;
+        }
+
+        .status-bar.loading {
+            border-color: var(--yellow);
+        }
+
+        .status-bar.success {
+            border-color: var(--green);
+        }
+
+        .status-bar.error {
+            border-color: var(--red);
+        }
+
+        .status-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-icon {
+            font-size: 18px;
+        }
+
+        .status-text {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .status-bar.loading .status-text {
+            color: var(--yellow);
+        }
+
+        .status-bar.success .status-text {
+            color: var(--green);
+        }
+
+        .status-bar.error .status-text {
+            color: var(--red);
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 12px;
+            display: none;
+        }
+
+        .status-bar.loading .progress-container {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta));
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            animation: progressPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes progressPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--gray);
+            margin-top: 6px;
+        }
+
+        /* Results Grid */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .result-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+        }
+
+        .result-card.visible {
+            display: block;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .result-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--gray);
+        }
+
+        .result-badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .badge-sequential {
+            background: rgba(102, 102, 128, 0.2);
+            color: var(--gray);
+            border: 1px solid var(--gray);
+        }
+
+        .badge-batch {
+            background: rgba(0, 255, 255, 0.1);
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+        }
+
+        .metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--gray);
+        }
+
+        .metric-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--white);
+        }
+
+        .metric-value.highlight {
+            color: var(--cyan);
+            text-shadow: var(--glow-cyan);
+        }
+
+        /* Speedup Card */
+        .speedup-card {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.05) 0%, rgba(255, 0, 255, 0.05) 100%);
+            border: 1px solid var(--magenta);
+            text-align: center;
+            padding: 30px;
+        }
+
+        .speedup-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--gray);
+            margin-bottom: 10px;
+        }
+
+        .speedup-value {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--magenta) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+
+        .speedup-unit {
+            font-size: 14px;
+            color: var(--magenta);
+            margin-top: 8px;
+        }
+
+        /* Terminal Output */
+        .terminal {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: var(--bg-tertiary);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.red { background: var(--red); }
+        .terminal-dot.yellow { background: var(--yellow); }
+        .terminal-dot.green { background: var(--green); }
+
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            font-size: 11px;
+            color: var(--gray);
+        }
+
+        .terminal-body {
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .terminal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .terminal-body::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        .terminal-body::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .log-line {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+
+        .log-time {
+            color: var(--gray);
+            flex-shrink: 0;
+        }
+
+        .log-level {
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+
+        .log-level.info { color: var(--cyan); }
+        .log-level.success { color: var(--green); }
+        .log-level.error { color: var(--red); }
+        .log-level.warn { color: var(--yellow); }
+
+        .log-message {
+            color: var(--white);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 20px 40px;
+            text-align: center;
+            font-size: 11px;
+            color: var(--gray);
+            margin-top: 40px;
+        }
+
+        footer a {
+            color: var(--cyan);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel {
+                position: static;
+            }
+
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            header {
+                flex-direction: column;
+                gap: 16px;
+                padding: 16px 20px;
+            }
+
+            .header-info {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            main {
+                padding: 20px;
+            }
+
+            .presets {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <polygon fill="#00ffff" points="50,10 90,30 90,70 50,90 10,70 10,30"/>
+                    <polygon fill="#0a0a0f" points="50,25 75,37 75,63 50,75 25,63 25,37"/>
+                    <circle fill="#ff00ff" cx="50" cy="50" r="8"/>
+                </svg>
+            </div>
+            <span class="logo-text">EDGEVEC</span>
+            <span class="logo-version">v0.2.0-alpha</span>
+        </div>
+        <div class="header-info">
+            <div class="info-item">
+                <span class="info-label">Browser:</span>
+                <span class="info-value" id="browserInfo">Detecting...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">WASM:</span>
+                <span class="info-value" id="wasmSupport">Checking...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Module:</span>
+                <span class="info-value" id="moduleStatus">Loading...</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <aside class="control-panel">
+            <h2 class="panel-title">Configuration</h2>
+
+            <div class="control-group">
+                <label class="control-label" for="vectorCount">Vector Count</label>
+                <input type="number" id="vectorCount" class="control-input" value="1000" min="10" max="100000">
+                <span class="control-hint">Range: 10 - 100,000</span>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label" for="dimensions">Dimensions</label>
+                <input type="number" id="dimensions" class="control-input" value="128" min="2" max="2048">
+                <span class="control-hint">Range: 2 - 2,048</span>
+            </div>
+
+            <h3 class="panel-title" style="margin-top: 24px;">Presets</h3>
+            <div class="presets">
+                <button class="preset-btn" data-vectors="100" data-dims="128">
+                    <span class="preset-name">C1: Small</span>
+                    <span class="preset-config">100 x 128</span>
+                </button>
+                <button class="preset-btn" data-vectors="1000" data-dims="128">
+                    <span class="preset-name">C2: Medium</span>
+                    <span class="preset-config">1K x 128</span>
+                </button>
+                <button class="preset-btn" data-vectors="1000" data-dims="512">
+                    <span class="preset-name">C3: High-D</span>
+                    <span class="preset-config">1K x 512</span>
+                </button>
+                <button class="preset-btn" data-vectors="5000" data-dims="128">
+                    <span class="preset-name">C4: Large</span>
+                    <span class="preset-config">5K x 128</span>
+                </button>
+            </div>
+
+            <h3 class="panel-title">Actions</h3>
+            <div class="actions">
+                <button id="runComparison" class="btn btn-compare">
+                    <span>Run Benchmark</span>
+                </button>
+                <button id="runSequential" class="btn btn-secondary">
+                    <span>Sequential Only</span>
+                </button>
+                <button id="runBatch" class="btn btn-primary">
+                    <span>Batch Only</span>
+                </button>
+                <button id="testErrors" class="btn btn-error">
+                    <span>Test Errors</span>
+                </button>
+            </div>
+        </aside>
+
+        <section class="results-area">
+            <div id="status" class="status-bar">
+                <div class="status-content">
+                    <span class="status-icon" id="statusIcon"></span>
+                    <span class="status-text" id="statusText"></span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-label">
+                        <span id="progressPhase">Initializing...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-grid">
+                <div id="sequentialResults" class="result-card">
+                    <div class="result-header">
+                        <span class="result-title">Sequential Insert</span>
+                        <span class="result-badge badge-sequential">Baseline</span>
+                    </div>
+                    <div class="metrics">
+                        <div class="metric-row">
+                            <span class="metric-label">Vectors Inserted</span>
+                            <span class="metric-value" id="seq-count">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Total Time</span>
+                            <span class="metric-value" id="seq-time">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Per Vector</span>
+                            <span class="metric-value" id="seq-avg">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Throughput</span>
+                            <span class="metric-value" id="seq-throughput">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="batchResults" class="result-card">
+                    <div class="result-header">
+                        <span class="result-title">Batch Insert</span>
+                        <span class="result-badge badge-batch">Optimized</span>
+                    </div>
+                    <div class="metrics">
+                        <div class="metric-row">
+                            <span class="metric-label">Vectors Inserted</span>
+                            <span class="metric-value" id="batch-count">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Total Time</span>
+                            <span class="metric-value highlight" id="batch-time">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Per Vector</span>
+                            <span class="metric-value highlight" id="batch-avg">-</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Throughput</span>
+                            <span class="metric-value highlight" id="batch-throughput">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="speedupCard" class="result-card speedup-card">
+                    <div class="speedup-label">Batch Speedup Factor</div>
+                    <div class="speedup-value" id="speedupValue">-</div>
+                    <div class="speedup-unit">times faster</div>
+                </div>
+            </div>
+
+            <div class="terminal">
+                <div class="terminal-header">
+                    <span class="terminal-dot red"></span>
+                    <span class="terminal-dot yellow"></span>
+                    <span class="terminal-dot green"></span>
+                    <span class="terminal-title">Console Output</span>
+                </div>
+                <div class="terminal-body" id="terminalOutput">
+                    <div class="log-line">
+                        <span class="log-time">[00:00:00]</span>
+                        <span class="log-level info">INFO</span>
+                        <span class="log-message">EdgeVec Batch Insert Demo initialized</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        EdgeVec &copy; 2025 | High-Performance WASM Vector Database |
+        <a href="https://github.com/matte1782/edgevec" target="_blank">GitHub</a>
+    </footer>
+
+    <script type="module" src="batch_insert.js"></script>
+</body>
+</html>
