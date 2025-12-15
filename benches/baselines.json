@@ -1,51 +1,61 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "created": "2025-12-13",
   "updated": "2025-12-15",
-  "description": "Baseline P50/P99 latencies for EdgeVec benchmark validation suite (W18.3 v1.2: P99 tracking)",
+  "description": "Baseline P50/tail latencies for EdgeVec benchmark validation suite (W18.3 v1.3: Calibrated)",
   "hardware": {
-    "note": "Baselines should be recalibrated per target hardware",
-    "reference": "Development machine (to be updated after first CI run)"
+    "note": "Baselines calibrated from actual benchmark runs on development machine",
+    "reference": "Intel/AMD x86-64 with AVX2 support",
+    "calibration_date": "2025-12-15"
   },
   "thresholds": {
     "regression_multiplier": 1.1,
-    "p99_regression_multiplier": 1.5,
-    "p99_median_ratio_max": 5.0,
-    "p99_estimation_note": "P99 estimated as mean + 5*std_dev (conservative for long-tailed distributions)",
-    "note": "P50: Fail if >110% baseline. P99: Fail if >150% baseline or >5x median (W18.3 v1.2)"
+    "tail_regression_multiplier": 1.5,
+    "tail_median_ratio_max": 5.0,
+    "tail_estimation_note": "Tail latency estimated as mean + 5*std_dev (conservative bound, ~P99.99997 for normal distributions). This is intentionally more conservative than true P99 to catch regressions early.",
+    "baseline_methodology": "Measured values + 20% buffer for normal CI variance",
+    "note": "P50: Fail if >110% baseline. Tail: Fail if >150% baseline or >5x median"
   },
   "benchmarks": {
     "insert_1k": {
       "description": "Insert 1000 vectors (768 dimensions) into HNSW index",
       "unit": "ms",
-      "p50": 300.0,
-      "p99": 600.0,
-      "target": 500.0,
-      "hard_limit": 1000.0
+      "p50": 240.0,
+      "tail": 255.0,
+      "measured_p50": 198.2,
+      "measured_tail": 211.9,
+      "target": 300.0,
+      "hard_limit": 500.0
     },
     "search_10k": {
       "description": "Search k=10 in 10k vector index (768 dimensions)",
       "unit": "ms",
-      "p50": 2.0,
-      "p99": 6.0,
-      "target": 5.0,
-      "hard_limit": 10.0
+      "p50": 0.15,
+      "tail": 0.18,
+      "measured_p50": 0.120,
+      "measured_tail": 0.142,
+      "target": 1.0,
+      "hard_limit": 5.0
     },
     "quantization_encode": {
       "description": "SQ8 quantization of single 768-dimension vector",
       "unit": "us",
-      "p50": 5.0,
-      "p99": 15.0,
-      "target": 10.0,
-      "hard_limit": 50.0
+      "p50": 1.0,
+      "tail": 1.4,
+      "measured_p50": 0.80,
+      "measured_tail": 1.11,
+      "target": 5.0,
+      "hard_limit": 20.0
     },
     "hamming_distance": {
       "description": "Binary Hamming distance (96 bytes)",
       "unit": "ns",
-      "p50": 50.0,
-      "p99": 150.0,
-      "target": 100.0,
-      "hard_limit": 200.0
+      "p50": 2.5,
+      "tail": 5.0,
+      "measured_p50": 1.9,
+      "measured_tail": 3.9,
+      "target": 50.0,
+      "hard_limit": 100.0
     }
   }
 }

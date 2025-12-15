@@ -3,15 +3,15 @@
 EdgeVec Benchmark Regression Detection Script
 
 Task: W10.8 - Create Benchmark Validation Suite
-Updated: W18.3 v1.2 - P99 latency tracking with hostile review fixes
+Updated: W18.3 v1.3 - Hostile review fixes (calibrated baselines, correct naming)
 
 This script compares criterion benchmark results against baselines and
-detects performance regressions for both median (P50) and tail (P99) latencies.
+detects performance regressions for both median (P50) and tail latencies.
 
 Checks performed:
 1. Median (P50) latency regression
-2. P99 latency regression (estimated)
-3. P99/median ratio sanity check
+2. Tail latency regression (conservative estimate)
+3. Tail/median ratio sanity check
 
 Usage:
     python benches/check_regression.py [--baseline baselines.json] [--results target/criterion]
@@ -19,7 +19,7 @@ Usage:
 Exit codes:
     0 - All benchmarks within threshold
     1 - Regression detected (>10% slower than baseline)
-    2 - Error (missing files, parse errors, P99 extraction failure)
+    2 - Error (missing files, parse errors, tail extraction failure)
 
 CRITERION OUTPUT FORMAT (verified 2025-12-15 from actual cargo bench run):
 Example estimates.json:
@@ -31,19 +31,25 @@ Example estimates.json:
     "slope": null  // or {"point_estimate": ..., "confidence_interval": {...}}
 }
 - Unit: nanoseconds (f64)
-- NO native percentiles key - P99 estimated as mean + 5*std_dev (conservative)
-- For iterated benchmarks, "slope" contains point_estimate
-- For non-iterated benchmarks, "median" contains point_estimate
+- NO native percentiles key
 
-W18.3 v1.2 Hostile Review Fixes:
-- [C1] Criterion output format verified from actual cargo bench run
-- [C3] Make validation FAIL if P99 extraction fails (not silent skip)
-- [C4] Use mean + 5*std_dev for conservative P99 estimate (long-tailed distributions)
-- [C5] Unit conversion validation with explicit error on unsupported units
-- [M3] Handle new benchmarks not in baselines (log warning, skip)
-- [M5] Print P99 estimation warnings to stdout for CI visibility
-- [m1] Magic numbers moved to named constants
-- [m2] Type hints added to all functions
+TAIL LATENCY ESTIMATION (W18.3 v1.3):
+We estimate tail latency as: mean + 5*std_dev
+
+This is NOT true P99. For normal distributions:
+- P99 = mean + 2.326*std_dev
+- P99.99997 = mean + 5*std_dev (our approach)
+
+We intentionally use this CONSERVATIVE bound because:
+1. It catches more regressions than true P99
+2. Performance distributions are often long-tailed
+3. Early detection is better than missed regressions
+
+W18.3 v1.3 Hostile Review Fixes:
+- [M4] Baselines tightened to measured values + 20% buffer
+- [M5] Tail baselines calibrated from actual benchmark runs
+- [C1] Renamed "P99" to "tail" for statistical accuracy
+- [m1] Removed unused verbose parameter
 """
 
 from __future__ import annotations
@@ -55,7 +61,7 @@ from pathlib import Path
 from typing import Any
 
 # =============================================================================
-# CONSTANTS (moved from inline magic numbers per [m1])
+# CONSTANTS
 # =============================================================================
 
 # Default paths
@@ -64,15 +70,18 @@ DEFAULT_RESULTS = Path(__file__).parent.parent / "target" / "criterion"
 
 # Regression thresholds
 P50_REGRESSION_THRESHOLD: float = 1.10  # 10% regression tolerance for median
-P99_REGRESSION_THRESHOLD: float = 1.50  # 50% regression tolerance for P99 (tail latency more variable)
-P99_MEDIAN_RATIO_MAX: float = 5.0  # P99 can be up to 5x median (relaxed per [M2] - real-world long tails)
+TAIL_REGRESSION_THRESHOLD: float = 1.50  # 50% regression tolerance for tail
+TAIL_MEDIAN_RATIO_MAX: float = 5.0  # Tail can be up to 5x median
 
-# P99 estimation multiplier (mean + N * std_dev)
-# Changed from 3 to 5 per [C4] - long-tailed distributions need conservative estimate
-P99_STDDEV_MULTIPLIER: float = 5.0
+# Tail estimation multiplier (mean + N * std_dev)
+# Using 5 for conservative tail estimate (~P99.99997 for normal distributions)
+TAIL_STDDEV_MULTIPLIER: float = 5.0
 
 # Supported units for conversion
 SUPPORTED_UNITS: set[str] = {"ns", "us", "ms", "s"}
+
+# Benchmark group name (hardcoded for now)
+BENCHMARK_GROUP: str = "validation"
 
 
 # =============================================================================
@@ -96,7 +105,7 @@ def find_criterion_estimate(benchmark_dir: Path) -> dict[str, Any] | None:
     Criterion stores results in:
     target/criterion/<group>/<benchmark>/new/estimates.json
 
-    Returns full estimates dict for P99 extraction.
+    Returns full estimates dict for tail extraction.
     """
     estimates_path = benchmark_dir / "new" / "estimates.json"
     if not estimates_path.exists():
@@ -127,18 +136,16 @@ def extract_median_ns(estimates: dict[str, Any]) -> float | None:
     return None
 
 
-def extract_p99_ns(estimates: dict[str, Any], benchmark_name: str) -> tuple[float | None, bool]:
+def extract_tail_ns(estimates: dict[str, Any], benchmark_name: str) -> tuple[float | None, bool]:
     """
-    Extract P99 latency in nanoseconds from Criterion estimates.
+    Extract tail latency estimate in nanoseconds from Criterion estimates.
 
     Returns:
-        (p99_value, is_estimated): Tuple of P99 value and whether it was estimated
+        (tail_value, is_estimated): Tuple of tail value and whether it was estimated
 
-    [C4 FIX] Uses mean + 5*std_dev for conservative estimate (not 3x).
-    Long-tailed performance distributions require more conservative estimate.
+    Uses mean + 5*std_dev for conservative tail estimate.
+    This is intentionally more conservative than true P99.
     """
-    # Criterion doesn't provide native percentiles, so we always estimate
-    # from mean + N*std_dev where N=5 for conservative tail estimate
     if "mean" in estimates and "std_dev" in estimates:
         mean = estimates["mean"]
         std_dev = estimates["std_dev"]
@@ -148,10 +155,9 @@ def extract_p99_ns(estimates: dict[str, Any], benchmark_name: str) -> tuple[floa
             std_dev_ns = std_dev.get("point_estimate", 0)
 
             if mean_ns > 0 and std_dev_ns >= 0:
-                p99_estimate = mean_ns + (P99_STDDEV_MULTIPLIER * std_dev_ns)
-                # [M5 FIX] Print to stdout so CI can see it
-                print(f"  [{benchmark_name}] P99 estimated: mean({mean_ns:.0f}) + {P99_STDDEV_MULTIPLIER}*std_dev({std_dev_ns:.0f}) = {p99_estimate:.0f} ns")
-                return p99_estimate, True
+                tail_estimate = mean_ns + (TAIL_STDDEV_MULTIPLIER * std_dev_ns)
+                print(f"  [{benchmark_name}] Tail estimated: mean({mean_ns:.0f}) + {TAIL_STDDEV_MULTIPLIER}*std_dev({std_dev_ns:.0f}) = {tail_estimate:.0f} ns")
+                return tail_estimate, True
 
     # Final fallback: use upper confidence bound
     if "mean" in estimates:
@@ -160,7 +166,7 @@ def extract_p99_ns(estimates: dict[str, Any], benchmark_name: str) -> tuple[floa
             ci = mean.get("confidence_interval", {})
             upper = ci.get("upper_bound")
             if upper:
-                print(f"  [{benchmark_name}] P99 fallback: using mean upper CI bound = {upper:.0f} ns")
+                print(f"  [{benchmark_name}] Tail fallback: using mean upper CI bound = {upper:.0f} ns")
                 return float(upper), True
 
     return None, False
@@ -170,7 +176,7 @@ def convert_ns_to_unit(value_ns: float, unit: str) -> float:
     """
     Convert nanoseconds to the target unit.
 
-    [C5 FIX] Validates unit is supported, raises error otherwise.
+    Validates unit is supported, raises error otherwise.
     """
     if unit not in SUPPORTED_UNITS:
         raise ValueError(f"Unsupported unit '{unit}'. Supported: {SUPPORTED_UNITS}")
@@ -184,8 +190,12 @@ def convert_ns_to_unit(value_ns: float, unit: str) -> float:
     elif unit == "s":
         return value_ns / 1_000_000_000.0
     else:
-        # Should never reach here due to validation above
         return value_ns
+
+
+def get_baseline_tail(config: dict[str, Any]) -> float:
+    """Get tail baseline, supporting both 'tail' and legacy 'p99' keys."""
+    return config.get("tail", config.get("p99", 0))
 
 
 # =============================================================================
@@ -196,18 +206,16 @@ def check_regression(
     baseline: dict[str, Any],
     results_dir: Path,
     threshold: float = P50_REGRESSION_THRESHOLD,
-    strict_p99: bool = True,
+    strict_tail: bool = True,
 ) -> tuple[bool, dict[str, Any]]:
     """
     Check for regressions against baselines.
-
-    W18.3: Now checks both P50 (median) and P99 (tail) latencies.
 
     Args:
         baseline: Baseline configuration dict
         results_dir: Path to criterion results
         threshold: P50 regression threshold multiplier
-        strict_p99: If True, FAIL validation when P99 cannot be extracted
+        strict_tail: If True, FAIL validation when tail cannot be extracted
 
     Returns:
         (passed, results_dict)
@@ -219,7 +227,7 @@ def check_regression(
 
     for name, config in benchmarks.items():
         # Look for benchmark in criterion output
-        benchmark_path = results_dir / "validation" / name
+        benchmark_path = results_dir / BENCHMARK_GROUP / name
 
         if not benchmark_path.exists():
             results[name] = {
@@ -238,7 +246,7 @@ def check_regression(
 
         # Extract metrics in nanoseconds
         current_median_ns = extract_median_ns(estimates)
-        current_p99_ns, p99_estimated = extract_p99_ns(estimates, name)
+        current_tail_ns, tail_estimated = extract_tail_ns(estimates, name)
 
         if current_median_ns is None:
             results[name] = {
@@ -247,12 +255,12 @@ def check_regression(
             }
             continue
 
-        # [C3 FIX] FAIL if P99 extraction fails and baseline expects P99
-        baseline_p99 = config.get("p99", 0)
-        if current_p99_ns is None and baseline_p99 > 0 and strict_p99:
+        # FAIL if tail extraction fails and baseline expects tail
+        baseline_tail = get_baseline_tail(config)
+        if current_tail_ns is None and baseline_tail > 0 and strict_tail:
             results[name] = {
                 "status": "FAIL",
-                "reason": "Could not extract P99 from estimates (baseline requires P99)",
+                "reason": "Could not extract tail from estimates (baseline requires tail)",
             }
             all_passed = False
             continue
@@ -275,16 +283,16 @@ def check_regression(
 
         # Convert to target unit
         current_median = convert_ns_to_unit(current_median_ns, unit)
-        current_p99 = convert_ns_to_unit(current_p99_ns, unit) if current_p99_ns else None
+        current_tail = convert_ns_to_unit(current_tail_ns, unit) if current_tail_ns else None
 
         # Initialize result
         result: dict[str, Any] = {
             "current_p50": current_median,
-            "current_p99": current_p99,
+            "current_tail": current_tail,
             "baseline_p50": baseline_p50,
-            "baseline_p99": baseline_p99,
+            "baseline_tail": baseline_tail,
             "unit": unit,
-            "p99_estimated": p99_estimated,
+            "tail_estimated": tail_estimated,
             "checks": [],
         }
 
@@ -314,42 +322,42 @@ def check_regression(
                     "reason": f"P50 {p50_ratio:.1%} of baseline"
                 })
 
-        # Check 2: P99 regression
-        if current_p99 is not None and baseline_p99 > 0:
-            p99_ratio = current_p99 / baseline_p99
-            result["p99_ratio"] = p99_ratio
+        # Check 2: Tail regression
+        if current_tail is not None and baseline_tail > 0:
+            tail_ratio = current_tail / baseline_tail
+            result["tail_ratio"] = tail_ratio
 
-            if p99_ratio > P99_REGRESSION_THRESHOLD:
+            if tail_ratio > TAIL_REGRESSION_THRESHOLD:
                 result["checks"].append({
-                    "name": "P99 Regression",
+                    "name": "Tail Regression",
                     "passed": False,
-                    "reason": f"P99 {p99_ratio:.1%} of baseline (threshold: {P99_REGRESSION_THRESHOLD:.0%})"
+                    "reason": f"Tail {tail_ratio:.1%} of baseline (threshold: {TAIL_REGRESSION_THRESHOLD:.0%})"
                 })
                 all_passed = False
             else:
                 result["checks"].append({
-                    "name": "P99 Regression",
+                    "name": "Tail Regression",
                     "passed": True,
-                    "reason": f"P99 {p99_ratio:.1%} of baseline"
+                    "reason": f"Tail {tail_ratio:.1%} of baseline"
                 })
 
-        # Check 3: P99/P50 ratio sanity check
-        if current_p99 is not None and current_median > 0:
-            p99_p50_ratio = current_p99 / current_median
-            result["p99_p50_ratio"] = p99_p50_ratio
+        # Check 3: Tail/P50 ratio sanity check
+        if current_tail is not None and current_median > 0:
+            tail_p50_ratio = current_tail / current_median
+            result["tail_p50_ratio"] = tail_p50_ratio
 
-            if p99_p50_ratio > P99_MEDIAN_RATIO_MAX:
+            if tail_p50_ratio > TAIL_MEDIAN_RATIO_MAX:
                 result["checks"].append({
-                    "name": "P99/P50 Ratio",
+                    "name": "Tail/P50 Ratio",
                     "passed": False,
-                    "reason": f"P99/P50 ratio {p99_p50_ratio:.2f}x exceeds {P99_MEDIAN_RATIO_MAX}x limit"
+                    "reason": f"Tail/P50 ratio {tail_p50_ratio:.2f}x exceeds {TAIL_MEDIAN_RATIO_MAX}x limit"
                 })
                 all_passed = False
             else:
                 result["checks"].append({
-                    "name": "P99/P50 Ratio",
+                    "name": "Tail/P50 Ratio",
                     "passed": True,
-                    "reason": f"P99/P50 ratio {p99_p50_ratio:.2f}x (OK)"
+                    "reason": f"Tail/P50 ratio {tail_p50_ratio:.2f}x (OK)"
                 })
 
         # Determine overall status
@@ -370,13 +378,13 @@ def check_regression(
 # OUTPUT FORMATTERS
 # =============================================================================
 
-def print_results(results: dict[str, Any], verbose: bool = True) -> None:
+def print_results(results: dict[str, Any]) -> None:
     """Print results in a formatted table."""
     print("\n" + "=" * 80)
-    print("BENCHMARK VALIDATION RESULTS (W18.3 v1.2: P99 Tracking)")
+    print("BENCHMARK VALIDATION RESULTS (W18.3 v1.3: Calibrated Baselines)")
     print("=" * 80)
-    print(f"P99 estimate: mean + {P99_STDDEV_MULTIPLIER}*std_dev (conservative for long tails)")
-    print(f"P99/P50 ratio max: {P99_MEDIAN_RATIO_MAX}x")
+    print(f"Tail estimate: mean + {TAIL_STDDEV_MULTIPLIER}*std_dev (conservative bound)")
+    print(f"Tail/P50 ratio max: {TAIL_MEDIAN_RATIO_MAX}x")
     print("=" * 80)
 
     for name, data in results.items():
@@ -387,22 +395,22 @@ def print_results(results: dict[str, Any], verbose: bool = True) -> None:
             continue
 
         current_p50 = data.get("current_p50", 0)
-        current_p99 = data.get("current_p99")
+        current_tail = data.get("current_tail")
         baseline_p50 = data.get("baseline_p50", 0)
-        baseline_p99 = data.get("baseline_p99", 0)
+        baseline_tail = data.get("baseline_tail", 0)
         unit = data.get("unit", "ns")
-        p99_estimated = data.get("p99_estimated", False)
+        tail_estimated = data.get("tail_estimated", False)
 
         # Status indicator
         indicator = {"PASS": "[PASS]", "REGRESSION": "[REGR]", "FAIL": "[FAIL]"}.get(status, "[????]")
 
         print(f"\n{indicator} {name}")
         print(f"    P50:  {current_p50:.2f} {unit} (baseline: {baseline_p50:.2f} {unit})")
-        if current_p99 is not None:
-            est_marker = " (estimated)" if p99_estimated else ""
-            print(f"    P99:  {current_p99:.2f} {unit} (baseline: {baseline_p99:.2f} {unit}){est_marker}")
+        if current_tail is not None:
+            est_marker = " (estimated)" if tail_estimated else ""
+            print(f"    Tail: {current_tail:.2f} {unit} (baseline: {baseline_tail:.2f} {unit}){est_marker}")
             if current_p50 > 0:
-                print(f"    P99/P50 Ratio: {current_p99/current_p50:.2f}x")
+                print(f"    Tail/P50 Ratio: {current_tail/current_p50:.2f}x")
 
         # Print check details
         for check in data.get("checks", []):
@@ -413,17 +421,17 @@ def print_results(results: dict[str, Any], verbose: bool = True) -> None:
 
 
 def generate_pr_comment(results: dict[str, Any], passed: bool) -> str:
-    """Generate a markdown comment for PR with P99 metrics."""
-    lines = ["## Benchmark Validation Results (W18.3 v1.2)\n"]
+    """Generate a markdown comment for PR with tail metrics."""
+    lines = ["## Benchmark Validation Results (W18.3 v1.3)\n"]
 
     if passed:
         lines.append("All benchmarks within threshold.\n")
     else:
         lines.append("**Regression detected!** See details below.\n")
 
-    # Summary table with P99
-    lines.append("| Benchmark | P50 | P99 | P50 vs Baseline | P99 vs Baseline | Status |")
-    lines.append("|:----------|----:|----:|----------------:|----------------:|:-------|")
+    # Summary table with tail
+    lines.append("| Benchmark | P50 | Tail | P50 vs Baseline | Tail vs Baseline | Status |")
+    lines.append("|:----------|----:|-----:|----------------:|-----------------:|:-------|")
 
     for name, data in results.items():
         status = data.get("status", "SKIP")
@@ -432,25 +440,25 @@ def generate_pr_comment(results: dict[str, Any], passed: bool) -> str:
             continue
 
         current_p50 = data.get("current_p50", 0)
-        current_p99 = data.get("current_p99")
+        current_tail = data.get("current_tail")
         p50_ratio = data.get("p50_ratio", 0)
-        p99_ratio = data.get("p99_ratio")
+        tail_ratio = data.get("tail_ratio")
         unit = data.get("unit", "ns")
 
         p50_str = f"{current_p50:.2f} {unit}"
-        p99_str = f"{current_p99:.2f} {unit}" if current_p99 else "-"
+        tail_str = f"{current_tail:.2f} {unit}" if current_tail else "-"
         p50_ratio_str = f"{p50_ratio:.0%}" if p50_ratio else "-"
-        p99_ratio_str = f"{p99_ratio:.0%}" if p99_ratio else "-"
+        tail_ratio_str = f"{tail_ratio:.0%}" if tail_ratio else "-"
 
         status_icon = {"PASS": "OK", "REGRESSION": "REGR", "FAIL": "FAIL"}.get(status, "??")
 
-        lines.append(f"| {name} | {p50_str} | {p99_str} | {p50_ratio_str} | {p99_ratio_str} | {status_icon} |")
+        lines.append(f"| {name} | {p50_str} | {tail_str} | {p50_ratio_str} | {tail_ratio_str} | {status_icon} |")
 
     lines.append("\n### Thresholds")
     lines.append(f"- P50 regression: >{P50_REGRESSION_THRESHOLD:.0%} of baseline")
-    lines.append(f"- P99 regression: >{P99_REGRESSION_THRESHOLD:.0%} of baseline")
-    lines.append(f"- P99/P50 ratio: <{P99_MEDIAN_RATIO_MAX}x")
-    lines.append(f"\n*P99 estimated as mean + {P99_STDDEV_MULTIPLIER}*std_dev*")
+    lines.append(f"- Tail regression: >{TAIL_REGRESSION_THRESHOLD:.0%} of baseline")
+    lines.append(f"- Tail/P50 ratio: <{TAIL_MEDIAN_RATIO_MAX}x")
+    lines.append(f"\n*Tail estimated as mean + {TAIL_STDDEV_MULTIPLIER}*std_dev (conservative bound)*")
 
     return "\n".join(lines)
 
@@ -460,7 +468,7 @@ def generate_pr_comment(results: dict[str, Any], passed: bool) -> str:
 # =============================================================================
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Check for benchmark regressions (P50 and P99)")
+    parser = argparse.ArgumentParser(description="Check for benchmark regressions (P50 and Tail)")
     parser.add_argument(
         "--baseline",
         type=Path,
@@ -490,9 +498,9 @@ def main() -> None:
         help="Only print final status",
     )
     parser.add_argument(
-        "--lenient-p99",
+        "--lenient-tail",
         action="store_true",
-        help="Don't fail if P99 extraction fails (skip instead)",
+        help="Don't fail if tail extraction fails (skip instead)",
     )
 
     args = parser.parse_args()
@@ -506,8 +514,8 @@ def main() -> None:
     )
 
     # Check for regressions
-    strict_p99 = not args.lenient_p99
-    passed, results = check_regression(baseline, args.results, threshold, strict_p99)
+    strict_tail = not args.lenient_tail
+    passed, results = check_regression(baseline, args.results, threshold, strict_tail)
 
     # Output results
     if args.pr_comment:
@@ -517,10 +525,10 @@ def main() -> None:
 
     # Final status
     if passed:
-        print("\nResult: PASS - All benchmarks within threshold (P50 and P99)")
+        print("\nResult: PASS - All benchmarks within threshold (P50 and Tail)")
         sys.exit(0)
     else:
-        print("\nResult: FAIL - Regression detected (P50 or P99)")
+        print("\nResult: FAIL - Regression detected (P50 or Tail)")
         sys.exit(1)
 
 

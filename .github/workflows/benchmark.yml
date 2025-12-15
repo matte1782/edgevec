@@ -1,8 +1,8 @@
 # EdgeVec Performance Benchmarks CI
-# Tracks P50 and P99 latency and detects regressions
+# Tracks P50 and tail latency and detects regressions
 # Created: W14.2 (Dec 2025)
 # Revised: W14.1 Day 1 - Fixed path alignment with check_regression.py
-# Revised: W18.3 - Enhanced P99 tracking with P99/P50 ratio checks
+# Revised: W18.3 v1.3 - Calibrated baselines, tail (not P99) naming, optimized workflow
 
 name: Performance Benchmarks
 
@@ -56,8 +56,21 @@ jobs:
           # Benchmarks: insert_1k, search_10k, quantization_encode, hamming_distance
           cargo bench --bench validation -- --noplot
 
-      - name: Check for regressions
-        run: python benches/check_regression.py
+      # [m2 FIX] Run check once and capture both stdout and PR comment in single pass
+      - name: Check for regressions and generate report
+        id: regression_check
+        run: |
+          # Run regression check and save output
+          python benches/check_regression.py 2>&1 | tee regression_output.txt
+          RESULT=${PIPESTATUS[0]}
+
+          # Generate PR comment if on pull request
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python benches/check_regression.py --pr-comment > benchmark_comment.md
+          fi
+
+          # Exit with original result
+          exit $RESULT
         continue-on-error: false
 
       - name: Upload benchmark results
@@ -68,12 +81,8 @@ jobs:
           path: |
             target/criterion/
             benches/baselines.json
+            regression_output.txt
           retention-days: 30
-
-      - name: Generate PR comment
-        if: github.event_name == 'pull_request'
-        run: python benches/check_regression.py --pr-comment > benchmark_comment.md
-        continue-on-error: true
 
       - name: Comment on PR with results
         if: github.event_name == 'pull_request'
