@@ -1,7 +1,8 @@
 # EdgeVec Performance Benchmarks CI
-# Tracks P99 latency and detects regressions
+# Tracks P50 and P99 latency and detects regressions
 # Created: W14.2 (Dec 2025)
 # Revised: W14.1 Day 1 - Fixed path alignment with check_regression.py
+# Revised: W18.3 - Enhanced P99 tracking with P99/P50 ratio checks
 
 name: Performance Benchmarks
 

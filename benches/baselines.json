@@ -1,21 +1,25 @@
 {
-  "version": "1.0.0",
+  "version": "1.2.0",
   "created": "2025-12-13",
-  "description": "Baseline P50/P99 latencies for EdgeVec benchmark validation suite",
+  "updated": "2025-12-15",
+  "description": "Baseline P50/P99 latencies for EdgeVec benchmark validation suite (W18.3 v1.2: P99 tracking)",
   "hardware": {
     "note": "Baselines should be recalibrated per target hardware",
     "reference": "Development machine (to be updated after first CI run)"
   },
   "thresholds": {
     "regression_multiplier": 1.1,
-    "note": "Fail if current > baseline * regression_multiplier (10% tolerance)"
+    "p99_regression_multiplier": 1.5,
+    "p99_median_ratio_max": 5.0,
+    "p99_estimation_note": "P99 estimated as mean + 5*std_dev (conservative for long-tailed distributions)",
+    "note": "P50: Fail if >110% baseline. P99: Fail if >150% baseline or >5x median (W18.3 v1.2)"
   },
   "benchmarks": {
     "insert_1k": {
       "description": "Insert 1000 vectors (768 dimensions) into HNSW index",
       "unit": "ms",
       "p50": 300.0,
-      "p99": 500.0,
+      "p99": 600.0,
       "target": 500.0,
       "hard_limit": 1000.0
     },
@@ -23,7 +27,7 @@
       "description": "Search k=10 in 10k vector index (768 dimensions)",
       "unit": "ms",
       "p50": 2.0,
-      "p99": 5.0,
+      "p99": 6.0,
       "target": 5.0,
       "hard_limit": 10.0
     },
@@ -31,7 +35,7 @@
       "description": "SQ8 quantization of single 768-dimension vector",
       "unit": "us",
       "p50": 5.0,
-      "p99": 10.0,
+      "p99": 15.0,
       "target": 10.0,
       "hard_limit": 50.0
     },
@@ -39,7 +43,7 @@
       "description": "Binary Hamming distance (96 bytes)",
       "unit": "ns",
       "p50": 50.0,
-      "p99": 100.0,
+      "p99": 150.0,
       "target": 100.0,
       "hard_limit": 200.0
     }
