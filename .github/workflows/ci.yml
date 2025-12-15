@@ -12,6 +12,8 @@ env:
   RUSTFLAGS: "-C target-cpu=x86-64-v2"
   # Reduce proptest cases in CI (full coverage runs locally)
   PROPTEST_CASES: "32"
+  # Reduce vector count for slow integration tests
+  NUM_VECTORS: "1000"
 
 jobs:
   # Job 1: Correctness & Testing
