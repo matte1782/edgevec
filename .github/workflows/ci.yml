@@ -10,12 +10,15 @@ env:
   CARGO_TERM_COLOR: always
   # Override .cargo/config.toml's target-cpu=native to prevent SIGILL on CI runners
   RUSTFLAGS: "-C target-cpu=x86-64-v2"
+  # Reduce proptest cases in CI (full coverage runs locally)
+  PROPTEST_CASES: "32"
 
 jobs:
   # Job 1: Correctness & Testing
   test:
     name: Test Suite (Linux)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
