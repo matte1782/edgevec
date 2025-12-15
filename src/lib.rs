@@ -120,7 +120,7 @@ pub mod simd;
 
 pub use batch::BatchInsertable;
 pub use error::BatchError;
-pub use hnsw::{HnswConfig, HnswIndex, SearchResult};
+pub use hnsw::{BatchDeleteError, BatchDeleteResult, HnswConfig, HnswIndex, SearchResult};
 pub use metric::Metric;
 pub use persistence::ChunkedWriter;
 pub use quantization::{BinaryQuantizer, QuantizedVector, QuantizerConfig, ScalarQuantizer};

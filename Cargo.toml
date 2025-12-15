@@ -137,6 +137,10 @@ harness = false
 name = "tombstone_bench"
 harness = false
 
+[[bench]]
+name = "batch_delete_bench"
+harness = false
+
 [[example]]
 name = "batch_insert"
 

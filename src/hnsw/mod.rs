@@ -13,7 +13,8 @@ pub mod search;
 
 pub use config::HnswConfig;
 pub use graph::{
-    CompactionResult, GraphError, HnswIndex, HnswNode, NodeId, VectorId, VectorProvider,
+    BatchDeleteError, BatchDeleteResult, CompactionResult, GraphError, HnswIndex, HnswNode, NodeId,
+    VectorId, VectorProvider,
 };
 pub use neighbor::NeighborPool;
 pub use search::{Candidate, SearchContext, SearchResult, Searcher};
