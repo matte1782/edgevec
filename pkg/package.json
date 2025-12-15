@@ -3,7 +3,7 @@
   "type": "module",
   "description": "High-performance embedded vector database for Browser, Node, and Edge",
   "version": "0.3.0",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "repository": {
     "type": "git",
     "url": "https://github.com/matte1782/edgevec"
