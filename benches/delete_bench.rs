@@ -4,7 +4,7 @@
 //!
 //! Run with: `cargo bench --bench delete_bench`
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use edgevec::hnsw::{HnswConfig, HnswIndex, VectorId};
 use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};
@@ -44,13 +44,13 @@ fn bench_delete_impact(c: &mut Criterion) {
     let (index_clean, storage_clean) = build_index(&vectors, dims);
 
     // 3. Prepare 50% Deleted
-    let (index_dirty, mut storage_dirty) = build_index(&vectors, dims);
+    let (mut index_dirty, storage_dirty) = build_index(&vectors, dims);
     let mut deleted_count = 0;
     // Delete even IDs
     for i in 0..count {
         if i % 2 == 0 {
             let id = VectorId((i + 1) as u64);
-            index_dirty.delete(id, &mut storage_dirty);
+            let _ = index_dirty.soft_delete(id);
             deleted_count += 1;
         }
     }

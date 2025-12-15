@@ -185,8 +185,8 @@ proptest! {
         let mut provider = MockVectorProvider::new();
 
         let count = std::cmp::min(n as usize, vectors.len());
-        for i in 0..count {
-            let vec = vectors[i].iter().take(d).copied().chain(std::iter::repeat(0.0)).take(d).collect::<Vec<_>>();
+        for (i, vectors_item) in vectors.iter().enumerate().take(count) {
+            let vec = vectors_item.iter().take(d).copied().chain(std::iter::repeat(0.0)).take(d).collect::<Vec<_>>();
             provider.add(i as u64 + 1, vec);
             index.add_node(VectorId(i as u64 + 1), 0).unwrap();
         }
@@ -310,8 +310,8 @@ proptest! {
 
         let count = std::cmp::min(n as usize, vectors.len());
         // Insert vectors
-        for i in 0..count {
-            let vec = vectors[i].iter().take(d).copied().chain(std::iter::repeat(0.0)).take(d).collect::<Vec<_>>();
+        for (i, vectors_item) in vectors.iter().enumerate().take(count) {
+            let vec = vectors_item.iter().take(d).copied().chain(std::iter::repeat(0.0)).take(d).collect::<Vec<_>>();
             storage.insert(&vec).unwrap();
             index.add_node(VectorId(i as u64 + 1), 0).unwrap();
         }
@@ -342,8 +342,8 @@ proptest! {
 
         // Calculate ground truth distances using original float vectors
         let mut truth: Vec<(NodeId, f32)> = Vec::new();
-        for i in 0..count {
-             let vec = vectors[i].iter().take(d).copied().chain(std::iter::repeat(0.0)).take(d).collect::<Vec<_>>();
+        for (i, vectors_item) in vectors.iter().enumerate().take(count) {
+             let vec = vectors_item.iter().take(d).copied().chain(std::iter::repeat(0.0)).take(d).collect::<Vec<_>>();
              let dist: f32 = query.iter().zip(vec.iter()).map(|(a, b)| (a - b).powi(2)).sum();
              truth.push((NodeId(i as u32), dist));
         }

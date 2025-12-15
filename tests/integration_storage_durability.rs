@@ -2,7 +2,7 @@ use edgevec::hnsw::{HnswConfig, VectorId};
 use edgevec::persistence::storage::file::FileBackend;
 use edgevec::persistence::wal::WalAppender;
 use edgevec::storage::VectorStorage;
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
 
 // INT-DUR-001: Standard Persistence Cycle
@@ -56,7 +56,7 @@ fn test_recovery_truncated_wal() {
         let wal = WalAppender::new(backend, 0);
         let mut storage = VectorStorage::new(&config, Some(wal));
         for i in 0..100 {
-            storage.insert(&vec![i as f32; 4]).unwrap();
+            storage.insert(&[i as f32; 4]).unwrap();
         }
     }
 
@@ -93,7 +93,7 @@ fn test_recovery_checksum_fail_tail() {
         let wal = WalAppender::new(backend, 0);
         let mut storage = VectorStorage::new(&config, Some(wal));
         for i in 0..100 {
-            storage.insert(&vec![i as f32; 4]).unwrap();
+            storage.insert(&[i as f32; 4]).unwrap();
         }
     }
 

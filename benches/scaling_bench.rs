@@ -77,10 +77,10 @@ fn bench_scaling(c: &mut Criterion) {
                 let check_start = Instant::now();
                 let check_count = 100.min(queries.len());
                 let mut search_ctx = SearchContext::new();
-                for i in 0..check_count {
+                for query in queries.iter().take(check_count) {
                     let _ = black_box(
                         index
-                            .search_with_context(&queries[i], k, &storage, &mut search_ctx)
+                            .search_with_context(query, k, &storage, &mut search_ctx)
                             .unwrap(),
                     );
                 }

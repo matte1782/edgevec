@@ -375,8 +375,8 @@ fn test_compaction_result_fields() {
         "Should have removed 20 tombstones"
     );
     assert_eq!(result.new_size, 30, "New size should be 30");
-    // duration_ms can be any value >= 0, just verify type
-    assert!(result.duration_ms >= 0, "Duration should be non-negative");
+    // duration_ms is u64, always >= 0, verify field exists
+    let _duration: u64 = result.duration_ms;
 }
 
 #[test]

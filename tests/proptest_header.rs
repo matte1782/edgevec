@@ -1,4 +1,3 @@
-use edgevec::hnsw::HnswConfig;
 use edgevec::persistence::{read_file_header, FileHeader, PersistenceError};
 use proptest::prelude::*;
 

@@ -34,12 +34,10 @@ impl StorageBackend for FaultyBackend {
         // Determine target path for temp file logic
         let target_path = if key.is_empty() {
             self.root.clone()
+        } else if let Some(parent) = self.root.parent() {
+            parent.join(key)
         } else {
-            if let Some(parent) = self.root.parent() {
-                parent.join(key)
-            } else {
-                PathBuf::from(key)
-            }
+            PathBuf::from(key)
         };
 
         // Write to temp file to simulate the "Prepare" phase
@@ -113,7 +111,7 @@ fn test_atomic_write_no_temp_left() {
     for entry in fs::read_dir(dir.path()).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "tmp") {
+        if path.extension().is_some_and(|ext| ext == "tmp") {
             found_tmp = true;
             println!("Found temp file: {:?}", path);
         }

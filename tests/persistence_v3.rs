@@ -164,7 +164,7 @@ fn test_crc32_checksum_catches_corruption() {
     }
 
     // Write corrupted data back
-    let mut corrupted_backend = MemoryBackend::default();
+    let corrupted_backend = MemoryBackend::default();
     corrupted_backend.atomic_write("", &corrupted).unwrap();
 
     // Load should fail with checksum error
@@ -186,7 +186,7 @@ fn test_header_checksum_catches_corruption() {
     corrupted[40] ^= 0xFF;
 
     // Write corrupted data back
-    let mut corrupted_backend = MemoryBackend::default();
+    let corrupted_backend = MemoryBackend::default();
     corrupted_backend.atomic_write("", &corrupted).unwrap();
 
     // Load should fail with checksum error

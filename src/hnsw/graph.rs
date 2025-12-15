@@ -1868,15 +1868,15 @@ mod tests {
             }
 
             // Delete 5 of 10 = 50% tombstones
-            for i in 0..5 {
-                index.soft_delete(ids[i]).unwrap();
+            for id in ids.iter().take(5) {
+                index.soft_delete(*id).unwrap();
             }
 
             // 50% tombstones → 2x multiplier
             // adjusted_k(10) = ceil(10 / 0.5) = 20
             let adjusted = index.adjusted_k(10);
             assert!(
-                adjusted >= 18 && adjusted <= 22,
+                (18..=22).contains(&adjusted),
                 "Expected ~20, got {adjusted}"
             );
         }
@@ -1893,8 +1893,8 @@ mod tests {
             }
 
             // Delete 95 of 100 = 95% tombstones
-            for i in 0..95 {
-                index.soft_delete(ids[i]).unwrap();
+            for id in ids.iter().take(95) {
+                index.soft_delete(*id).unwrap();
             }
 
             // Should cap at 10x, not 20x
@@ -1920,7 +1920,7 @@ mod tests {
             // adjusted_k(10) = ceil(10 / 0.9) = ceil(11.11) = 12
             let adjusted = index.adjusted_k(10);
             assert!(
-                adjusted >= 11 && adjusted <= 13,
+                (11..=13).contains(&adjusted),
                 "Expected ~12, got {adjusted}"
             );
         }
@@ -1955,8 +1955,8 @@ mod tests {
             }
 
             // Delete exactly 5 of 10 = 50%
-            for i in 0..5 {
-                index.soft_delete(ids[i]).unwrap();
+            for id in ids.iter().take(5) {
+                index.soft_delete(*id).unwrap();
             }
 
             // 50% tombstones → 2x
@@ -1977,8 +1977,8 @@ mod tests {
             }
 
             // Delete 9 of 10 = 90%
-            for i in 0..9 {
-                index.soft_delete(ids[i]).unwrap();
+            for id in ids.iter().take(9) {
+                index.soft_delete(*id).unwrap();
             }
 
             // 90% tombstones → 10x
@@ -2032,7 +2032,7 @@ mod tests {
             // Note: adjusted_k controls internal effort, not final result count
             let adjusted = index.adjusted_k(100);
             assert!(
-                adjusted >= 166 && adjusted <= 168,
+                (166..=168).contains(&adjusted),
                 "Should compute ~166 for 40% tombstones, got {adjusted}"
             );
         }
@@ -2055,15 +2055,15 @@ mod tests {
             }
 
             // Delete 33 of 100 = 33%
-            for i in 0..33 {
-                index.soft_delete(ids[i]).unwrap();
+            for id in ids.iter().take(33) {
+                index.soft_delete(*id).unwrap();
             }
 
             // adjusted_k(10) = 10 * 100 / 67 = 14.925... → 14
             let adjusted = index.adjusted_k(10);
             // Should be close to 15 (1.49x)
             assert!(
-                adjusted >= 14 && adjusted <= 16,
+                (14..=16).contains(&adjusted),
                 "33% tombstones: expected ~15, got {adjusted}"
             );
         }
