@@ -283,7 +283,8 @@ mod neon_tests {
         assert!(
             (neon_result - portable_result).abs() < 0.01,
             "768 dims: NEON {} != Portable {}",
-            neon_result, portable_result
+            neon_result,
+            portable_result
         );
     }
 
@@ -333,14 +334,17 @@ mod neon_tests {
         assert!(
             (neon_result - portable_result).abs() < 0.01,
             "768 dims: NEON {} != Portable {}",
-            neon_result, portable_result
+            neon_result,
+            portable_result
         );
     }
 
     #[test]
     fn test_neon_matches_portable_various_sizes() {
         // Test sizes that exercise NEON vector boundaries
-        for size in [0, 1, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 100, 768, 1024] {
+        for size in [
+            0, 1, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 100, 768, 1024,
+        ] {
             let a: Vec<f32> = (0..size).map(|i| (i as f32) * 0.1).collect();
             let b: Vec<f32> = (0..size).map(|i| ((size - i) as f32) * 0.1).collect();
 
@@ -350,7 +354,9 @@ mod neon_tests {
             assert!(
                 (neon_dot - portable_dot).abs() < 0.01,
                 "dot_product size={}: NEON {} != Portable {}",
-                size, neon_dot, portable_dot
+                size,
+                neon_dot,
+                portable_dot
             );
 
             // Euclidean
@@ -359,7 +365,9 @@ mod neon_tests {
             assert!(
                 (neon_euc - portable_euc).abs() < 0.01,
                 "euclidean size={}: NEON {} != Portable {}",
-                size, neon_euc, portable_euc
+                size,
+                neon_euc,
+                portable_euc
             );
         }
     }

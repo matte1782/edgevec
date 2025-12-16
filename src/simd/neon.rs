@@ -31,7 +31,6 @@
 //! }
 //! ```
 
-use crate::quantization::simd::portable::hamming_distance_portable;
 use crate::quantization::simd::portable::hamming_distance_slice as hamming_distance_portable_generic;
 use std::arch::aarch64::*;
 
