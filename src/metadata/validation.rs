@@ -212,7 +212,7 @@ pub fn validate_key(key: &str) -> Result<(), MetadataError> {
 /// // Valid values
 /// assert!(validate_value(&MetadataValue::String("hello".into())).is_ok());
 /// assert!(validate_value(&MetadataValue::Integer(42)).is_ok());
-/// assert!(validate_value(&MetadataValue::Float(3.14)).is_ok());
+/// assert!(validate_value(&MetadataValue::Float(2.5)).is_ok());
 /// assert!(validate_value(&MetadataValue::Boolean(true)).is_ok());
 ///
 /// // Invalid values

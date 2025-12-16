@@ -11,6 +11,7 @@ fn vector_strategy(dim: usize) -> impl Strategy<Value = Vec<f32>> {
     proptest::collection::vec(proptest::num::f32::NORMAL, dim)
 }
 
+#[allow(dead_code)]
 fn hnsw_config_strategy() -> impl Strategy<Value = HnswConfig> {
     Just(HnswConfig::new(2)) // Use 2D for simplicity in these tests
 }

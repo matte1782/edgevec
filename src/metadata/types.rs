@@ -23,7 +23,7 @@
 //! ```json
 //! {"type": "string", "value": "hello"}
 //! {"type": "integer", "value": 42}
-//! {"type": "float", "value": 3.14}
+//! {"type": "float", "value": 2.5}
 //! {"type": "boolean", "value": true}
 //! {"type": "string_array", "value": ["a", "b", "c"]}
 //! ```
@@ -122,7 +122,7 @@ impl MetadataValue {
     ///
     /// assert_eq!(MetadataValue::String("hi".into()).type_name(), "string");
     /// assert_eq!(MetadataValue::Integer(42).type_name(), "integer");
-    /// assert_eq!(MetadataValue::Float(3.14).type_name(), "float");
+    /// assert_eq!(MetadataValue::Float(2.5).type_name(), "float");
     /// assert_eq!(MetadataValue::Boolean(true).type_name(), "boolean");
     /// assert_eq!(MetadataValue::StringArray(vec![]).type_name(), "string_array");
     /// ```
@@ -202,7 +202,7 @@ impl MetadataValue {
     /// let value = MetadataValue::Integer(42);
     /// assert_eq!(value.as_integer(), Some(42));
     ///
-    /// let value = MetadataValue::Float(3.14);
+    /// let value = MetadataValue::Float(2.5);
     /// assert_eq!(value.as_integer(), None);
     /// ```
     #[must_use]
@@ -222,8 +222,8 @@ impl MetadataValue {
     /// ```rust
     /// use edgevec::metadata::MetadataValue;
     ///
-    /// let value = MetadataValue::Float(3.14);
-    /// assert_eq!(value.as_float(), Some(3.14));
+    /// let value = MetadataValue::Float(2.5);
+    /// assert_eq!(value.as_float(), Some(2.5));
     ///
     /// let value = MetadataValue::Integer(42);
     /// assert_eq!(value.as_float(), None);
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_metadata_value_float_roundtrip() {
-        let value = MetadataValue::Float(3.14159);
+        let value = MetadataValue::Float(9.87654);
         let json = serde_json::to_string(&value).unwrap();
         let parsed: MetadataValue = serde_json::from_str(&json).unwrap();
         assert_eq!(value, parsed);
@@ -428,9 +428,9 @@ mod tests {
 
     #[test]
     fn test_json_format_float() {
-        let value = MetadataValue::Float(3.14159);
+        let value = MetadataValue::Float(9.87654);
         let json = serde_json::to_string(&value).unwrap();
-        assert_eq!(json, r#"{"type":"float","value":3.14159}"#);
+        assert_eq!(json, r#"{"type":"float","value":9.87654}"#);
     }
 
     #[test]
@@ -456,7 +456,7 @@ mod tests {
     fn test_is_string() {
         assert!(MetadataValue::String("test".into()).is_string());
         assert!(!MetadataValue::Integer(42).is_string());
-        assert!(!MetadataValue::Float(3.14).is_string());
+        assert!(!MetadataValue::Float(2.5).is_string());
         assert!(!MetadataValue::Boolean(true).is_string());
         assert!(!MetadataValue::StringArray(vec![]).is_string());
     }
@@ -465,7 +465,7 @@ mod tests {
     fn test_is_integer() {
         assert!(!MetadataValue::String("test".into()).is_integer());
         assert!(MetadataValue::Integer(42).is_integer());
-        assert!(!MetadataValue::Float(3.14).is_integer());
+        assert!(!MetadataValue::Float(2.5).is_integer());
         assert!(!MetadataValue::Boolean(true).is_integer());
         assert!(!MetadataValue::StringArray(vec![]).is_integer());
     }
@@ -474,7 +474,7 @@ mod tests {
     fn test_is_float() {
         assert!(!MetadataValue::String("test".into()).is_float());
         assert!(!MetadataValue::Integer(42).is_float());
-        assert!(MetadataValue::Float(3.14).is_float());
+        assert!(MetadataValue::Float(2.5).is_float());
         assert!(!MetadataValue::Boolean(true).is_float());
         assert!(!MetadataValue::StringArray(vec![]).is_float());
     }
@@ -483,7 +483,7 @@ mod tests {
     fn test_is_boolean() {
         assert!(!MetadataValue::String("test".into()).is_boolean());
         assert!(!MetadataValue::Integer(42).is_boolean());
-        assert!(!MetadataValue::Float(3.14).is_boolean());
+        assert!(!MetadataValue::Float(2.5).is_boolean());
         assert!(MetadataValue::Boolean(true).is_boolean());
         assert!(!MetadataValue::StringArray(vec![]).is_boolean());
     }
@@ -492,7 +492,7 @@ mod tests {
     fn test_is_string_array() {
         assert!(!MetadataValue::String("test".into()).is_string_array());
         assert!(!MetadataValue::Integer(42).is_string_array());
-        assert!(!MetadataValue::Float(3.14).is_string_array());
+        assert!(!MetadataValue::Float(2.5).is_string_array());
         assert!(!MetadataValue::Boolean(true).is_string_array());
         assert!(MetadataValue::StringArray(vec![]).is_string_array());
     }
@@ -518,7 +518,7 @@ mod tests {
 
     #[test]
     fn test_as_float() {
-        assert_eq!(MetadataValue::Float(3.14).as_float(), Some(3.14));
+        assert_eq!(MetadataValue::Float(2.5).as_float(), Some(2.5));
         assert_eq!(MetadataValue::Integer(3).as_float(), None);
     }
 
@@ -542,7 +542,7 @@ mod tests {
 
     #[test]
     fn test_type_name() {
-        assert_eq!(MetadataValue::String("".into()).type_name(), "string");
+        assert_eq!(MetadataValue::String(String::new()).type_name(), "string");
         assert_eq!(MetadataValue::Integer(0).type_name(), "integer");
         assert_eq!(MetadataValue::Float(0.0).type_name(), "float");
         assert_eq!(MetadataValue::Boolean(false).type_name(), "boolean");
@@ -559,37 +559,39 @@ mod tests {
     #[test]
     fn test_display_string() {
         let value = MetadataValue::String("hello".into());
-        assert_eq!(format!("{}", value), "\"hello\"");
+        assert_eq!(format!("{value}"), "\"hello\"");
     }
 
     #[test]
     fn test_display_integer() {
         let value = MetadataValue::Integer(42);
-        assert_eq!(format!("{}", value), "42");
+        assert_eq!(format!("{value}"), "42");
     }
 
     #[test]
     fn test_display_float() {
-        let value = MetadataValue::Float(3.14);
-        assert_eq!(format!("{}", value), "3.14");
+        let value = MetadataValue::Float(2.5);
+        assert_eq!(format!("{value}"), "2.5");
     }
 
     #[test]
     fn test_display_boolean() {
-        assert_eq!(format!("{}", MetadataValue::Boolean(true)), "true");
-        assert_eq!(format!("{}", MetadataValue::Boolean(false)), "false");
+        let value_true = MetadataValue::Boolean(true);
+        let value_false = MetadataValue::Boolean(false);
+        assert_eq!(format!("{value_true}"), "true");
+        assert_eq!(format!("{value_false}"), "false");
     }
 
     #[test]
     fn test_display_string_array() {
         let value = MetadataValue::StringArray(vec!["a".into(), "b".into()]);
-        assert_eq!(format!("{}", value), "[\"a\", \"b\"]");
+        assert_eq!(format!("{value}"), "[\"a\", \"b\"]");
     }
 
     #[test]
     fn test_display_empty_array() {
         let value = MetadataValue::StringArray(vec![]);
-        assert_eq!(format!("{}", value), "[]");
+        assert_eq!(format!("{value}"), "[]");
     }
 
     // =========================================================================
@@ -622,14 +624,14 @@ mod tests {
 
     #[test]
     fn test_from_f64() {
-        let value: MetadataValue = 3.14f64.into();
-        assert_eq!(value, MetadataValue::Float(3.14));
+        let value: MetadataValue = 2.5f64.into();
+        assert_eq!(value, MetadataValue::Float(2.5));
     }
 
     #[test]
     fn test_from_f32() {
-        let value: MetadataValue = 3.14f32.into();
-        assert!(matches!(value, MetadataValue::Float(f) if (f - 3.14).abs() < 0.001));
+        let value: MetadataValue = 2.5f32.into();
+        assert!(matches!(value, MetadataValue::Float(f) if (f - 2.5).abs() < 0.001));
     }
 
     #[test]
@@ -696,7 +698,7 @@ mod tests {
 
     #[test]
     fn test_negative_float() {
-        let value = MetadataValue::Float(-3.14159);
+        let value = MetadataValue::Float(-9.87654);
         let json = serde_json::to_string(&value).unwrap();
         let parsed: MetadataValue = serde_json::from_str(&json).unwrap();
         assert_eq!(value, parsed);

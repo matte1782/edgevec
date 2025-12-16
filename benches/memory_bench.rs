@@ -7,7 +7,7 @@
 //! - Measures capacity of internal buffers.
 //! - Compares QuantizedU8 vs Float32.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use edgevec::hnsw::HnswConfig;
 use edgevec::quantization::QuantizerConfig;
 use edgevec::storage::{StorageType, VectorStorage};

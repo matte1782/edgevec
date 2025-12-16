@@ -144,6 +144,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_train_finds_min_max() {
         let v1 = vec![1.0, 5.0, -2.0];
         let v2 = vec![0.0, 10.0, 3.0];
@@ -170,7 +171,7 @@ mod tests {
 
         for (orig, dec) in original.iter().zip(decoded.iter()) {
             let diff = (*orig - *dec).abs();
-            assert!(diff < 0.05, "Diff too large: {} vs {}", orig, dec);
+            assert!(diff < 0.05, "Diff too large: {orig} vs {dec}");
         }
     }
 

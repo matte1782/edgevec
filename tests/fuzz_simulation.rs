@@ -1,7 +1,6 @@
 use edgevec::hnsw::VectorId;
 use edgevec::wasm::EdgeVec;
 use edgevec::{HnswConfig, HnswIndex, VectorStorage};
-use proptest::prelude::*;
 use rand::{Rng, SeedableRng};
 use std::time::{Duration, Instant};
 
@@ -67,7 +66,7 @@ fn fuzz_simulation_graph_ops() {
         let op = match op_type {
             0 => {
                 // Insert
-                let mut vec: Vec<f32> = (0..dim).map(|_| rng.gen()).collect();
+                let vec: Vec<f32> = (0..dim).map(|_| rng.gen()).collect();
                 Op::Insert { vector: vec }
             }
             1 => {
@@ -77,7 +76,7 @@ fn fuzz_simulation_graph_ops() {
             }
             2 => {
                 // Search
-                let mut vec: Vec<f32> = (0..dim).map(|_| rng.gen()).collect();
+                let vec: Vec<f32> = (0..dim).map(|_| rng.gen()).collect();
                 let k = rng.gen_range(1..20);
                 Op::Search { vector: vec, k }
             }

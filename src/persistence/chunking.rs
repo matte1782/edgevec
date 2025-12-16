@@ -342,6 +342,7 @@ mod tests {
         let config = HnswConfig::new(4); // Small dimension
         let mut storage = VectorStorage::new(&config, None);
         // Insert some vectors
+        #[allow(clippy::cast_precision_loss)]
         for i in 0..10 {
             storage.insert(&[i as f32; 4]).unwrap();
         }

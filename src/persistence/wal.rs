@@ -286,7 +286,8 @@ mod tests {
 
         // 2. Write 100 entries
         let mut appender = WalAppender::new(backend, 0);
-        for i in 0..100 {
+        #[allow(clippy::cast_sign_loss)]
+        for i in 0..100_i32 {
             let payload = (i as u32).to_le_bytes(); // 4 bytes payload
             appender.append(0, &payload).expect("append failed");
         }
@@ -299,6 +300,7 @@ mod tests {
         let iterator = WalIterator::new(cursor);
 
         let mut count = 0;
+        #[allow(clippy::cast_possible_truncation)]
         for (i, result) in iterator.enumerate() {
             let (entry, payload) = result.expect("replay failed");
             assert_eq!(entry.sequence, i as u64);

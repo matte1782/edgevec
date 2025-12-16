@@ -192,7 +192,7 @@ mod neon_correctness {
 #[test]
 fn sanity_check_test_runs() {
     // This test always passes, confirms test file is included
-    assert!(true);
+    // Sanity check that the test infrastructure works
 }
 
 /// Document total test count

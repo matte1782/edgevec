@@ -671,6 +671,7 @@ mod test_count_verification {
     /// Total: 30 tests
     ///
     /// Compile-time verification: 30 tests >= 25 minimum required
+    #[allow(clippy::assertions_on_constants)]
     const _: () = {
         assert!(30 >= 25, "Test count must exceed minimum");
     };

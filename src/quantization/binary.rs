@@ -445,7 +445,7 @@ mod tests {
 
         // Even indices are positive -> bits 0, 2, 4, 6 set in each byte
         // Binary: 01010101 = 0x55
-        for byte in quantized.data.iter() {
+        for byte in &quantized.data {
             assert_eq!(*byte, 0x55);
         }
     }
@@ -461,6 +461,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_possible_truncation)]
     fn test_hamming_distance_opposite() {
         let q1 = QuantizedVector::from_bytes([0x00u8; QUANTIZED_VECTOR_SIZE]);
         let q2 = QuantizedVector::from_bytes([0xFFu8; QUANTIZED_VECTOR_SIZE]);
@@ -469,6 +470,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_possible_truncation)]
     fn test_hamming_distance_symmetric() {
         let q1 = QuantizedVector::from_bytes([0xAAu8; QUANTIZED_VECTOR_SIZE]); // 10101010...
         let q2 = QuantizedVector::from_bytes([0x55u8; QUANTIZED_VECTOR_SIZE]); // 01010101...
@@ -479,6 +481,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_possible_truncation)]
     fn test_hamming_distance_partial() {
         let q1 = QuantizedVector::from_bytes([0xF0u8; QUANTIZED_VECTOR_SIZE]); // 11110000
         let q2 = QuantizedVector::from_bytes([0x0Fu8; QUANTIZED_VECTOR_SIZE]); // 00001111
@@ -609,6 +612,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_possible_truncation)]
     fn test_hamming_bounds() {
         let q1 = QuantizedVector::default();
         let q2 = QuantizedVector::from_bytes([0xFFu8; QUANTIZED_VECTOR_SIZE]);
@@ -621,6 +625,7 @@ mod tests {
 }
 
 #[cfg(test)]
+#[allow(clippy::cast_possible_truncation)]
 mod proptests {
     use super::*;
     use proptest::prelude::*;

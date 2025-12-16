@@ -167,9 +167,8 @@ fn test_adjusted_k_increases_fetch_size() {
     // 50% tombstones: adjusted_k should be ~2x
     let adjusted = index.adjusted_k(10);
     assert!(
-        adjusted >= 18 && adjusted <= 22,
-        "Expected ~20, got {}",
-        adjusted
+        (18..=22).contains(&adjusted),
+        "Expected ~20, got {adjusted}"
     );
 }
 

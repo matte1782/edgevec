@@ -1637,11 +1637,12 @@ mod tests {
         let mut index = HnswIndex::new(config, &storage).unwrap();
 
         let mut levels = vec![0u8; 1000];
-        for l in levels.iter_mut() {
+        for l in &mut levels {
             *l = index.get_random_level();
         }
 
         // Level 0 should be most common
+        #[allow(clippy::naive_bytecount)]
         let l0_count = levels.iter().filter(|&&l| l == 0).count();
         assert!(
             l0_count > 800,
@@ -2116,6 +2117,7 @@ mod tests {
         }
 
         #[test]
+        #[allow(clippy::float_cmp)]
         fn test_tombstone_ratio() {
             let (mut index, mut storage) = create_test_index();
 
@@ -2124,12 +2126,13 @@ mod tests {
 
             // Insert 4 vectors
             let mut ids = Vec::new();
+            #[allow(clippy::cast_precision_loss)]
             for i in 0..4 {
                 let id = index.insert(&[i as f32; 4], &mut storage).unwrap();
                 ids.push(id);
             }
 
-            assert_eq!(index.tombstone_ratio(), 0.0);
+            assert!((index.tombstone_ratio() - 0.0).abs() < f64::EPSILON);
 
             // Delete 1 of 4 = 25%
             index.soft_delete(ids[0]).unwrap();
@@ -2309,7 +2312,7 @@ mod tests {
             // 0% tombstones → no adjustment
             assert_eq!(index.adjusted_k(5), 5);
             assert_eq!(index.adjusted_k(10), 10);
-            assert_eq!(index.tombstone_ratio(), 0.0);
+            assert!((index.tombstone_ratio() - 0.0).abs() < f64::EPSILON);
         }
 
         #[test]

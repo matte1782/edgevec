@@ -491,6 +491,7 @@ mod tests {
         let chain_len = 20;
         let mut node_ids = Vec::new();
 
+        #[allow(clippy::cast_precision_loss)]
         for i in 0..chain_len {
             let vec = vec![i as f32, 0.0, 0.0, 0.0];
             let vid = storage.insert(&vec).unwrap();

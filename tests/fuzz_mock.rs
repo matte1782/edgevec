@@ -20,11 +20,8 @@ proptest! {
          let iter = WalIterator::new(cursor);
 
          for item in iter {
-             // Force evaluation
-             match item {
-                 Ok(_) => {},
-                 Err(_) => {},
-             }
+             // Force evaluation - drop result to acknowledge we're just iterating
+             let _ = item;
          }
     }
 }

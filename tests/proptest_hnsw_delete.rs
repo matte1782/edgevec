@@ -135,8 +135,8 @@ fn test_pathological_delete() {
     }
 
     // 2. Delete 99 (keep the last one) using RFC-001 soft_delete API
-    for i in 0..count - 1 {
-        index.soft_delete(ids[i]).unwrap();
+    for id in ids.iter().take(count - 1) {
+        index.soft_delete(*id).unwrap();
     }
 
     // 3. Search for the survivor (last one)

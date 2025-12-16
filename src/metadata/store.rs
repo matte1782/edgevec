@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_default_trait() {
-        let store: MetadataStore = Default::default();
+        let store: MetadataStore = MetadataStore::default();
         assert!(store.is_empty());
     }
 
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn test_debug() {
         let store = MetadataStore::new();
-        let debug_str = format!("{:?}", store);
+        let debug_str = format!("{store:?}");
         assert!(debug_str.contains("MetadataStore"));
     }
 }

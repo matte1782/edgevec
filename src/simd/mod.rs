@@ -187,7 +187,7 @@ mod tests {
     fn test_select_backend_no_panic() {
         // Should not panic on any platform
         let backend = select_backend();
-        println!("Selected backend: {:?}", backend);
+        println!("Selected backend: {backend:?}");
         // Backend should be one of the valid variants
         assert!(matches!(
             backend,

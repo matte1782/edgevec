@@ -8,8 +8,9 @@ fn create_test_index(count: usize) -> (HnswIndex, VectorStorage) {
     let mut storage = VectorStorage::new(&config, None);
     let mut index = HnswIndex::new(config, &storage).unwrap();
 
+    #[allow(clippy::cast_precision_loss)]
     for i in 0..count {
-        index.insert(&vec![i as f32; 4], &mut storage).unwrap();
+        index.insert(&[i as f32; 4], &mut storage).unwrap();
     }
 
     (index, storage)

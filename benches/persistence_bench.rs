@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use edgevec::hnsw::{HnswConfig, HnswIndex};
-use edgevec::persistence::storage::{MemoryBackend, StorageBackend};
+use edgevec::persistence::storage::MemoryBackend;
 use edgevec::persistence::{read_snapshot, write_snapshot};
 use edgevec::storage::VectorStorage;
 use rand::Rng;

@@ -154,7 +154,7 @@ mod tests {
             vector_id: 5,
             key: "missing_key".to_string(),
         };
-        assert!(error.to_string().contains("5"));
+        assert!(error.to_string().contains('5'));
         assert!(error.to_string().contains("missing_key"));
 
         let error = MetadataError::Serialization("failed".to_string());
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_error_debug() {
         let error = MetadataError::EmptyKey;
-        let debug_str = format!("{:?}", error);
+        let debug_str = format!("{error:?}");
         assert!(debug_str.contains("EmptyKey"));
     }
 }

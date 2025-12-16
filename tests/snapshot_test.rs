@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use edgevec::hnsw::{HnswConfig, HnswIndex, VectorId};
-    use edgevec::persistence::storage::{MemoryBackend, StorageBackend};
+    use edgevec::hnsw::{HnswConfig, HnswIndex};
+    use edgevec::persistence::storage::MemoryBackend;
     use edgevec::persistence::{read_snapshot, write_snapshot};
     use edgevec::storage::VectorStorage;
 

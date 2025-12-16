@@ -67,7 +67,7 @@
 //! ```json
 //! {"type": "string", "value": "hello"}
 //! {"type": "integer", "value": 42}
-//! {"type": "float", "value": 3.14}
+//! {"type": "float", "value": 2.5}
 //! {"type": "boolean", "value": true}
 //! {"type": "string_array", "value": ["a", "b"]}
 //! ```
@@ -99,7 +99,7 @@ mod tests {
         let values = vec![
             MetadataValue::String("hello".to_string()),
             MetadataValue::Integer(42),
-            MetadataValue::Float(3.14159),
+            MetadataValue::Float(9.87654),
             MetadataValue::Boolean(true),
             MetadataValue::StringArray(vec!["a".into(), "b".into()]),
         ];

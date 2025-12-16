@@ -278,7 +278,7 @@ mod tests {
     fn test_empty_batch_error() {
         // Test that EmptyBatch error has correct Display message
         let error = BatchError::EmptyBatch;
-        let msg = format!("{}", error);
+        let msg = format!("{error}");
         assert!(
             msg.contains("empty") || msg.contains("Empty"),
             "EmptyBatch error message should mention 'empty'"
@@ -298,10 +298,10 @@ mod tests {
         };
 
         // Verify error contains expected information in display
-        let msg = format!("{}", error);
+        let msg = format!("{error}");
         assert!(msg.contains("128"), "Should contain expected dimension");
         assert!(msg.contains("64"), "Should contain actual dimension");
-        assert!(msg.contains("1"), "Should contain vector_id");
+        assert!(msg.contains('1'), "Should contain vector_id");
     }
 
     // ==========================================================================
@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn test_duplicate_id_error() {
         let error = BatchError::DuplicateId { vector_id: 42 };
-        let msg = format!("{}", error);
+        let msg = format!("{error}");
         assert!(
             msg.contains("42"),
             "DuplicateId error should contain the duplicate ID"
@@ -368,9 +368,9 @@ mod tests {
             vector_id: 7,
             reason: "contains NaN".to_string(),
         };
-        let msg = format!("{}", error);
+        let msg = format!("{error}");
         assert!(
-            msg.contains("7"),
+            msg.contains('7'),
             "InvalidVector error should contain vector_id"
         );
         assert!(
@@ -389,7 +389,7 @@ mod tests {
             current: 100_000,
             max: 100_000,
         };
-        let msg = format!("{}", error);
+        let msg = format!("{error}");
         assert!(
             msg.contains("100000"),
             "CapacityExceeded error should contain capacity numbers"
@@ -409,7 +409,7 @@ mod tests {
         let error = BatchError::InternalError {
             message: "HNSW invariant violated".to_string(),
         };
-        let msg = format!("{}", error);
+        let msg = format!("{error}");
         assert!(
             msg.contains("HNSW invariant violated"),
             "InternalError should contain the message"
@@ -445,11 +445,10 @@ mod tests {
         ];
 
         for error in errors {
-            let msg = format!("{}", error);
+            let msg = format!("{error}");
             assert!(
                 !msg.is_empty(),
-                "Error variant {:?} should have non-empty Display",
-                error
+                "Error variant {error:?} should have non-empty Display"
             );
         }
     }
