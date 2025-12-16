@@ -2,6 +2,7 @@
 
 use crate::error::EdgeVecError;
 use crate::hnsw::{GraphError, HnswConfig, HnswIndex};
+use crate::metadata::MetadataStore;
 use crate::persistence::{chunking::ChunkIter, ChunkedWriter, PersistenceError};
 use crate::storage::VectorStorage;
 use js_sys::{Array, Float32Array, Function, Object, Reflect, Uint32Array, Uint8Array};
@@ -14,9 +15,11 @@ use wasm_bindgen::prelude::*;
 
 mod batch;
 mod iterator;
+mod metadata;
 
 pub use batch::{BatchInsertConfig, BatchInsertResult};
 pub use iterator::PersistenceIterator;
+pub use metadata::JsMetadataValue;
 
 /// Interface to the JavaScript IndexedDB backend.
 #[wasm_bindgen(module = "/src/js/storage.js")]
@@ -121,6 +124,9 @@ pub struct EdgeVec {
     inner: HnswIndex,
     #[allow(dead_code)]
     storage: VectorStorage,
+    /// Metadata store for attaching key-value pairs to vectors.
+    #[serde(default)]
+    metadata: MetadataStore,
     /// Safety guard for iterators (skipped during serialization).
     #[serde(skip, default = "default_liveness")]
     liveness: Arc<AtomicBool>,
@@ -185,6 +191,7 @@ impl EdgeVec {
         Ok(EdgeVec {
             inner: index,
             storage,
+            metadata: MetadataStore::new(),
             liveness: Arc::new(AtomicBool::new(true)),
         })
     }
@@ -913,6 +920,242 @@ impl EdgeVec {
             total: result.total as u32,
             unique_count: result.unique_count as u32,
         })
+    }
+
+    // =========================================================================
+    // METADATA API (v0.5.0 — Week 21)
+    // =========================================================================
+
+    /// Sets metadata for a vector (upsert operation).
+    ///
+    /// If the key already exists, its value is overwritten. If the key is new,
+    /// it is added (subject to the 64-key-per-vector limit).
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_id` - The ID of the vector to attach metadata to
+    /// * `key` - The metadata key (alphanumeric + underscore, max 256 chars)
+    /// * `value` - The metadata value (created via JsMetadataValue.fromX methods)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Key is empty or contains invalid characters
+    /// - Key exceeds 256 characters
+    /// - Value validation fails (e.g., NaN float, string too long)
+    /// - Vector already has 64 keys and this is a new key
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const id = index.insert(vector);
+    /// index.setMetadata(id, 'title', JsMetadataValue.fromString('My Document'));
+    /// index.setMetadata(id, 'page_count', JsMetadataValue.fromInteger(42));
+    /// index.setMetadata(id, 'score', JsMetadataValue.fromFloat(0.95));
+    /// index.setMetadata(id, 'verified', JsMetadataValue.fromBoolean(true));
+    /// ```
+    #[wasm_bindgen(js_name = "setMetadata")]
+    pub fn set_metadata(
+        &mut self,
+        vector_id: u32,
+        key: &str,
+        value: &metadata::JsMetadataValue,
+    ) -> Result<(), JsError> {
+        self.metadata
+            .insert(vector_id, key, value.inner.clone())
+            .map_err(metadata::metadata_error_to_js)
+    }
+
+    /// Gets metadata for a vector.
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_id` - The ID of the vector
+    /// * `key` - The metadata key to retrieve
+    ///
+    /// # Returns
+    ///
+    /// The metadata value, or `undefined` if the key or vector doesn't exist.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const title = index.getMetadata(id, 'title');
+    /// if (title) {
+    ///     console.log('Title:', title.asString());
+    ///     console.log('Type:', title.getType());
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "getMetadata")]
+    #[must_use]
+    pub fn get_metadata(&self, vector_id: u32, key: &str) -> Option<metadata::JsMetadataValue> {
+        metadata::metadata_value_to_js(self.metadata.get(vector_id, key))
+    }
+
+    /// Gets all metadata for a vector as a JavaScript object.
+    ///
+    /// Returns a plain JavaScript object where keys are metadata keys and
+    /// values are JavaScript-native types (string, number, boolean, string[]).
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_id` - The ID of the vector
+    ///
+    /// # Returns
+    ///
+    /// A JavaScript object mapping keys to values, or `undefined` if the vector
+    /// has no metadata.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const metadata = index.getAllMetadata(id);
+    /// if (metadata) {
+    ///     console.log(metadata.title);     // 'My Document'
+    ///     console.log(metadata.page_count); // 42
+    ///     console.log(Object.keys(metadata)); // ['title', 'page_count', ...]
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "getAllMetadata")]
+    #[must_use]
+    pub fn get_all_metadata(&self, vector_id: u32) -> JsValue {
+        metadata::metadata_to_js_object(&self.metadata, vector_id)
+    }
+
+    /// Deletes a metadata key for a vector.
+    ///
+    /// This operation is idempotent - deleting a non-existent key is not an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_id` - The ID of the vector
+    /// * `key` - The metadata key to delete
+    ///
+    /// # Returns
+    ///
+    /// `true` if the key existed and was deleted, `false` otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the key is invalid (empty or contains invalid characters).
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const wasDeleted = index.deleteMetadata(id, 'title');
+    /// console.log(wasDeleted); // true if key existed
+    /// ```
+    #[wasm_bindgen(js_name = "deleteMetadata")]
+    pub fn delete_metadata(&mut self, vector_id: u32, key: &str) -> Result<bool, JsError> {
+        self.metadata
+            .delete(vector_id, key)
+            .map_err(metadata::metadata_error_to_js)
+    }
+
+    /// Deletes all metadata for a vector.
+    ///
+    /// This operation is idempotent - deleting metadata for a vector without
+    /// metadata is not an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_id` - The ID of the vector
+    ///
+    /// # Returns
+    ///
+    /// `true` if the vector had metadata that was deleted, `false` otherwise.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const hadMetadata = index.deleteAllMetadata(id);
+    /// console.log(hadMetadata); // true if vector had any metadata
+    /// ```
+    #[wasm_bindgen(js_name = "deleteAllMetadata")]
+    pub fn delete_all_metadata(&mut self, vector_id: u32) -> bool {
+        self.metadata.delete_all(vector_id)
+    }
+
+    /// Checks if a metadata key exists for a vector.
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_id` - The ID of the vector
+    /// * `key` - The metadata key to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if the key exists, `false` otherwise.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// if (index.hasMetadata(id, 'title')) {
+    ///     console.log('Vector has title metadata');
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "hasMetadata")]
+    #[must_use]
+    pub fn has_metadata(&self, vector_id: u32, key: &str) -> bool {
+        self.metadata.has_key(vector_id, key)
+    }
+
+    /// Returns the number of metadata keys for a vector.
+    ///
+    /// # Arguments
+    ///
+    /// * `vector_id` - The ID of the vector
+    ///
+    /// # Returns
+    ///
+    /// The number of metadata keys, or 0 if the vector has no metadata.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const count = index.metadataKeyCount(id);
+    /// console.log(`Vector has ${count} metadata keys`);
+    /// ```
+    #[wasm_bindgen(js_name = "metadataKeyCount")]
+    #[must_use]
+    pub fn metadata_key_count(&self, vector_id: u32) -> usize {
+        self.metadata.key_count(vector_id)
+    }
+
+    /// Returns the total number of vectors with metadata.
+    ///
+    /// # Returns
+    ///
+    /// The count of vectors that have at least one metadata key.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const count = index.metadataVectorCount();
+    /// console.log(`${count} vectors have metadata`);
+    /// ```
+    #[wasm_bindgen(js_name = "metadataVectorCount")]
+    #[must_use]
+    pub fn metadata_vector_count(&self) -> usize {
+        self.metadata.vector_count()
+    }
+
+    /// Returns the total number of metadata key-value pairs across all vectors.
+    ///
+    /// # Returns
+    ///
+    /// The total count of metadata entries.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const total = index.totalMetadataCount();
+    /// console.log(`${total} total metadata entries`);
+    /// ```
+    #[wasm_bindgen(js_name = "totalMetadataCount")]
+    #[must_use]
+    pub fn total_metadata_count(&self) -> usize {
+        self.metadata.total_key_count()
     }
 }
 
