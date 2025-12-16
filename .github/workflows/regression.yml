@@ -1,0 +1,210 @@
+# EdgeVec Performance Regression CI (W19.4)
+# ==========================================
+# Purpose: P99 latency tracking and automated regression detection
+# Created: W19.4 (Dec 2025)
+#
+# This workflow:
+# 1. Runs the P99 benchmark suite on every PR and main push
+# 2. Compares against baselines in benches/baselines.json
+# 3. Fails the workflow if search latency regresses by >10%
+# 4. Reports P50/P99/P999 percentiles for visibility
+#
+# Baseline Updates:
+#   - Baselines are stored in benches/baselines.json
+#   - To update baselines: run locally and update the file
+#   - CI baseline artifact is uploaded for historical tracking
+
+name: Performance Regression
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: 'Update baseline artifact on main'
+        required: false
+        default: 'false'
+
+env:
+  CARGO_TERM_COLOR: always
+  # Use x86-64-v3 (AVX2) for consistent CI performance
+  # This matches the benchmark.yml configuration
+  RUSTFLAGS: "-C target-cpu=x86-64-v3 -C opt-level=3"
+
+jobs:
+  regression-check:
+    name: Performance Regression Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-regression-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-regression-
+
+      # Clean build to avoid CPU-specific artifacts causing SIGILL
+      - name: Clean build artifacts
+        run: cargo clean || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Run the P99 benchmark
+      - name: Run P99 Benchmark
+        run: |
+          echo "Running P99 latency benchmarks..."
+          cargo bench --bench p99_bench -- --noplot 2>&1 | tee p99_output.txt
+
+      # Run validation benchmark for regression checking
+      - name: Run Validation Benchmarks
+        run: |
+          echo "Running validation benchmark suite..."
+          cargo bench --bench validation -- --noplot
+
+      # Check for regressions
+      - name: Check for Performance Regression
+        id: regression
+        run: |
+          echo "Checking for performance regressions..."
+          python benches/check_regression.py 2>&1 | tee regression_result.txt
+          RESULT=${PIPESTATUS[0]}
+
+          # Set output for later steps
+          if [ $RESULT -ne 0 ]; then
+            echo "regression_detected=true" >> $GITHUB_OUTPUT
+            echo "::error::Performance regression detected! See regression_result.txt for details."
+          else
+            echo "regression_detected=false" >> $GITHUB_OUTPUT
+            echo "✅ No performance regression detected."
+          fi
+
+          exit $RESULT
+
+      # Upload benchmark artifacts
+      - name: Upload Benchmark Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-results-${{ github.sha }}
+          path: |
+            target/criterion/
+            p99_output.txt
+            regression_result.txt
+          retention-days: 30
+
+      # Update baseline artifact on main branch
+      - name: Upload Baseline Artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline-latest
+          path: |
+            target/criterion/
+            benches/baselines.json
+          retention-days: 90
+
+      # Generate summary for PR
+      - name: Generate Performance Summary
+        if: always()
+        run: |
+          echo "## Performance Regression Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.regression.outputs.regression_detected }}" = "true" ]; then
+            echo "### ❌ Regression Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Performance regression detected. Please review the benchmark results." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ✅ No Regression" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All benchmarks within acceptable thresholds." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add P99 results if available
+          if [ -f p99_output.txt ]; then
+            echo "#### P99 Latency Tracking" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -20 p99_output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See artifacts for detailed Criterion reports." >> $GITHUB_STEP_SUMMARY
+
+      # Comment on PR with results
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let summary = '## Performance Regression Check\n\n';
+
+            // Check if regression was detected
+            const regressionDetected = '${{ steps.regression.outputs.regression_detected }}' === 'true';
+
+            if (regressionDetected) {
+              summary += '### ❌ Performance Regression Detected\n\n';
+              summary += 'The benchmark results show performance degradation exceeding the 10% threshold.\n\n';
+            } else {
+              summary += '### ✅ No Performance Regression\n\n';
+              summary += 'All benchmarks are within acceptable thresholds.\n\n';
+            }
+
+            // Add benchmark table
+            summary += '| Benchmark | Status | Notes |\n';
+            summary += '|:----------|:-------|:------|\n';
+
+            // Read regression output if available
+            try {
+              const output = fs.readFileSync('regression_result.txt', 'utf8');
+              if (output.includes('PASS')) {
+                summary += '| Validation Suite | ✅ PASS | Within baseline |\n';
+              } else if (output.includes('FAIL')) {
+                summary += '| Validation Suite | ❌ FAIL | Regression detected |\n';
+              } else {
+                summary += '| Validation Suite | ⚠️ Unknown | Check logs |\n';
+              }
+            } catch (e) {
+              summary += '| Validation Suite | ⚠️ Unknown | Output not found |\n';
+            }
+
+            // Add P99 results
+            try {
+              const p99Output = fs.readFileSync('p99_output.txt', 'utf8');
+              if (p99Output.length > 0) {
+                summary += '| P99 Latency | ✅ Tracked | See artifacts |\n';
+              }
+            } catch (e) {
+              summary += '| P99 Latency | ⚠️ Unknown | Output not found |\n';
+            }
+
+            summary += '\n\n📊 See [benchmark artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed results.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

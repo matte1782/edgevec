@@ -1,9 +1,318 @@
 # EdgeVec Migration Guide
 
-**Version:** 0.3.0
-**Last Updated:** 2025-12-15
+**Version:** 0.4.0
+**Last Updated:** 2025-12-16
 
-This guide covers migration between EdgeVec versions and file format versions.
+This guide covers:
+1. [Migration from Competitors](#migration-from-competitors) — hnswlib, FAISS, Pinecone
+2. [EdgeVec Version Migration](#edgevec-version-migration) — Between EdgeVec versions
+
+---
+
+## Migration from Competitors
+
+### From hnswlib (Python/C++)
+
+hnswlib is a popular C++ HNSW implementation with Python bindings.
+
+#### Conceptual Differences
+
+| Concept | hnswlib | EdgeVec |
+|:--------|:--------|:--------|
+| Index creation | `hnswlib.Index(space, dim)` | `new EdgeVec(config)` |
+| Insert | `index.add_items(vectors, ids)` | `index.insert(vector)` |
+| Search | `index.knn_query(vector, k)` | `index.search(vector, k)` |
+| Persistence | `index.save_index(path)` | `index.save(name)` |
+| Delete | Not natively supported | `index.softDelete(id)` |
+| Browser support | No (native only) | Yes (WASM) |
+
+#### Migration Steps
+
+**Step 1: Export from hnswlib**
+
+```python
+import hnswlib
+import numpy as np
+import json
+
+# Load your existing index
+p = hnswlib.Index(space='l2', dim=128)
+p.load_index("my_index.bin")
+
+# Get all vectors (hnswlib doesn't expose this directly)
+# You need to keep your original vectors somewhere
+vectors = np.load("my_vectors.npy")
+ids = np.arange(len(vectors))
+
+# Export to JSON for EdgeVec import
+export_data = {
+    "dimensions": 128,
+    "metric": "l2",
+    "vectors": vectors.tolist(),
+    "ids": ids.tolist()
+}
+with open("export.json", "w") as f:
+    json.dump(export_data, f)
+```
+
+**Step 2: Import into EdgeVec**
+
+```javascript
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+
+async function migrateFromHnswlib() {
+    await init();
+
+    // Load exported data
+    const response = await fetch('export.json');
+    const data = await response.json();
+
+    // Create EdgeVec index with matching config
+    const config = new EdgeVecConfig(data.dimensions);
+    config.metric = data.metric;  // 'l2', 'cosine', or 'dot'
+    const index = new EdgeVec(config);
+
+    // Import vectors
+    for (let i = 0; i < data.vectors.length; i++) {
+        const id = index.insert(new Float32Array(data.vectors[i]));
+        // Note: EdgeVec assigns IDs automatically
+        // Map: hnswlib_id[i] -> edgevec_id[id]
+    }
+
+    // Save to IndexedDB
+    await index.save("migrated-index");
+    console.log(`Migrated ${data.vectors.length} vectors`);
+}
+```
+
+#### Key Differences
+
+1. **Auto IDs:** EdgeVec assigns IDs automatically (no manual IDs like hnswlib)
+2. **Delete support:** EdgeVec has `softDelete()`, hnswlib doesn't
+3. **Browser native:** EdgeVec runs in browsers via WASM
+4. **Async init:** EdgeVec requires `await init()` for WASM
+
+---
+
+### From FAISS (Python)
+
+FAISS is Meta's library for efficient similarity search.
+
+#### Conceptual Differences
+
+| Concept | FAISS | EdgeVec |
+|:--------|:------|:--------|
+| Index type | Multiple (Flat, HNSW, IVF, PQ) | HNSW only |
+| Training | May require `index.train()` | No training needed |
+| GPU support | Yes | No (CPU/WASM) |
+| Quantization | PQ, OPQ, SQ | SQ8 (scalar) |
+| Browser support | No | Yes (WASM) |
+
+#### Migration Steps
+
+**Step 1: Export from FAISS**
+
+```python
+import faiss
+import numpy as np
+import json
+
+# Load existing FAISS index
+index = faiss.read_index("my_faiss_index.bin")
+
+# Reconstruct vectors (only for Flat or HNSW indices)
+# For IVF/PQ, you need original vectors
+n = index.ntotal
+d = index.d
+vectors = np.zeros((n, d), dtype='float32')
+for i in range(n):
+    vectors[i] = index.reconstruct(i)
+
+# Export
+export_data = {
+    "dimensions": d,
+    "vectors": vectors.tolist()
+}
+with open("faiss_export.json", "w") as f:
+    json.dump(export_data, f)
+```
+
+**Step 2: Import into EdgeVec**
+
+```javascript
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+
+async function migrateFromFaiss() {
+    await init();
+
+    const response = await fetch('faiss_export.json');
+    const data = await response.json();
+
+    const config = new EdgeVecConfig(data.dimensions);
+    const index = new EdgeVec(config);
+
+    // Batch insert for better performance
+    for (const vector of data.vectors) {
+        index.insert(new Float32Array(vector));
+    }
+
+    await index.save("migrated-from-faiss");
+}
+```
+
+#### Important Notes
+
+1. **No GPU:** EdgeVec is CPU/WASM only
+2. **HNSW only:** EdgeVec uses HNSW; IVF/PQ indices need vector export
+3. **SQ8 quantization:** EdgeVec offers SQ8 (3.6x compression)
+4. **Result format:** EdgeVec returns `{ id, score }` objects
+
+---
+
+### From Pinecone (Cloud)
+
+Pinecone is a managed vector database service.
+
+#### Conceptual Differences
+
+| Concept | Pinecone | EdgeVec |
+|:--------|:---------|:--------|
+| Architecture | Cloud service | Embedded/local |
+| Pricing | Per-query/storage | Free (open source) |
+| Latency | Network RTT + processing | Sub-millisecond local |
+| Metadata | Native support | Store separately |
+| Scaling | Managed sharding | Single-node |
+| Privacy | Data on servers | Data stays local |
+
+#### Migration Steps
+
+**Step 1: Export from Pinecone**
+
+```python
+import pinecone
+import json
+
+# Initialize
+pinecone.init(api_key="your-api-key", environment="your-env")
+index = pinecone.Index("your-index")
+
+# Fetch all vectors (paginated)
+# Note: Pinecone doesn't have a direct "get all" API
+# You need to iterate through your ID list
+
+all_vectors = []
+all_metadata = []
+batch_size = 100
+
+# Assuming you have a list of IDs
+ids = ["id1", "id2", ...]  # Your vector IDs
+
+for i in range(0, len(ids), batch_size):
+    batch_ids = ids[i:i+batch_size]
+    response = index.fetch(ids=batch_ids)
+
+    for id, data in response['vectors'].items():
+        all_vectors.append({
+            "id": id,
+            "values": data['values'],
+            "metadata": data.get('metadata', {})
+        })
+
+# Export
+with open("pinecone_export.json", "w") as f:
+    json.dump({
+        "vectors": all_vectors,
+        "dimensions": len(all_vectors[0]['values'])
+    }, f)
+```
+
+**Step 2: Import into EdgeVec**
+
+```javascript
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+
+async function migrateFromPinecone() {
+    await init();
+
+    const response = await fetch('pinecone_export.json');
+    const data = await response.json();
+
+    const config = new EdgeVecConfig(data.dimensions);
+    const index = new EdgeVec(config);
+
+    // EdgeVec doesn't store metadata natively
+    // Store it separately (localStorage, IndexedDB, etc.)
+    const metadataStore = {};
+
+    for (const item of data.vectors) {
+        const edgevecId = index.insert(new Float32Array(item.values));
+        // Map original ID to EdgeVec ID
+        metadataStore[edgevecId] = {
+            originalId: item.id,
+            metadata: item.metadata
+        };
+    }
+
+    // Save index
+    await index.save("migrated-from-pinecone");
+
+    // Save metadata separately
+    localStorage.setItem("pinecone-metadata", JSON.stringify(metadataStore));
+}
+```
+
+#### Key Differences
+
+1. **Local first:** EdgeVec runs entirely on-device (no cloud)
+2. **No network latency:** Sub-millisecond search
+3. **Privacy:** Data never leaves the device
+4. **No native metadata:** Store metadata separately
+5. **Manual scaling:** You manage data partitioning if needed
+
+---
+
+### General Migration Tips
+
+#### Data Migration Steps
+
+1. **Export vectors** from source system (JSON, CSV, NumPy)
+2. **Convert to Float32Array** if needed
+3. **Batch insert** using EdgeVec's API
+4. **Verify** by searching for known vectors
+5. **Persist** using `index.save()`
+
+#### ID Mapping
+
+EdgeVec uses auto-incrementing IDs. Create a mapping:
+
+```javascript
+const idMapping = new Map();  // oldId -> newEdgevecId
+
+for (const [oldId, vector] of yourData) {
+    const newId = index.insert(new Float32Array(vector));
+    idMapping.set(oldId, newId);
+}
+```
+
+#### Performance Tuning
+
+After migration, tune these parameters:
+- `M`: Connection count (16 default, higher = better recall)
+- `efConstruction`: Build quality (200 default)
+- `ef`: Search accuracy (set at search time)
+
+See [PERFORMANCE_TUNING.md](./PERFORMANCE_TUNING.md) for detailed guidance.
+
+#### Common Pitfalls
+
+1. **Dimension mismatch:** Ensure vector dimensions match config
+2. **Metric mismatch:** Use the same distance metric (L2, cosine, dot)
+3. **Normalization:** Some systems expect normalized vectors
+4. **Memory:** Large migrations may need chunking
+
+---
+
+## EdgeVec Version Migration
 
 ---
 

@@ -11,34 +11,31 @@
 
 ---
 
-## What's New in v0.3.0
+## What's New in v0.4.0
 
-### Soft Delete API (RFC-001)
-- **`soft_delete(id)`** — O(1) tombstone-based deletion
-- **`is_deleted(id)`** — Check deletion status
-- **`deleted_count()` / `live_count()`** — Vector statistics
-- **`tombstone_ratio()`** — Monitor index health
+### Documentation & Quality Sprint
+- **`docs/TUTORIAL.md`** — Complete getting started guide
+- **`docs/PERFORMANCE_TUNING.md`** — HNSW parameter optimization
+- **`docs/TROUBLESHOOTING.md`** — Top 10 errors and solutions
+- **`docs/INTEGRATION_GUIDE.md`** — Third-party embedding integrations
+- **`docs/MIGRATION.md`** — Migration from hnswlib, FAISS, Pinecone
 
-### Compaction API
-- **`compact()`** — Rebuild index removing all tombstones
-- **`needs_compaction()`** — Check if compaction recommended
-- **`compaction_warning()`** — Get actionable warning message
-- Configurable threshold (default: 30% tombstones)
+### Benchmark Dashboard
+- **Interactive visualization** at `/wasm/examples/benchmark-dashboard.html`
+- EdgeVec vs hnswlib-node vs voy comparison
+- Real-time performance charts with Chart.js
 
-### WASM Bindings
-- Full soft delete API exposed to JavaScript/TypeScript
-- `softDelete()`, `isDeleted()`, `deletedCount()`, `liveCount()`
-- `compact()`, `needsCompaction()`, `compactionWarning()`
-- Interactive browser demo at `/wasm/examples/soft_delete.html`
+### Quality Infrastructure
+- **Chaos Testing** — 15 edge case tests (empty index, max dimensions, etc.)
+- **Load Testing** — 100k vector stress tests, sustained search load
+- **P99 Latency Tracking** — P50/P99/P999 percentile benchmarks
+- **CI Regression Detection** — 10% threshold enforcement
 
-### Persistence Format v0.3
-- Automatic migration from v0.2 snapshots
-- Tombstone state preserved across save/load cycles
-
-### Previous (v0.2.1)
-- Safety hardening with `bytemuck` for alignment-verified operations
-- Batch insert API with progress callback
-- 24x faster search than voy (fastest pure-WASM competitor)
+### Previous (v0.3.0)
+- Soft delete API with O(1) tombstone-based deletion
+- Compaction API for reclaiming space
+- Full WASM bindings for soft delete operations
+- Persistence format v0.3 with automatic migration
 
 ---
 
@@ -257,17 +254,57 @@ if (index.needsCompaction()) {
 
 ## Interactive Examples
 
-Try EdgeVec directly in your browser with our interactive demos:
+Try EdgeVec directly in your browser with our NVIDIA-grade cyberpunk demo suite:
 
-**[View All Examples](wasm/examples/index.html)** | [Launch Dashboard](wasm/examples/benchmark-dashboard.html)
+<p align="center">
+  <a href="wasm/examples/index.html">
+    <img src="docs/screenshot/demo-catalog.png" alt="EdgeVec Demo Catalog" width="800">
+  </a>
+</p>
 
-| Demo | Description |
-|:-----|:------------|
-| [Performance Dashboard](wasm/examples/benchmark-dashboard.html) | **Featured** — Competitive analysis vs hnswlib-node & voy with interactive charts |
-| [Batch Insert](wasm/examples/batch_insert.html) | Test bulk insertion performance with real-time metrics |
-| [Batch Delete](wasm/examples/batch_delete.html) | Measure batch deletion throughput |
-| [Soft Delete & Compaction](wasm/examples/soft_delete.html) | RFC-001 implementation — tombstone deletion with live visualization |
-| [Stress Test](wasm/examples/stress-test.html) | Push EdgeVec to its limits with continuous operations |
+<p align="center">
+  <strong>
+    <a href="wasm/examples/index.html">View All Examples</a> |
+    <a href="wasm/examples/benchmark-dashboard.html">Launch Dashboard</a>
+  </strong>
+</p>
+
+### Demo Gallery
+
+<table>
+<tr>
+<td width="50%">
+<a href="wasm/examples/benchmark-dashboard.html">
+<img src="docs/screenshot/benchmark-dashboard.png" alt="Benchmark Dashboard">
+</a>
+<h4>Performance Dashboard</h4>
+<p>Competitive analysis vs hnswlib-node & voy with interactive Chart.js visualizations</p>
+</td>
+<td width="50%">
+<a href="wasm/examples/soft_delete.html">
+<img src="docs/screenshot/soft-delete-demo.png" alt="Soft Delete Demo">
+</a>
+<h4>Soft Delete & Compaction</h4>
+<p>RFC-001 implementation with tombstone visualization and real-time metrics</p>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<a href="wasm/examples/batch_insert.html">
+<img src="docs/screenshot/batch-insert-demo.png" alt="Batch Insert Demo">
+</a>
+<h4>Batch Insert</h4>
+<p>Sequential vs batch comparison with progress tracking</p>
+</td>
+<td width="50%">
+<a href="wasm/examples/stress-test.html">
+<img src="docs/screenshot/stress-test-demo.png" alt="Stress Test Demo">
+</a>
+<h4>Stress Test</h4>
+<p>Push EdgeVec to its limits with continuous operations</p>
+</td>
+</tr>
+</table>
 
 ### Running Locally
 
@@ -276,12 +313,14 @@ Try EdgeVec directly in your browser with our interactive demos:
 git clone https://github.com/matte1782/edgevec.git
 cd edgevec
 
-# Start local server
-python -m http.server 8000
+# IMPORTANT: Start server from project root!
+python -m http.server 8080
 
-# Open in browser
-# http://localhost:8000/wasm/examples/
+# Open in browser (include full path)
+# http://localhost:8080/wasm/examples/index.html
 ```
+
+> ⚠️ **Note:** Do NOT start server from `wasm/examples/` — WASM module requires `/pkg/` access from root.
 
 ---
 
@@ -304,7 +343,7 @@ python -m http.server 8000
 - ✅ **Crash Recovery (WAL)** — Log-based replay
 - ✅ **Atomic Snapshots** — Safe background saving
 - ✅ **Browser Integration** — WASM Bindings + IndexedDB
-- ✅ **npm Package** — `edgevec@0.3.0` published
+- ✅ **npm Package** — `edgevec@0.4.0` published
 
 **Development Progress:**
 - Phase 0: Environment Setup — ✅ COMPLETE
@@ -314,18 +353,12 @@ python -m http.server 8000
 - Phase 4: WASM Integration — ✅ COMPLETE
 - Phase 5: Alpha Release — ✅ **READY**
 
-### What's Next (v0.4.0)
-
-1. ~~**Multi-vector Delete**~~ ✅ Shipped in v0.3.0
-2. **P99 Tracking** — Latency distribution metrics in CI
-3. **Benchmark Dashboard** — Interactive performance visualization
-4. **User Documentation** — Tutorial, tuning guide, integration guide
-
 ### Future Roadmap (v0.5.0+)
 
 1. **ARM/NEON Optimization** — Cross-platform SIMD verification
 2. **Mobile Support** — iOS Safari and Android Chrome formalized
 3. **CLI Tools** — Optional developer command-line interface
+4. **Enhanced Metadata Storage** — Native metadata support
 
 ### Path to v1.0
 
@@ -362,7 +395,7 @@ Measured using `index.memory_usage() + storage.memory_usage()` after building 10
 
 | Package | Size (Gzipped) | Target | Status |
 |:--------|:---------------|:-------|:-------|
-| `edgevec@0.3.0` | **213 KB** | <500 KB | ✅ **57% under** |
+| `edgevec@0.4.0` | **213 KB** | <500 KB | ✅ **57% under** |
 
 ### Competitive Comparison (10k vectors, 128 dimensions)
 

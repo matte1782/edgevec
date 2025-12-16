@@ -834,6 +834,7 @@ impl EdgeVec {
     /// ```
     #[wasm_bindgen(js_name = softDeleteBatch)]
     #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn soft_delete_batch(
         &mut self,
         ids: js_sys::Uint32Array,
@@ -952,30 +953,35 @@ pub struct WasmBatchDeleteResult {
 impl WasmBatchDeleteResult {
     /// Number of vectors successfully deleted in this operation.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn deleted(&self) -> u32 {
         self.deleted
     }
 
     /// Number of vectors that were already deleted (tombstoned).
     #[wasm_bindgen(getter, js_name = "alreadyDeleted")]
+    #[must_use]
     pub fn already_deleted(&self) -> u32 {
         self.already_deleted
     }
 
     /// Number of invalid IDs (not found in the index).
     #[wasm_bindgen(getter, js_name = "invalidIds")]
+    #[must_use]
     pub fn invalid_ids(&self) -> u32 {
         self.invalid_ids
     }
 
     /// Total number of vector IDs provided in the input (including duplicates).
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn total(&self) -> u32 {
         self.total
     }
 
     /// Number of unique vector IDs after deduplication.
     #[wasm_bindgen(getter, js_name = "uniqueCount")]
+    #[must_use]
     pub fn unique_count(&self) -> u32 {
         self.unique_count
     }
@@ -984,6 +990,7 @@ impl WasmBatchDeleteResult {
     ///
     /// Returns `true` if every ID was valid (either deleted or already deleted).
     #[wasm_bindgen(js_name = "allValid")]
+    #[must_use]
     pub fn all_valid(&self) -> bool {
         self.invalid_ids == 0
     }
@@ -992,6 +999,7 @@ impl WasmBatchDeleteResult {
     ///
     /// Returns `true` if at least one vector was newly deleted.
     #[wasm_bindgen(js_name = "anyDeleted")]
+    #[must_use]
     pub fn any_deleted(&self) -> bool {
         self.deleted > 0
     }

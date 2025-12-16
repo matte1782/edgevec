@@ -2,15 +2,118 @@
 
 All notable changes to EdgeVec will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Planned
-- P99 latency tracking in CI
-- ARM/NEON optimization verification
-- Multi-vector delete API
+### Planned (v0.5.0)
+- ARM/NEON SIMD optimization verification
+- Mobile support (iOS Safari, Android Chrome)
+- Enhanced metadata storage
+
+---
+
+## [0.4.0] - 2025-12-20 — Documentation & Quality Sprint
+
+**Focus:** Production readiness — comprehensive documentation, P99 tracking, and quality hardening.
+
+### Added
+
+#### User Documentation
+- **`docs/TUTORIAL.md`** — Complete getting started guide
+  - Step-by-step installation instructions
+  - First index creation walkthrough
+  - Browser and Node.js examples
+  - Persistence tutorial
+
+- **`docs/PERFORMANCE_TUNING.md`** — HNSW parameter optimization guide
+  - M, efConstruction, ef parameter explanations
+  - Tuning recommendations for different use cases
+  - Memory vs. recall tradeoff guidance
+  - Quantization configuration
+
+- **`docs/TROUBLESHOOTING.md`** — Debugging guide
+  - Top 10 common errors and solutions
+  - WASM initialization issues
+  - Dimension mismatch debugging
+  - Search returning empty results
+
+- **`docs/INTEGRATION_GUIDE.md`** — Third-party integration guide
+  - transformers.js integration
+  - TensorFlow.js Universal Sentence Encoder
+  - OpenAI embeddings API
+  - Cohere embeddings
+
+#### Benchmark Dashboard
+- **`wasm/examples/benchmark-dashboard.html`** — Interactive visualization
+  - Real-time performance charts (Chart.js)
+  - EdgeVec vs hnswlib-node vs voy comparison
+  - Search latency, insert latency, memory charts
+  - Dark/light theme toggle
+
+- **`docs/benchmarks/PERFORMANCE_BASELINES.md`** — Baseline documentation
+  - Official baseline values for regression detection
+  - Target metrics for different scales
+  - CI threshold configuration
+
+#### Quality Infrastructure
+
+- **Chaos Testing** (`tests/chaos_hnsw.rs`)
+  - 15 edge case tests (11 required + 4 bonus)
+  - Empty index, single vector, all deleted
+  - Zero vector, max dimensions (4096)
+  - Duplicate vectors, delete/reinsert
+  - Extreme values, rapid cycles
+  - Compaction stress, recall accuracy
+
+- **Load Testing** (`tests/load_test.rs`)
+  - 100k vector insertion stress test
+  - Sustained search load (60 seconds)
+  - Mixed workload (insert + search + delete)
+  - High tombstone ratio validation
+  - Memory stability testing
+  - Batch insert performance
+
+- **P99 Latency Tracking** (`benches/p99_bench.rs`)
+  - P50/P99/P999 percentile reporting
+  - 10k index latency benchmark
+  - Tombstone impact benchmark
+  - Scaling benchmark (1k to 25k)
+
+- **CI Regression Detection** (`.github/workflows/regression.yml`)
+  - Automatic P99 benchmark on PRs
+  - 10% regression threshold enforcement
+  - Performance summary in PR comments
+  - Artifact upload for historical tracking
+
+#### Release Documentation
+- **`CONTRIBUTING.md`** — Contribution guidelines
+  - Code of Conduct reference
+  - PR process and requirements
+  - Development setup instructions
+  - Commit message conventions
+
+- **`docs/RELEASE_CHECKLIST_v0.4.md`** — Release verification
+  - 25+ verification items
+  - Pre-release, release, post-release steps
+  - Rollback procedures
+
+- **`docs/MIGRATION.md`** — Migration from competitors
+  - hnswlib migration guide
+  - FAISS migration guide
+  - Pinecone migration guide
+  - General migration tips
+
+### Changed
+- Version bumped from 0.3.0 to 0.4.0
+- Updated README.md with v0.4.0 features
+- CI pipeline enhanced with P99 tracking
+
+### Documentation
+- Week 16-18 work reconciled with gate files
+- ROADMAP.md updated to reflect v0.4.0 completion
+- All pending gates (16, 17, 18) documented
 
 ---
 
@@ -50,6 +153,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `tombstones_removed: u32` — Number of deleted vectors removed
   - `new_size: u32` — Index size after compaction
   - `duration_ms: f64` — Time taken in milliseconds
+
+#### Batch Delete API
+- **`batch_delete(ids)`** — Delete multiple vectors efficiently
+- **WASM bindings:** `softDeleteBatch()`, `softDeleteBatchCompat()`
 
 #### WASM Bindings (v0.3.0)
 - **`softDelete(vectorId)`** — JavaScript soft delete
@@ -91,6 +198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `HnswNode.pad` renamed to `HnswNode.deleted` (repurposed padding byte)
 - Internal `adjusted_k()` calculation compensates for tombstones during search
 - Snapshot version bumped to v0.3 (reads v0.2, writes v0.3)
+- License changed to dual MIT OR Apache-2.0
 
 ### Fixed
 - Memory leak prevention in browser demo particle system (MAX_PARTICLES cap)
@@ -132,33 +240,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.2.0-alpha.2] - 2025-12-12 — HOTFIX
+## [0.2.0] - 2025-12-12 — Initial Alpha Release
 
-**HOTFIX RELEASE** — Fixes critical packaging bug in v0.2.0-alpha.1.
-
-### Fixed
-- **[CRITICAL] npm package missing snippets directory** — The v0.2.0-alpha.1 package was missing the `snippets/` directory containing IndexedDB storage JS code, causing complete import failures in Node.js. This hotfix adds the missing files. (Incident: INC-2025-12-12-001)
-
-### Changed
-- Updated package.json `files` array to include `snippets` directory
-
-### Incident Reference
-- **Incident Report:** [docs/incidents/2025-12-12_alpha1_missing_snippets.md](docs/incidents/2025-12-12_alpha1_missing_snippets.md)
-- **Root Cause:** wasm-pack generated `snippets/` directory was not included in package.json files array
-- **Time to Resolution:** ~10 minutes
-
----
-
-## [0.2.0-alpha.1] - 2025-12-12 — DEPRECATED (DO NOT USE)
-
-> **CRITICAL BUG — DO NOT USE THIS VERSION**
->
-> This version was published without the `snippets/` directory due to incomplete
-> `package.json` files array. All imports will fail with `ERR_MODULE_NOT_FOUND`.
->
-> **Use v0.2.0-alpha.2 instead:** `npm install edgevec@0.2.0-alpha.2`
->
-> See [Incident Report](docs/incidents/2025-12-12_alpha1_missing_snippets.md) for details.
+**Focus:** First public alpha — core HNSW engine with WASM support.
 
 ### Added
 
@@ -231,76 +315,57 @@ Criterion 0.5.x with 10 samples per configuration. `-C target-cpu=native` enable
 | Float32 | 3,176 bytes | 303 MB | 3.03 GB | N/A |
 | Quantized (SQ8) | 872 bytes | 83 MB | **832 MB** | <1 GB (17% under) |
 
-#### Throughput (Queries Per Second)
-
-| Scale | Float32 | Quantized (SQ8) |
-|:------|:--------|:----------------|
-| 10k | 4,930 qps | **11,360 qps** |
-| 50k | 2,080 qps | **5,990 qps** |
-| 100k | 1,750 qps | **3,040 qps** |
-
 #### Bundle Size
 
 | Package | Size (Gzipped) | Target | Status |
 |:--------|:---------------|:-------|:-------|
-| `@edgevec/core` | **148 KB** | <500 KB | 70% under target |
-
-#### Build/Insert Time (768-dimensional vectors)
-
-**Note:** Build time is not optimized in this alpha release. See [Known Limitations](docs/KNOWN_LIMITATIONS.md#1-insertbuild-time-not-optimized) for workarounds.
-
-| Scale | Float32 Build | Quantized (SQ8) Build |
-|:------|:--------------|:----------------------|
-| 10k vectors | 6.3s | 2.6s |
-| 50k vectors | 55s | 24s |
-| 100k vectors | 116s | 63s |
-
-*Quantized mode is 2-3x faster for bulk building. Batch insert API planned for v0.3.0.*
-
-### Known Limitations
-
-See [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) for detailed information.
-
-1. **Insert Latency**: Build time is not optimized for this alpha. Batch insert API planned for v0.3.0.
-
-2. **No Delete/Update**: Vectors are append-only. Tombstone-based deletion planned for v0.3.0.
-
-3. **Single-Threaded WASM**: Browser execution is single-threaded. Use Web Workers for parallel searches on separate index instances.
-
-4. **Compiler Flags Required**: For optimal performance, users must configure `.cargo/config.toml` with `-C target-cpu=native`. Without this, performance is 60-78% slower.
-
-### Breaking Changes
-
-None (initial alpha release).
-
-### Security
-
-- No external network calls
-- No user data sent to servers
-- All computation runs locally (browser, Node, edge)
-- IndexedDB data stored locally in browser sandbox
-
-### Migration Guide
-
-N/A (initial release).
+| `@edgevec/core` | **213 KB** | <500 KB | 57% under target |
 
 ---
 
-## Version History
+## [0.1.0] - 2025-12-05 — Genesis Release (Internal)
+
+**Focus:** Initial architecture validation and core infrastructure.
+
+### Added
+- Project structure and Cargo configuration
+- HNSW algorithm prototype
+- Distance metric implementations
+- Basic persistence framework
+- Architecture documentation (ARCHITECTURE.md, DATA_LAYOUT.md)
+- Testing infrastructure (proptest, criterion)
+- CI/CD pipeline
+
+### Notes
+This version was internal only, not published to crates.io or npm.
+
+---
+
+## Version Comparison
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
-| 0.2.0-alpha.1 | 2025-12-12 | Initial public alpha release |
+| 0.4.0 | 2025-12-20 | Documentation sprint, P99 tracking, chaos testing |
+| 0.3.0 | 2025-12-15 | Soft delete API, compaction, dual-license |
+| 0.2.1 | 2025-12-14 | Safety hardening, batch insert |
+| 0.2.0 | 2025-12-12 | Initial alpha release |
+| 0.1.0 | 2025-12-05 | Internal genesis release |
 
 ---
 
 ## Links
 
-- [GitHub Repository](https://github.com/anthropics/edgevec)
+- [GitHub Repository](https://github.com/matte1782/edgevec)
 - [Documentation](docs/)
 - [Performance Guide](docs/PERFORMANCE_GUIDE.md)
-- [Known Limitations](docs/KNOWN_LIMITATIONS.md)
+- [Tutorial](docs/TUTORIAL.md)
+- [API Reference](docs/API_REFERENCE.md)
 
 ---
 
-**Note:** This is an **alpha release**. APIs may change before v1.0.0 stable. Please report issues at the GitHub repository.
+[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/matte1782/edgevec/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/matte1782/edgevec/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/matte1782/edgevec/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/matte1782/edgevec/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/matte1782/edgevec/releases/tag/v0.1.0

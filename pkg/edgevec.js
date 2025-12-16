@@ -1,4 +1,4 @@
-import { IndexedDbBackend } from './snippets/edgevec-457ad9d818f0da2b/src/js/storage.js';
+import { IndexedDbBackend } from './snippets/edgevec-e9d90602e6bb6c2c/src/js/storage.js';
 
 let wasm;
 
@@ -1526,7 +1526,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_queueMicrotask_fca69f5bfad613a5 = function(arg0) {
         queueMicrotask(getObject(arg0));
     };
-    imports.wbg.__wbg_read_1fbcd60955a83a1d = function() { return handleError(function (arg0, arg1) {
+    imports.wbg.__wbg_read_fae8abcd008c321a = function() { return handleError(function (arg0, arg1) {
         const ret = IndexedDbBackend.read(getStringFromWasm0(arg0, arg1));
         return addHeapObject(ret);
     }, arguments) };
@@ -1575,7 +1575,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_warn_6e567d0d926ff881 = function(arg0) {
         console.warn(getObject(arg0));
     };
-    imports.wbg.__wbg_write_0e9131050e80458b = function() { return handleError(function (arg0, arg1, arg2, arg3) {
+    imports.wbg.__wbg_write_2eb8c26f002dc6fe = function() { return handleError(function (arg0, arg1, arg2, arg3) {
         const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getArrayU8FromWasm0(arg2, arg3));
         return addHeapObject(ret);
     }, arguments) };

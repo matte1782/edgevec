@@ -2,7 +2,7 @@
   "name": "edgevec",
   "type": "module",
   "description": "High-performance embedded vector database for Browser, Node, and Edge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
@@ -11,7 +11,9 @@
   "files": [
     "edgevec_bg.wasm",
     "edgevec.js",
-    "edgevec.d.ts"
+    "edgevec.d.ts",
+    "LICENSE-APACHE",
+    "LICENSE-MIT"
   ],
   "main": "edgevec.js",
   "types": "edgevec.d.ts",

@@ -11,34 +11,31 @@
 
 ---
 
-## What's New in v0.3.0
+## What's New in v0.4.0
 
-### Soft Delete API (RFC-001)
-- **`soft_delete(id)`** — O(1) tombstone-based deletion
-- **`is_deleted(id)`** — Check deletion status
-- **`deleted_count()` / `live_count()`** — Vector statistics
-- **`tombstone_ratio()`** — Monitor index health
+### Documentation & Quality Sprint
+- **`docs/TUTORIAL.md`** — Complete getting started guide
+- **`docs/PERFORMANCE_TUNING.md`** — HNSW parameter optimization
+- **`docs/TROUBLESHOOTING.md`** — Top 10 errors and solutions
+- **`docs/INTEGRATION_GUIDE.md`** — Third-party embedding integrations
+- **`docs/MIGRATION.md`** — Migration from hnswlib, FAISS, Pinecone
 
-### Compaction API
-- **`compact()`** — Rebuild index removing all tombstones
-- **`needs_compaction()`** — Check if compaction recommended
-- **`compaction_warning()`** — Get actionable warning message
-- Configurable threshold (default: 30% tombstones)
+### Benchmark Dashboard
+- **Interactive visualization** at `/wasm/examples/benchmark-dashboard.html`
+- EdgeVec vs hnswlib-node vs voy comparison
+- Real-time performance charts with Chart.js
 
-### WASM Bindings
-- Full soft delete API exposed to JavaScript/TypeScript
-- `softDelete()`, `isDeleted()`, `deletedCount()`, `liveCount()`
-- `compact()`, `needsCompaction()`, `compactionWarning()`
-- Interactive browser demo at `/wasm/examples/soft_delete.html`
+### Quality Infrastructure
+- **Chaos Testing** — 15 edge case tests (empty index, max dimensions, etc.)
+- **Load Testing** — 100k vector stress tests, sustained search load
+- **P99 Latency Tracking** — P50/P99/P999 percentile benchmarks
+- **CI Regression Detection** — 10% threshold enforcement
 
-### Persistence Format v0.3
-- Automatic migration from v0.2 snapshots
-- Tombstone state preserved across save/load cycles
-
-### Previous (v0.2.1)
-- Safety hardening with `bytemuck` for alignment-verified operations
-- Batch insert API with progress callback
-- 24x faster search than voy (fastest pure-WASM competitor)
+### Previous (v0.3.0)
+- Soft delete API with O(1) tombstone-based deletion
+- Compaction API for reclaiming space
+- Full WASM bindings for soft delete operations
+- Persistence format v0.3 with automatic migration
 
 ---
 
@@ -54,7 +51,7 @@
 - **WASM-First** — Native browser support via WebAssembly
 - **Persistent Storage** — `IndexedDB` in browser, file system elsewhere
 - **Minimal Dependencies** — No C compiler required, WASM-ready
-- **Tiny Bundle** — 213 KB gzipped (57% under 500KB target)
+- **Tiny Bundle** — 227 KB gzipped (55% under 500KB target)
 
 ---
 
@@ -337,7 +334,7 @@ python -m http.server 8080
 - ✅ **Search Mean:** 0.23ms (4.3x under 1ms target)
 - ✅ **Search P99 (estimated):** <600µs (based on Mean + 2σ)
 - ✅ **Memory:** 832 MB for 1M vectors (17% under 1GB target)
-- ✅ **Bundle Size:** 213 KB (57% under 500KB target)
+- ✅ **Bundle Size:** 227 KB (55% under 500KB target)
 
 **What Works Now:**
 - ✅ **HNSW Indexing** — Sub-millisecond search at 100k scale
@@ -346,7 +343,7 @@ python -m http.server 8080
 - ✅ **Crash Recovery (WAL)** — Log-based replay
 - ✅ **Atomic Snapshots** — Safe background saving
 - ✅ **Browser Integration** — WASM Bindings + IndexedDB
-- ✅ **npm Package** — `edgevec@0.3.0` published
+- ✅ **npm Package** — `edgevec@0.4.0` published
 
 **Development Progress:**
 - Phase 0: Environment Setup — ✅ COMPLETE
@@ -356,18 +353,12 @@ python -m http.server 8080
 - Phase 4: WASM Integration — ✅ COMPLETE
 - Phase 5: Alpha Release — ✅ **READY**
 
-### What's Next (v0.4.0)
-
-1. ~~**Multi-vector Delete**~~ ✅ Shipped in v0.3.0
-2. **P99 Tracking** — Latency distribution metrics in CI
-3. **Benchmark Dashboard** — Interactive performance visualization
-4. **User Documentation** — Tutorial, tuning guide, integration guide
-
 ### Future Roadmap (v0.5.0+)
 
 1. **ARM/NEON Optimization** — Cross-platform SIMD verification
 2. **Mobile Support** — iOS Safari and Android Chrome formalized
 3. **CLI Tools** — Optional developer command-line interface
+4. **Enhanced Metadata Storage** — Native metadata support
 
 ### Path to v1.0
 
@@ -404,7 +395,7 @@ Measured using `index.memory_usage() + storage.memory_usage()` after building 10
 
 | Package | Size (Gzipped) | Target | Status |
 |:--------|:---------------|:-------|:-------|
-| `edgevec@0.3.0` | **213 KB** | <500 KB | ✅ **57% under** |
+| `edgevec@0.4.0` | **227 KB** | <500 KB | ✅ **55% under** |
 
 ### Competitive Comparison (10k vectors, 128 dimensions)
 
@@ -425,7 +416,7 @@ Native bindings (hnswlib-node) are faster but require C++ compilation and don't 
 - ✅ **Fastest pure-WASM solution** — 24x faster than voy
 - ✅ **Zero network latency** — runs 100% locally (browser, Node, edge)
 - ✅ **Privacy-preserving** — no data leaves the device
-- ✅ **Tiny bundle** — 213 KB gzipped
+- ✅ **Tiny bundle** — 227 KB gzipped
 - ✅ **No compilation required** — unlike native bindings
 
 ### Test Environment
