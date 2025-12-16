@@ -118,6 +118,9 @@ pub mod quantization;
 /// SIMD capability detection and runtime optimization.
 pub mod simd;
 
+/// Metadata storage for vector annotations.
+pub mod metadata;
+
 pub use batch::BatchInsertable;
 pub use error::BatchError;
 pub use hnsw::{BatchDeleteError, BatchDeleteResult, HnswConfig, HnswIndex, SearchResult};
