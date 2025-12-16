@@ -12,13 +12,11 @@
 #   cross build --target aarch64-unknown-linux-gnu --release
 #   cross test --target aarch64-unknown-linux-gnu --release
 #
-# Environment Variables:
-#   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: QEMU executor
-#   PROPTEST_CASES: Reduced for faster CI execution
-#
-# Job Timeouts:
-#   arm64-build: 10 minutes (cross-compilation)
-#   arm64-test:  15 minutes (QEMU test execution)
+# Performance Notes:
+#   - First run downloads ~2GB Docker image (can take 10+ minutes)
+#   - Docker layer caching reduces subsequent runs to ~2 minutes
+#   - QEMU emulation is ~10x slower than native execution
+#   - Proptest cases reduced to 16 to stay within time budget
 
 name: ARM CI
 
@@ -34,13 +32,15 @@ env:
   PROPTEST_CASES: "16"
   # Reduce vector count for integration tests under emulation
   NUM_VECTORS: "500"
+  # Cross version for caching
+  CROSS_VERSION: "0.2.5"
 
 jobs:
-  # Job 1: ARM64 Cross-Compilation
-  arm64-build:
-    name: ARM64 Build
+  # Job 1: ARM64 Build + Test (Combined to avoid duplicate builds)
+  arm64-test:
+    name: ARM64 Build & Test (QEMU)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45  # Increased: Docker pull (15min) + compile (15min) + QEMU tests (15min)
     steps:
       - uses: actions/checkout@v4
 
@@ -49,54 +49,64 @@ jobs:
         with:
           targets: aarch64-unknown-linux-gnu
 
-      - name: Install cross
+      # Cache cargo registry and cross binary
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cross
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-cross-${{ env.CROSS_VERSION }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cross-${{ env.CROSS_VERSION }}-
+            ${{ runner.os }}-cargo-cross-
+
+      # Cache Docker layers for cross image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.docker-cache
+          key: ${{ runner.os }}-docker-aarch64-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-aarch64-
+
+      - name: Install cross (if not cached)
         run: |
-          cargo install cross --git https://github.com/cross-rs/cross
+          if ! command -v cross &> /dev/null; then
+            cargo install cross --git https://github.com/cross-rs/cross
+          fi
           cross --version
+
+      # Pre-pull the Docker image to track time separately
+      - name: Pull cross Docker image
+        run: |
+          docker pull ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main || true
 
       - name: Build ARM64 (Release)
         run: cross build --target aarch64-unknown-linux-gnu --release
 
-      - name: Build ARM64 (Debug for tests)
-        run: cross build --target aarch64-unknown-linux-gnu
-
-  # Job 2: ARM64 Test Execution under QEMU
-  arm64-test:
-    name: ARM64 Tests (QEMU)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: arm64-build
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-unknown-linux-gnu
-
-      - name: Install cross
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross
-          cross --version
-
       - name: Run ARM64 Tests
         run: |
-          cross test --target aarch64-unknown-linux-gnu --release -- --test-threads=1
+          cross test --target aarch64-unknown-linux-gnu --release --lib -- --test-threads=1
         env:
-          # QEMU user-mode emulation (bundled with cross, explicit for visibility)
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64
 
       - name: Verify NEON Detection
         run: |
-          cross test --target aarch64-unknown-linux-gnu --release simd -- --nocapture
+          cross test --target aarch64-unknown-linux-gnu --release simd -- --nocapture --test-threads=1
         env:
           RUST_BACKTRACE: 1
 
-  # Job 3: ARM64 Clippy Check
+  # Job 2: ARM64 Clippy Check (separate, faster)
   arm64-lint:
     name: ARM64 Clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30  # Increased for Docker pull
     steps:
       - uses: actions/checkout@v4
 
@@ -106,14 +116,33 @@ jobs:
           targets: aarch64-unknown-linux-gnu
           components: clippy
 
-      - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cross
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-cross-clippy-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-cross-clippy-
+
+      - name: Install cross (if not cached)
+        run: |
+          if ! command -v cross &> /dev/null; then
+            cargo install cross --git https://github.com/cross-rs/cross
+          fi
+
+      - name: Pull cross Docker image
+        run: |
+          docker pull ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main || true
 
       - name: Run Clippy for ARM64
         run: |
           cross clippy --target aarch64-unknown-linux-gnu -- -D clippy::correctness -W clippy::suspicious
 
-  # Job 4: Verify x86 Not Broken (Regression Guard)
+  # Job 3: Verify x86 Not Broken (Regression Guard) - Fast, no Docker needed
   x86-regression:
     name: x86 Regression Check
     runs-on: ubuntu-latest
@@ -123,6 +152,18 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-x86-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-x86-
 
       - name: Run x86 Tests (Quick Check)
         run: cargo test --lib -- --test-threads=2

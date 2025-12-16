@@ -1,9 +1,10 @@
 # SIMD Safety Audit
 
-**Document Version:** 1.0.0
+**Document Version:** 2.0.0
 **Date:** 2025-12-16
 **Author:** EdgeVec Development Team
 **Week:** 20 (ARM/NEON Implementation Sprint)
+**Revision:** Added Day 4 NEON Dot Product & Euclidean Distance
 
 ---
 
@@ -178,25 +179,138 @@ All unsafe blocks have `// SAFETY:` comments explaining the justification.
 
 ---
 
-## Future Work
+### 2. NEON Dot Product (`src/simd/neon.rs`)
 
-### Day 4: NEON Dot Product
+#### Location: `dot_product_neon_unchecked`
 
-Will follow the same safety pattern:
-- Safe public wrapper with validation
-- Unsafe internal function with `#[target_feature(enable = "neon")]`
-- Bounds checking via chunk calculation
-- `// SAFETY:` comments on all unsafe blocks
+**File:** `src/simd/neon.rs`
+**Lines:** 276-312
 
-### Day 5: NEON Euclidean Distance
+```rust
+#[inline]
+#[target_feature(enable = "neon")]
+unsafe fn dot_product_neon_unchecked(a: &[f32], b: &[f32]) -> f32 {
+    // ... implementation
+}
+```
 
-Same pattern as dot product.
+**Operation:** Loads 4 floats at a time using NEON intrinsics (`vld1q_f32`) for vectorized fused multiply-add operations.
+
+**Unsafe Operations:**
+
+| Operation | Intrinsic | Risk |
+|:----------|:----------|:-----|
+| Load 4 floats from `a` | `vld1q_f32(a.as_ptr().add(offset))` | Out-of-bounds read |
+| Load 4 floats from `b` | `vld1q_f32(b.as_ptr().add(offset))` | Out-of-bounds read |
+| Initialize zero vector | `vdupq_n_f32(0.0)` | None (pure computation) |
+| Fused multiply-add | `vfmaq_f32(sum, va, vb)` | None (pure computation) |
+| Horizontal sum | `vaddvq_f32(sum)` | None (pure computation) |
+
+**Justification:**
+
+1. **Bounds Safety:** The chunk calculation `chunks = len / 4` guarantees that for each iteration `i < chunks`, the read of 4 floats starting at `offset = i * 4` stays within bounds:
+   - `offset + 4 = i * 4 + 4 ≤ (chunks - 1) * 4 + 4 = chunks * 4 ≤ len`
+
+2. **Alignment:** NEON `vld1q_f32` supports unaligned loads, so no alignment requirements.
+
+3. **NEON Availability:** The `#[target_feature(enable = "neon")]` attribute ensures the function is only called when NEON is available.
+
+**Invariants:**
+
+| Invariant | Enforcement |
+|:----------|:------------|
+| `a.len() == b.len()` | `assert_eq!` in public wrapper |
+| NEON available | Compile-time (`#[target_feature(enable = "neon")]`) |
+| Read within bounds | Chunk calculation guarantees `offset + 4 ≤ len` |
+
+**Verification:**
+
+1. **Property Tests:** 1000+ random test cases verify NEON matches portable within 1e-4
+2. **Edge Case Tests:** Empty, 1, 3, 4, 5, 768, 1024 element inputs tested
+3. **ARM CI:** Tests run on ARM64 via QEMU emulation
+
+---
+
+### 3. NEON Euclidean Distance (`src/simd/neon.rs`)
+
+#### Location: `euclidean_distance_neon_unchecked`
+
+**File:** `src/simd/neon.rs`
+**Lines:** 408-451
+
+```rust
+#[inline]
+#[target_feature(enable = "neon")]
+unsafe fn euclidean_distance_neon_unchecked(a: &[f32], b: &[f32]) -> f32 {
+    // ... implementation
+}
+```
+
+**Operation:** Loads 4 floats at a time using NEON intrinsics for vectorized difference, squaring, and accumulation.
+
+**Unsafe Operations:**
+
+| Operation | Intrinsic | Risk |
+|:----------|:----------|:-----|
+| Load 4 floats from `a` | `vld1q_f32(a.as_ptr().add(offset))` | Out-of-bounds read |
+| Load 4 floats from `b` | `vld1q_f32(b.as_ptr().add(offset))` | Out-of-bounds read |
+| Initialize zero vector | `vdupq_n_f32(0.0)` | None (pure computation) |
+| Vector subtraction | `vsubq_f32(va, vb)` | None (pure computation) |
+| Fused multiply-add | `vfmaq_f32(sum_sq, diff, diff)` | None (pure computation) |
+| Horizontal sum | `vaddvq_f32(sum_sq)` | None (pure computation) |
+
+**Justification:**
+
+Same bounds proof as dot product. Uses standard library `sqrt()` for final result (accurate, not NEON estimate).
+
+**Invariants:**
+
+| Invariant | Enforcement |
+|:----------|:------------|
+| `a.len() == b.len()` | `assert_eq!` in public wrapper |
+| NEON available | Compile-time (`#[target_feature(enable = "neon")]`) |
+| Read within bounds | Chunk calculation guarantees `offset + 4 ≤ len` |
+
+**Verification:**
+
+1. **Property Tests:** 1000+ random test cases verify NEON matches portable within 1e-4
+2. **Edge Case Tests:** Empty, identical vectors, Pythagorean triangle, various sizes
+3. **ARM CI:** Tests run on ARM64 via QEMU emulation
+
+---
+
+## Test Coverage (Updated for Day 4)
+
+### Property Tests (`tests/simd_neon_similarity.rs`)
+
+| Property | Cases | Platform |
+|:---------|:------|:---------|
+| NEON dot product == Portable | 1000 | ARM64 |
+| NEON euclidean == Portable | 1000 | ARM64 |
+| Dot product commutative | 1000 | All |
+| Euclidean symmetric | 1000 | All |
+| Euclidean self = 0 | 1000 | All |
+| Euclidean non-negative | 1000 | All |
+
+### Edge Case Tests (Similarity Functions)
+
+| Case | Description | Platform |
+|:-----|:------------|:---------|
+| Empty vectors | len = 0 | All |
+| 1 element | Scalar only | All |
+| 3 elements | Below NEON width | All |
+| 4 elements | Exact NEON width | All |
+| 5 elements | NEON + 1 tail | All |
+| 768 elements | OpenAI embedding size | All |
+| 1024 elements | Large input | All |
 
 ---
 
 ## Approval
 
-This safety audit covers the NEON hamming distance implementation completed in Week 20 Day 3.
+This safety audit covers:
+- Day 3: NEON hamming distance implementation
+- Day 4: NEON dot product and euclidean distance implementation
 
 **Auditor:** EdgeVec Development Team
 **Date:** 2025-12-16

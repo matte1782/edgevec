@@ -194,12 +194,15 @@ pub fn hamming_distance_portable_ref(a: &[u8], b: &[u8]) -> u32 {
 
 /// NEON-optimized dot product for f32 slices.
 ///
-/// Computes the dot product of two f32 slices.
+/// Computes the dot product (inner product) of two f32 vectors using
+/// NEON SIMD instructions for maximum performance on ARM64.
 ///
-/// # Current Implementation
+/// # Algorithm
 ///
-/// **STUB** - Currently delegates to scalar implementation.
-/// Will be replaced with NEON intrinsics in W20.4.
+/// 1. Process 4 floats at a time using NEON 128-bit vectors
+/// 2. Use `vfmaq_f32` for fused multiply-add (more accurate than separate mul+add)
+/// 3. Use `vaddvq_f32` to horizontally sum the accumulator
+/// 4. Handle remaining tail elements with scalar operations
 ///
 /// # Arguments
 ///
@@ -212,27 +215,126 @@ pub fn hamming_distance_portable_ref(a: &[u8], b: &[u8]) -> u32 {
 ///
 /// # Panics
 ///
-/// Panics if slices have different lengths (in debug builds).
+/// Panics if slices have different lengths.
+///
+/// # Precision
+///
+/// May differ from portable implementation by up to 1e-6 due to:
+/// - FMA operations (fused multiply-add) vs separate multiply and add
+/// - Different accumulation order
+///
+/// # Safety
+///
+/// This function uses unsafe NEON intrinsics internally. Safety is guaranteed by:
+/// - Slice length equality is verified before processing
+/// - All pointer arithmetic stays within slice bounds (verified by chunk calculation)
+/// - NEON feature availability is verified by `#[target_feature(enable = "neon")]`
+///
+/// # Performance
+///
+/// - Processes 4 floats per iteration (vs 1 for portable)
+/// - Expected speedup: ~2-4x for large inputs
+/// - Falls back to scalar for tail elements (0-3 floats)
+///
+/// # Example
+///
+/// ```ignore
+/// #[cfg(target_arch = "aarch64")]
+/// {
+///     use edgevec::simd::neon;
+///     let a = vec![1.0f32, 2.0, 3.0, 4.0];
+///     let b = vec![1.0f32, 1.0, 1.0, 1.0];
+///     let dot = neon::dot_product(&a, &b);
+///     assert!((dot - 10.0).abs() < 1e-6);
+/// }
+/// ```
 #[inline]
 #[must_use]
 pub fn dot_product(a: &[f32], b: &[f32]) -> f32 {
-    // TODO(W20.4): Replace with NEON intrinsics
-    // Implementation will use:
-    // - vld1q_f32: Load 4 floats
-    // - vmulq_f32: Multiply 4 floats
-    // - vaddvq_f32: Horizontal sum
+    assert_eq!(a.len(), b.len(), "Slice lengths must match");
+
+    // SAFETY: We've verified equal lengths. The unsafe function handles
+    // all bounds checking internally and NEON is available on aarch64.
+    unsafe { dot_product_neon_unchecked(a, b) }
+}
+
+/// NEON-optimized dot product (unchecked).
+///
+/// # Safety
+///
+/// - Caller must ensure `a.len() == b.len()`
+/// - NEON must be available (guaranteed by `#[target_feature(enable = "neon")]`)
+///
+/// # Implementation Notes
+///
+/// All memory accesses are bounds-checked by the chunk calculation:
+/// - `chunks = len / 4` ensures we only read complete 4-float blocks
+/// - `offset = i * 4` where `i < chunks` ensures `offset + 4 <= len`
+/// - Tail processing uses safe Rust indexing with bounds checking
+#[inline]
+#[target_feature(enable = "neon")]
+unsafe fn dot_product_neon_unchecked(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len(), "Slices must have equal length");
+
+    let len = a.len();
+    let chunks = len / 4;
+
+    // Initialize accumulator to zero vector
+    // SAFETY: vdupq_n_f32 is safe - just creates a vector of zeros
+    let mut sum = vdupq_n_f32(0.0);
+
+    // Process 4 floats at a time using NEON
+    for i in 0..chunks {
+        let offset = i * 4;
+
+        // SAFETY: offset + 4 <= len is guaranteed by chunks = len / 4
+        // We're reading 4 floats (16 bytes) starting at offset, which is within bounds.
+        let va = vld1q_f32(a.as_ptr().add(offset));
+        let vb = vld1q_f32(b.as_ptr().add(offset));
+
+        // Fused multiply-add: sum = sum + (va * vb)
+        // vfmaq_f32 is more accurate than vmulq_f32 + vaddq_f32
+        sum = vfmaq_f32(sum, va, vb);
+    }
+
+    // Horizontal sum of the accumulator vector
+    // vaddvq_f32 adds all 4 lanes together
+    let mut result = vaddvq_f32(sum);
+
+    // Handle remaining elements (0-3 floats) with scalar operations
+    let tail_start = chunks * 4;
+    for i in tail_start..len {
+        // SAFETY: i < len is guaranteed by the loop bounds
+        result += a[i] * b[i];
+    }
+
+    result
+}
+
+/// Portable dot product reference implementation.
+///
+/// This is the scalar (non-SIMD) implementation used for comparison
+/// and testing against the NEON version.
+#[inline]
+#[must_use]
+pub fn dot_product_portable(a: &[f32], b: &[f32]) -> f32 {
     debug_assert_eq!(a.len(), b.len(), "Slice lengths must match");
     a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
 }
 
 /// NEON-optimized Euclidean distance for f32 slices.
 ///
-/// Computes the Euclidean distance (L2 norm) between two f32 slices.
+/// Computes the Euclidean distance (L2 norm) between two f32 vectors using
+/// NEON SIMD instructions for maximum performance on ARM64.
 ///
-/// # Current Implementation
+/// # Algorithm
 ///
-/// **STUB** - Currently delegates to scalar implementation.
-/// Will be replaced with NEON intrinsics in W20.4.
+/// 1. Process 4 floats at a time using NEON 128-bit vectors
+/// 2. Use `vsubq_f32` to compute differences
+/// 3. Use `vfmaq_f32` for fused multiply-add to accumulate squared differences
+/// 4. Use `vaddvq_f32` to horizontally sum the accumulator
+/// 5. Use standard library `sqrt` for the final result (accurate)
+/// 6. Handle remaining tail elements with scalar operations
 ///
 /// # Arguments
 ///
@@ -245,17 +347,116 @@ pub fn dot_product(a: &[f32], b: &[f32]) -> f32 {
 ///
 /// # Panics
 ///
-/// Panics if slices have different lengths (in debug builds).
+/// Panics if slices have different lengths.
+///
+/// # Precision
+///
+/// May differ from portable implementation by up to 1e-6 due to:
+/// - FMA operations vs separate multiply and add
+/// - Different accumulation order
+/// Uses standard library `sqrt` for accuracy (not NEON reciprocal estimate).
+///
+/// # Safety
+///
+/// This function uses unsafe NEON intrinsics internally. Safety is guaranteed by:
+/// - Slice length equality is verified before processing
+/// - All pointer arithmetic stays within slice bounds (verified by chunk calculation)
+/// - NEON feature availability is verified by `#[target_feature(enable = "neon")]`
+///
+/// # Performance
+///
+/// - Processes 4 floats per iteration (vs 1 for portable)
+/// - Expected speedup: ~2-4x for large inputs
+/// - Falls back to scalar for tail elements (0-3 floats)
+///
+/// # Example
+///
+/// ```ignore
+/// #[cfg(target_arch = "aarch64")]
+/// {
+///     use edgevec::simd::neon;
+///     let a = vec![0.0f32, 0.0, 0.0];
+///     let b = vec![3.0f32, 4.0, 0.0];
+///     let dist = neon::euclidean_distance(&a, &b);
+///     assert!((dist - 5.0).abs() < 1e-6); // 3-4-5 triangle
+/// }
+/// ```
 #[inline]
 #[must_use]
 pub fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {
-    // TODO(W20.4): Replace with NEON intrinsics
-    // Implementation will use:
-    // - vld1q_f32: Load 4 floats
-    // - vsubq_f32: Subtract 4 floats
-    // - vmulq_f32: Square differences
-    // - vaddvq_f32: Horizontal sum
-    // - vsqrtf: Square root
+    assert_eq!(a.len(), b.len(), "Slice lengths must match");
+
+    // SAFETY: We've verified equal lengths. The unsafe function handles
+    // all bounds checking internally and NEON is available on aarch64.
+    unsafe { euclidean_distance_neon_unchecked(a, b) }
+}
+
+/// NEON-optimized Euclidean distance (unchecked).
+///
+/// # Safety
+///
+/// - Caller must ensure `a.len() == b.len()`
+/// - NEON must be available (guaranteed by `#[target_feature(enable = "neon")]`)
+///
+/// # Implementation Notes
+///
+/// All memory accesses are bounds-checked by the chunk calculation:
+/// - `chunks = len / 4` ensures we only read complete 4-float blocks
+/// - `offset = i * 4` where `i < chunks` ensures `offset + 4 <= len`
+/// - Tail processing uses safe Rust indexing with bounds checking
+#[inline]
+#[target_feature(enable = "neon")]
+unsafe fn euclidean_distance_neon_unchecked(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len(), "Slices must have equal length");
+
+    let len = a.len();
+    let chunks = len / 4;
+
+    // Initialize accumulator for squared differences
+    // SAFETY: vdupq_n_f32 is safe - just creates a vector of zeros
+    let mut sum_sq = vdupq_n_f32(0.0);
+
+    // Process 4 floats at a time using NEON
+    for i in 0..chunks {
+        let offset = i * 4;
+
+        // SAFETY: offset + 4 <= len is guaranteed by chunks = len / 4
+        // We're reading 4 floats (16 bytes) starting at offset, which is within bounds.
+        let va = vld1q_f32(a.as_ptr().add(offset));
+        let vb = vld1q_f32(b.as_ptr().add(offset));
+
+        // Compute difference: diff = a - b
+        let diff = vsubq_f32(va, vb);
+
+        // Square and accumulate: sum_sq = sum_sq + (diff * diff)
+        // vfmaq_f32 is more accurate than vmulq_f32 + vaddq_f32
+        sum_sq = vfmaq_f32(sum_sq, diff, diff);
+    }
+
+    // Horizontal sum of the accumulator vector
+    // vaddvq_f32 adds all 4 lanes together
+    let mut result = vaddvq_f32(sum_sq);
+
+    // Handle remaining elements (0-3 floats) with scalar operations
+    let tail_start = chunks * 4;
+    for i in tail_start..len {
+        // SAFETY: i < len is guaranteed by the loop bounds
+        let diff = a[i] - b[i];
+        result += diff * diff;
+    }
+
+    // Use standard library sqrt for accuracy
+    // (not NEON vrsqrteq_f32 which is just an estimate)
+    result.sqrt()
+}
+
+/// Portable Euclidean distance reference implementation.
+///
+/// This is the scalar (non-SIMD) implementation used for comparison
+/// and testing against the NEON version.
+#[inline]
+#[must_use]
+pub fn euclidean_distance_portable(a: &[f32], b: &[f32]) -> f32 {
     debug_assert_eq!(a.len(), b.len(), "Slice lengths must match");
     a.iter()
         .zip(b.iter())
@@ -450,5 +651,148 @@ mod tests {
         let b: [f32; 0] = [];
         let result = euclidean_distance(&a, &b);
         assert!((result - 0.0).abs() < 1e-6);
+    }
+
+    // NEON dot_product SIMD tests
+
+    #[test]
+    fn test_dot_product_single_element() {
+        let a = [5.0f32];
+        let b = [3.0f32];
+        let result = dot_product(&a, &b);
+        assert!((result - 15.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_product_three_elements_tail() {
+        // 3 elements = 0 NEON chunks + 3 tail
+        let a = [1.0f32, 2.0, 3.0];
+        let b = [4.0f32, 5.0, 6.0];
+        // 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
+        let result = dot_product(&a, &b);
+        assert!((result - 32.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_product_four_elements_exact_chunk() {
+        // 4 elements = 1 NEON chunk + 0 tail
+        let a = [1.0f32, 2.0, 3.0, 4.0];
+        let b = [4.0f32, 3.0, 2.0, 1.0];
+        // 1*4 + 2*3 + 3*2 + 4*1 = 4 + 6 + 6 + 4 = 20
+        let result = dot_product(&a, &b);
+        assert!((result - 20.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_product_five_elements_with_tail() {
+        // 5 elements = 1 NEON chunk + 1 tail
+        let a = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+        let b = [1.0f32, 1.0, 1.0, 1.0, 1.0];
+        // 1+2+3+4+5 = 15
+        let result = dot_product(&a, &b);
+        assert!((result - 15.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dot_product_large_768() {
+        // Common embedding dimension
+        let a: Vec<f32> = (0..768).map(|i| (i as f32) * 0.001).collect();
+        let b: Vec<f32> = vec![1.0; 768];
+        let result = dot_product(&a, &b);
+        let expected: f32 = (0..768).map(|i| (i as f32) * 0.001).sum();
+        assert!(
+            (result - expected).abs() < 0.01,
+            "result={}, expected={}",
+            result,
+            expected
+        );
+    }
+
+    #[test]
+    fn test_dot_product_matches_portable() {
+        for size in [0, 1, 3, 4, 5, 7, 8, 9, 100, 768, 1024] {
+            let a: Vec<f32> = (0..size).map(|i| (i as f32) * 0.1).collect();
+            let b: Vec<f32> = (0..size).map(|i| ((size - i) as f32) * 0.1).collect();
+
+            let neon_result = dot_product(&a, &b);
+            let portable_result = dot_product_portable(&a, &b);
+
+            assert!(
+                (neon_result - portable_result).abs() < 1e-3,
+                "NEON != Portable for size={}: {} != {}",
+                size,
+                neon_result,
+                portable_result
+            );
+        }
+    }
+
+    // NEON euclidean_distance SIMD tests
+
+    #[test]
+    fn test_euclidean_single_element() {
+        let a = [5.0f32];
+        let b = [3.0f32];
+        // sqrt((5-3)^2) = sqrt(4) = 2
+        let result = euclidean_distance(&a, &b);
+        assert!((result - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_euclidean_three_elements_tail() {
+        // 3 elements = 0 NEON chunks + 3 tail
+        let a = [0.0f32, 0.0, 0.0];
+        let b = [1.0f32, 2.0, 2.0];
+        // sqrt(1 + 4 + 4) = sqrt(9) = 3
+        let result = euclidean_distance(&a, &b);
+        assert!((result - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_euclidean_four_elements_exact_chunk() {
+        // 4 elements = 1 NEON chunk + 0 tail
+        let a = [0.0f32, 0.0, 0.0, 0.0];
+        let b = [1.0f32, 1.0, 1.0, 1.0];
+        // sqrt(4) = 2
+        let result = euclidean_distance(&a, &b);
+        assert!((result - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_euclidean_five_elements_with_tail() {
+        // 5 elements = 1 NEON chunk + 1 tail
+        let a = [0.0f32, 0.0, 0.0, 0.0, 0.0];
+        let b = [1.0f32, 1.0, 1.0, 1.0, 1.0];
+        // sqrt(5) ≈ 2.236
+        let result = euclidean_distance(&a, &b);
+        assert!((result - 5.0f32.sqrt()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_euclidean_large_768() {
+        // Common embedding dimension - identical vectors
+        let a: Vec<f32> = vec![0.5; 768];
+        let b = a.clone();
+        let result = euclidean_distance(&a, &b);
+        assert!(result < 1e-6, "Distance to self should be ~0");
+    }
+
+    #[test]
+    fn test_euclidean_matches_portable() {
+        for size in [0, 1, 3, 4, 5, 7, 8, 9, 100, 768, 1024] {
+            let a: Vec<f32> = (0..size).map(|i| (i as f32) * 0.1).collect();
+            let b: Vec<f32> = (0..size).map(|i| ((size - i) as f32) * 0.1).collect();
+
+            let neon_result = euclidean_distance(&a, &b);
+            let portable_result = euclidean_distance_portable(&a, &b);
+
+            assert!(
+                (neon_result - portable_result).abs() < 1e-3,
+                "NEON != Portable for size={}: {} != {}",
+                size,
+                neon_result,
+                portable_result
+            );
+        }
     }
 }
