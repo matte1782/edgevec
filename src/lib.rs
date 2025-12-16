@@ -124,7 +124,9 @@ pub use hnsw::{BatchDeleteError, BatchDeleteResult, HnswConfig, HnswIndex, Searc
 pub use metric::Metric;
 pub use persistence::ChunkedWriter;
 pub use quantization::{BinaryQuantizer, QuantizedVector, QuantizerConfig, ScalarQuantizer};
-pub use simd::{capabilities, warn_if_suboptimal, SimdCapabilities};
+pub use simd::{
+    capabilities, detect_neon, select_backend, warn_if_suboptimal, SimdBackend, SimdCapabilities,
+};
 pub use storage::VectorStorage;
 
 /// The crate version string.

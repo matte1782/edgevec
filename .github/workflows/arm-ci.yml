@@ -1,0 +1,131 @@
+# EdgeVec ARM CI Configuration
+# ============================
+# W20.1: ARM64 Cross-Compilation & QEMU Test Execution
+#
+# Purpose:
+#   - Cross-compile for ARM64 (aarch64-unknown-linux-gnu)
+#   - Execute tests under QEMU user-mode emulation
+#   - Verify NEON SIMD detection works correctly
+#
+# Local Simulation:
+#   cargo install cross --git https://github.com/cross-rs/cross
+#   cross build --target aarch64-unknown-linux-gnu --release
+#   cross test --target aarch64-unknown-linux-gnu --release
+#
+# Environment Variables:
+#   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: QEMU executor
+#   PROPTEST_CASES: Reduced for faster CI execution
+#
+# Job Timeouts:
+#   arm64-build: 10 minutes (cross-compilation)
+#   arm64-test:  15 minutes (QEMU test execution)
+
+name: ARM CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Reduce proptest cases in CI (QEMU is slower than native)
+  PROPTEST_CASES: "16"
+  # Reduce vector count for integration tests under emulation
+  NUM_VECTORS: "500"
+
+jobs:
+  # Job 1: ARM64 Cross-Compilation
+  arm64-build:
+    name: ARM64 Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          cross --version
+
+      - name: Build ARM64 (Release)
+        run: cross build --target aarch64-unknown-linux-gnu --release
+
+      - name: Build ARM64 (Debug for tests)
+        run: cross build --target aarch64-unknown-linux-gnu
+
+  # Job 2: ARM64 Test Execution under QEMU
+  arm64-test:
+    name: ARM64 Tests (QEMU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: arm64-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+
+      - name: Install cross
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          cross --version
+
+      - name: Run ARM64 Tests
+        run: |
+          cross test --target aarch64-unknown-linux-gnu --release -- --test-threads=1
+        env:
+          # QEMU user-mode emulation (bundled with cross, explicit for visibility)
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64
+
+      - name: Verify NEON Detection
+        run: |
+          cross test --target aarch64-unknown-linux-gnu --release simd -- --nocapture
+        env:
+          RUST_BACKTRACE: 1
+
+  # Job 3: ARM64 Clippy Check
+  arm64-lint:
+    name: ARM64 Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+          components: clippy
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Run Clippy for ARM64
+        run: |
+          cross clippy --target aarch64-unknown-linux-gnu -- -D clippy::correctness -W clippy::suspicious
+
+  # Job 4: Verify x86 Not Broken (Regression Guard)
+  x86-regression:
+    name: x86 Regression Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run x86 Tests (Quick Check)
+        run: cargo test --lib -- --test-threads=2
+        env:
+          RUSTFLAGS: "-C target-cpu=x86-64-v2"
+          PROPTEST_CASES: "16"
