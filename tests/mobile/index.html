@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="EdgeVec Mobile Browser Compatibility Test Suite - Cyberpunk Edition">
+    <meta name="theme-color" content="#0f0f13">
+    <meta property="og:title" content="EdgeVec Mobile Test Suite">
+    <meta property="og:description" content="High-Performance WASM Vector Engine - Mobile Compatibility Tests">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <title>EdgeVec // Mobile Test Suite</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════
+           EDGEVEC CYBERPUNK THEME - Mobile Test Suite
+           ═══════════════════════════════════════════════════════════════════ */
+
+        :root {
+            --bg-main: #0f0f13;
+            --bg-panel: #16161e;
+            --bg-card: #1a1a24;
+            --text-primary: #e0e0e0;
+            --text-muted: #858595;
+            --text-dim: #555566;
+
+            /* Neon Palette */
+            --neon-cyan: #00f3ff;
+            --neon-purple: #bc13fe;
+            --neon-red: #ff003c;
+            --neon-green: #0aff00;
+            --neon-yellow: #fcee09;
+            --neon-orange: #ff6b35;
+
+            --border-color: #2a2a35;
+            --font-ui: 'Inter', -apple-system, system-ui, sans-serif;
+            --font-mono: 'Fira Code', monospace;
+
+            /* Shadows & Glows */
+            --glow-cyan: 0 0 20px rgba(0, 243, 255, 0.4);
+            --glow-green: 0 0 20px rgba(10, 255, 0, 0.4);
+            --glow-red: 0 0 20px rgba(255, 0, 60, 0.4);
+            --glow-purple: 0 0 20px rgba(188, 19, 254, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            background: var(--bg-main);
+            color: var(--text-primary);
+            font-family: var(--font-ui);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           HEADER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        header {
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, #fff, var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-divider {
+            color: var(--neon-cyan);
+            font-weight: 300;
+        }
+
+        .logo-subtitle {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .version-badge {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(0, 243, 255, 0.1);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           STATUS BAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .status-bar {
+            background: linear-gradient(90deg, var(--bg-panel), #1a1a22);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            box-shadow: 0 0 5px var(--text-dim);
+            transition: all 0.3s ease;
+        }
+
+        .status-indicator.ready {
+            background: var(--neon-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .status-indicator.running {
+            background: var(--neon-purple);
+            box-shadow: var(--glow-purple);
+            animation: pulse 1s infinite;
+        }
+
+        .status-indicator.complete {
+            background: var(--neon-green);
+            box-shadow: var(--glow-green);
+        }
+
+        .status-indicator.error {
+            background: var(--neon-red);
+            box-shadow: var(--glow-red);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+
+        .status-text {
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-text.active {
+            color: var(--neon-cyan);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            main {
+                grid-template-columns: 320px 1fr;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CONTROL PANEL
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .control-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .panel-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .panel-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .panel-label::before {
+            content: '';
+            width: 3px;
+            height: 12px;
+            background: var(--neon-cyan);
+            border-radius: 2px;
+        }
+
+        /* Buttons */
+        .btn {
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 0.9rem 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: rgba(0, 243, 255, 0.15);
+            box-shadow: var(--glow-cyan);
+            text-shadow: 0 0 8px var(--neon-cyan);
+            transform: translateY(-1px);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            border-color: var(--border-color);
+            color: var(--text-dim);
+            background: transparent;
+            cursor: not-allowed;
+        }
+
+        .btn.btn-green {
+            border-color: var(--neon-green);
+            color: var(--neon-green);
+            background: rgba(10, 255, 0, 0.05);
+        }
+
+        .btn.btn-green:hover:not(:disabled) {
+            background: rgba(10, 255, 0, 0.15);
+            box-shadow: var(--glow-green);
+            text-shadow: 0 0 8px var(--neon-green);
+        }
+
+        .btn.btn-purple {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            background: rgba(188, 19, 254, 0.05);
+        }
+
+        .btn.btn-purple:hover:not(:disabled) {
+            background: rgba(188, 19, 254, 0.15);
+            box-shadow: var(--glow-purple);
+            text-shadow: 0 0 8px var(--neon-purple);
+        }
+
+        /* Device Info */
+        .device-info {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+        }
+
+        .device-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .device-row:last-child {
+            border-bottom: none;
+        }
+
+        .device-label {
+            color: var(--text-dim);
+        }
+
+        .device-value {
+            color: var(--text-primary);
+            text-align: right;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Progress Section */
+        .progress-section {
+            display: none;
+        }
+
+        .progress-section.visible {
+            display: block;
+        }
+
+        .progress-bar-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            height: 24px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-text {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--neon-cyan);
+        }
+
+        .stat-value.pass {
+            color: var(--neon-green);
+        }
+
+        .stat-value.fail {
+            color: var(--neon-red);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            margin-top: 0.25rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESULTS PANEL
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .results-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            min-height: 400px;
+            max-height: calc(100vh - 300px);
+        }
+
+        .results-header {
+            background: #1a1a1a;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .results-title {
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .results-title::before {
+            content: '>';
+            color: var(--neon-cyan);
+        }
+
+        .results-count {
+            color: var(--text-muted);
+        }
+
+        .results-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .test-result {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            animation: slideIn 0.3s ease;
+            transition: all 0.2s ease;
+        }
+
+        .test-result:hover {
+            border-color: rgba(0, 243, 255, 0.3);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .test-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            width: 28px;
+            text-align: center;
+        }
+
+        .test-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .test-name {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .test-result.pass .test-name {
+            color: var(--neon-green);
+        }
+
+        .test-result.fail .test-name {
+            color: var(--neon-red);
+        }
+
+        .test-meta {
+            display: flex;
+            gap: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .test-time {
+            color: var(--neon-cyan);
+        }
+
+        .test-error {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--neon-red);
+            background: rgba(255, 0, 60, 0.1);
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            word-break: break-word;
+        }
+
+        /* Running state */
+        .test-result.running {
+            border-color: var(--neon-purple);
+            background: rgba(188, 19, 254, 0.05);
+        }
+
+        .test-result.running .test-icon {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LOG PANEL
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .log-panel {
+            background: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 1.5rem;
+            grid-column: 1 / -1;
+        }
+
+        .log-header {
+            background: #111;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .log-content {
+            padding: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+        }
+
+        .log-entry {
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .log-timestamp {
+            color: var(--text-dim);
+            margin-right: 1rem;
+        }
+
+        .log-message {
+            color: var(--text-muted);
+        }
+
+        .log-message.success { color: var(--neon-green); }
+        .log-message.error { color: var(--neon-red); }
+        .log-message.info { color: var(--neon-cyan); }
+        .log-message.warning { color: var(--neon-yellow); }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: auto;
+        }
+
+        footer a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           SCROLLBAR
+           ═══════════════════════════════════════════════════════════════════ */
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-main);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-dim);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MOBILE OPTIMIZATIONS
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 767px) {
+            header {
+                padding: 0.75rem 1rem;
+            }
+
+            h1 {
+                font-size: 1rem;
+            }
+
+            .logo-subtitle {
+                display: none;
+            }
+
+            main {
+                padding: 1rem;
+                gap: 1rem;
+            }
+
+            .control-panel {
+                padding: 1rem;
+            }
+
+            .btn {
+                padding: 0.75rem 1rem;
+                font-size: 0.8rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .stat-card {
+                padding: 0.5rem;
+            }
+
+            .stat-value {
+                font-size: 1.1rem;
+            }
+
+            .results-panel {
+                max-height: none;
+                min-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <h1>EdgeVec</h1>
+                <span class="logo-divider">//</span>
+                <span class="logo-subtitle">Mobile Test Suite</span>
+            </div>
+            <span class="version-badge" id="versionBadge">v0.0.0</span>
+        </div>
+    </header>
+
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <span class="status-text" id="statusText">INITIALIZING</span>
+        </div>
+        <span id="timestamp"></span>
+    </div>
+
+    <main>
+        <aside class="control-panel">
+            <div class="panel-section">
+                <div class="panel-label">System Controls</div>
+                <button class="btn btn-green" id="btnRun">Run All Tests</button>
+                <button class="btn btn-purple" id="btnRerun" disabled>Rerun Tests</button>
+            </div>
+
+            <div class="panel-section progress-section" id="progressSection">
+                <div class="panel-label">Progress</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="progress-text" id="progressText">Waiting...</div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-label">Test Results</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTotal">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value pass" id="statPassed">0</div>
+                        <div class="stat-label">Passed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value fail" id="statFailed">0</div>
+                        <div class="stat-label">Failed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTime">0ms</div>
+                        <div class="stat-label">Time</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-label">Device Info</div>
+                <div class="device-info">
+                    <div class="device-row">
+                        <span class="device-label">Platform</span>
+                        <span class="device-value" id="devicePlatform">-</span>
+                    </div>
+                    <div class="device-row">
+                        <span class="device-label">Browser</span>
+                        <span class="device-value" id="deviceBrowser">-</span>
+                    </div>
+                    <div class="device-row">
+                        <span class="device-label">Screen</span>
+                        <span class="device-value" id="deviceScreen">-</span>
+                    </div>
+                    <div class="device-row">
+                        <span class="device-label">Memory</span>
+                        <span class="device-value" id="deviceMemory">-</span>
+                    </div>
+                    <div class="device-row">
+                        <span class="device-label">Cores</span>
+                        <span class="device-value" id="deviceCores">-</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <section class="results-panel">
+            <div class="results-header">
+                <span class="results-title">Test Results</span>
+                <span class="results-count" id="resultsCount">0 / 12 tests</span>
+            </div>
+            <div class="results-list" id="resultsList">
+                <div style="text-align: center; padding: 3rem; color: var(--text-dim); font-family: var(--font-mono);">
+                    Press "Run All Tests" to begin
+                </div>
+            </div>
+        </section>
+
+        <div class="log-panel">
+            <div class="log-header">
+                <span>> SYSTEM LOG</span>
+                <span id="logCount">0 entries</span>
+            </div>
+            <div class="log-content" id="logContent"></div>
+        </div>
+    </main>
+
+    <footer>
+        <a href="https://github.com/matteopanzeri/edgevec" target="_blank">EdgeVec</a>
+        — High-Performance WASM Vector Engine
+    </footer>
+
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════════
+        // EDGEVEC MOBILE TEST SUITE - Cyberpunk Edition
+        // ═══════════════════════════════════════════════════════════════════
+
+        import init, { EdgeVec, EdgeVecConfig, JsMetadataValue } from './edgevec.js';
+
+        // ─────────────────────────────────────────────────────────────────────
+        // State Management
+        // ─────────────────────────────────────────────────────────────────────
+
+        const state = {
+            initialized: false,
+            running: false,
+            totalTests: 12,
+            passedTests: 0,
+            failedTests: 0,
+            completedTests: 0,
+            startTime: 0,
+            logEntries: 0
+        };
+
+        // ─────────────────────────────────────────────────────────────────────
+        // DOM Elements
+        // ─────────────────────────────────────────────────────────────────────
+
+        const elements = {
+            statusIndicator: document.getElementById('statusIndicator'),
+            statusText: document.getElementById('statusText'),
+            timestamp: document.getElementById('timestamp'),
+            versionBadge: document.getElementById('versionBadge'),
+            btnRun: document.getElementById('btnRun'),
+            btnRerun: document.getElementById('btnRerun'),
+            progressSection: document.getElementById('progressSection'),
+            progressBar: document.getElementById('progressBar'),
+            progressText: document.getElementById('progressText'),
+            statTotal: document.getElementById('statTotal'),
+            statPassed: document.getElementById('statPassed'),
+            statFailed: document.getElementById('statFailed'),
+            statTime: document.getElementById('statTime'),
+            resultsCount: document.getElementById('resultsCount'),
+            resultsList: document.getElementById('resultsList'),
+            logContent: document.getElementById('logContent'),
+            logCount: document.getElementById('logCount'),
+            devicePlatform: document.getElementById('devicePlatform'),
+            deviceBrowser: document.getElementById('deviceBrowser'),
+            deviceScreen: document.getElementById('deviceScreen'),
+            deviceMemory: document.getElementById('deviceMemory'),
+            deviceCores: document.getElementById('deviceCores')
+        };
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Utility Functions
+        // ─────────────────────────────────────────────────────────────────────
+
+        function updateTimestamp() {
+            const now = new Date();
+            elements.timestamp.textContent = now.toLocaleTimeString('en-US', { hour12: false });
+        }
+
+        function setStatus(status, text) {
+            elements.statusIndicator.className = 'status-indicator ' + status;
+            elements.statusText.textContent = text;
+            elements.statusText.className = 'status-text' + (status === 'running' ? ' active' : '');
+        }
+
+        function log(message, type = 'info') {
+            state.logEntries++;
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            entry.innerHTML = `
+                <span class="log-timestamp">[${time}]</span>
+                <span class="log-message ${type}">${message}</span>
+            `;
+
+            elements.logContent.appendChild(entry);
+            elements.logContent.scrollTop = elements.logContent.scrollHeight;
+            elements.logCount.textContent = `${state.logEntries} entries`;
+        }
+
+        function updateProgress(current, total, message) {
+            const percent = Math.round((current / total) * 100);
+            elements.progressBar.style.width = percent + '%';
+            elements.progressText.textContent = message || `${current} / ${total}`;
+        }
+
+        function updateStats() {
+            elements.statTotal.textContent = state.completedTests;
+            elements.statPassed.textContent = state.passedTests;
+            elements.statFailed.textContent = state.failedTests;
+            elements.resultsCount.textContent = `${state.completedTests} / ${state.totalTests} tests`;
+
+            if (state.startTime > 0) {
+                const elapsed = Date.now() - state.startTime;
+                elements.statTime.textContent = elapsed < 1000 ? `${elapsed}ms` : `${(elapsed / 1000).toFixed(1)}s`;
+            }
+        }
+
+        function addTestResult(name, passed, timeMs, error = null) {
+            const result = document.createElement('div');
+            result.className = `test-result ${passed ? 'pass' : 'fail'}`;
+
+            const icon = passed ? '✓' : '✗';
+            const timeStr = timeMs < 1 ? '<1ms' : `${timeMs.toFixed(1)}ms`;
+
+            let html = `
+                <div class="test-icon">${icon}</div>
+                <div class="test-content">
+                    <div class="test-name">${name}</div>
+                    <div class="test-meta">
+                        <span class="test-time">${timeStr}</span>
+                    </div>
+            `;
+
+            if (error) {
+                html += `<div class="test-error">${error}</div>`;
+            }
+
+            html += '</div>';
+            result.innerHTML = html;
+
+            elements.resultsList.appendChild(result);
+            elements.resultsList.scrollTop = elements.resultsList.scrollHeight;
+
+            state.completedTests++;
+            if (passed) {
+                state.passedTests++;
+            } else {
+                state.failedTests++;
+            }
+
+            updateStats();
+        }
+
+        function showRunningTest(name) {
+            // Remove any existing running indicator
+            const existing = elements.resultsList.querySelector('.test-result.running');
+            if (existing) existing.remove();
+
+            const result = document.createElement('div');
+            result.className = 'test-result running';
+            result.innerHTML = `
+                <div class="test-icon">⟳</div>
+                <div class="test-content">
+                    <div class="test-name">${name}</div>
+                    <div class="test-meta">
+                        <span>Running...</span>
+                    </div>
+                </div>
+            `;
+            elements.resultsList.appendChild(result);
+            elements.resultsList.scrollTop = elements.resultsList.scrollHeight;
+        }
+
+        function clearRunningIndicator() {
+            const existing = elements.resultsList.querySelector('.test-result.running');
+            if (existing) existing.remove();
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Device Detection
+        // ─────────────────────────────────────────────────────────────────────
+
+        function detectDevice() {
+            // Platform
+            const ua = navigator.userAgent;
+            let platform = 'Unknown';
+            if (/iPhone|iPad|iPod/.test(ua)) platform = 'iOS';
+            else if (/Android/.test(ua)) platform = 'Android';
+            else if (/Windows/.test(ua)) platform = 'Windows';
+            else if (/Mac/.test(ua)) platform = 'macOS';
+            else if (/Linux/.test(ua)) platform = 'Linux';
+            elements.devicePlatform.textContent = platform;
+
+            // Browser
+            let browser = 'Unknown';
+            if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+            else if (/Chrome/.test(ua)) browser = 'Chrome';
+            else if (/Firefox/.test(ua)) browser = 'Firefox';
+            else if (/Edge/.test(ua)) browser = 'Edge';
+            elements.deviceBrowser.textContent = browser;
+
+            // Screen
+            elements.deviceScreen.textContent = `${window.screen.width}×${window.screen.height}`;
+
+            // Memory (if available)
+            if (navigator.deviceMemory) {
+                elements.deviceMemory.textContent = `${navigator.deviceMemory} GB`;
+            } else {
+                elements.deviceMemory.textContent = 'N/A';
+            }
+
+            // Cores
+            elements.deviceCores.textContent = navigator.hardwareConcurrency || 'N/A';
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Test Definitions
+        // ─────────────────────────────────────────────────────────────────────
+
+        const tests = [
+            {
+                name: 'WASM Initialization',
+                run: async () => {
+                    await init();
+                    state.initialized = true;
+                    return true;
+                }
+            },
+            {
+                name: 'Create EdgeVec Index',
+                run: async (ctx) => {
+                    const config = new EdgeVecConfig(128);
+                    ctx.index = new EdgeVec(config);
+                    return true;
+                }
+            },
+            {
+                name: 'Insert Vector',
+                run: async (ctx) => {
+                    const vector = new Float32Array(128).fill(0.5);
+                    ctx.vectorId = ctx.index.insert(vector);
+                    return ctx.vectorId === 0;
+                }
+            },
+            {
+                name: 'Search Query',
+                run: async (ctx) => {
+                    const query = new Float32Array(128).fill(0.5);
+                    const results = ctx.index.search(query, 1);
+                    return results.length === 1 && results[0].id === 0;
+                }
+            },
+            {
+                name: 'Metadata: String',
+                run: async (ctx) => {
+                    ctx.index.setMetadata(0, 'title', JsMetadataValue.fromString('EdgeVec Test'));
+                    const val = ctx.index.getMetadata(0, 'title');
+                    return val?.asString() === 'EdgeVec Test';
+                }
+            },
+            {
+                name: 'Metadata: Integer',
+                run: async (ctx) => {
+                    ctx.index.setMetadata(0, 'count', JsMetadataValue.fromInteger(42));
+                    const val = ctx.index.getMetadata(0, 'count');
+                    return val?.asInteger() === 42;
+                }
+            },
+            {
+                name: 'Metadata: Float',
+                run: async (ctx) => {
+                    ctx.index.setMetadata(0, 'score', JsMetadataValue.fromFloat(0.95));
+                    const val = ctx.index.getMetadata(0, 'score');
+                    return Math.abs(val?.asFloat() - 0.95) < 0.001;
+                }
+            },
+            {
+                name: 'Metadata: Boolean',
+                run: async (ctx) => {
+                    ctx.index.setMetadata(0, 'verified', JsMetadataValue.fromBoolean(true));
+                    const val = ctx.index.getMetadata(0, 'verified');
+                    return val?.asBoolean() === true;
+                }
+            },
+            {
+                name: 'Metadata: Array',
+                run: async (ctx) => {
+                    ctx.index.setMetadata(0, 'tags', JsMetadataValue.fromStringArray(['wasm', 'vector', 'mobile']));
+                    const val = ctx.index.getMetadata(0, 'tags');
+                    const arr = val?.asStringArray();
+                    return arr && arr.length === 3 && arr[0] === 'wasm';
+                }
+            },
+            {
+                name: 'Get All Metadata',
+                run: async (ctx) => {
+                    const all = ctx.index.getAllMetadata(0);
+                    return all && all.title === 'EdgeVec Test' && all.count === 42;
+                }
+            },
+            {
+                name: 'Delete Metadata',
+                run: async (ctx) => {
+                    const deleted = ctx.index.deleteMetadata(0, 'title');
+                    const gone = !ctx.index.hasMetadata(0, 'title');
+                    return deleted && gone;
+                }
+            },
+            {
+                name: 'Memory Stress (1000 vectors)',
+                run: async (ctx) => {
+                    const stressConfig = new EdgeVecConfig(128);
+                    const stressIndex = new EdgeVec(stressConfig);
+                    const totalVectors = 1000;
+                    const updateInterval = 50;
+
+                    for (let i = 0; i < totalVectors; i++) {
+                        const v = new Float32Array(128);
+                        for (let j = 0; j < 128; j++) v[j] = Math.random();
+                        stressIndex.insert(v);
+
+                        // Update progress every N vectors
+                        if (i % updateInterval === 0 || i === totalVectors - 1) {
+                            updateProgress(i + 1, totalVectors, `Inserting vectors... ${i + 1}/${totalVectors}`);
+                            // Yield to UI thread
+                            await new Promise(r => setTimeout(r, 0));
+                        }
+                    }
+
+                    const results = stressIndex.search(new Float32Array(128).fill(0.5), 10);
+                    ctx.stressIndex = stressIndex;
+                    return results.length === 10;
+                }
+            }
+        ];
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Test Runner
+        // ─────────────────────────────────────────────────────────────────────
+
+        async function runTests() {
+            if (state.running) return;
+
+            // Reset state
+            state.running = true;
+            state.passedTests = 0;
+            state.failedTests = 0;
+            state.completedTests = 0;
+            state.startTime = Date.now();
+
+            // Reset UI
+            elements.resultsList.innerHTML = '';
+            elements.btnRun.disabled = true;
+            elements.btnRerun.disabled = true;
+            elements.progressSection.classList.add('visible');
+
+            setStatus('running', 'RUNNING TESTS');
+            log('Starting test suite...', 'info');
+
+            const ctx = {}; // Shared context between tests
+
+            for (let i = 0; i < tests.length; i++) {
+                const test = tests[i];
+                showRunningTest(test.name);
+                log(`Running: ${test.name}`, 'info');
+
+                const testStart = performance.now();
+                let passed = false;
+                let error = null;
+
+                try {
+                    passed = await test.run(ctx);
+                } catch (e) {
+                    passed = false;
+                    error = e.message || String(e);
+                    log(`Error: ${error}`, 'error');
+                }
+
+                const testTime = performance.now() - testStart;
+                clearRunningIndicator();
+                addTestResult(test.name, passed, testTime, error);
+
+                updateProgress(i + 1, tests.length, `Test ${i + 1}/${tests.length}`);
+
+                if (passed) {
+                    log(`✓ ${test.name} (${testTime.toFixed(1)}ms)`, 'success');
+                } else {
+                    log(`✗ ${test.name} FAILED`, 'error');
+                }
+
+                // Small delay between tests for visual feedback
+                await new Promise(r => setTimeout(r, 100));
+            }
+
+            // Performance benchmark (additional)
+            if (ctx.stressIndex) {
+                log('Running performance benchmark...', 'info');
+                const searchCount = 100;
+                const benchStart = performance.now();
+
+                for (let i = 0; i < searchCount; i++) {
+                    ctx.stressIndex.search(new Float32Array(128).fill(Math.random()), 10);
+                    if (i % 20 === 0) {
+                        updateProgress(i, searchCount, `Benchmark: ${i}/${searchCount} searches`);
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                }
+
+                const benchTime = performance.now() - benchStart;
+                const avgTime = benchTime / searchCount;
+                log(`Performance: ${avgTime.toFixed(2)}ms avg search time (${searchCount} searches)`, 'success');
+            }
+
+            // Complete
+            const totalTime = Date.now() - state.startTime;
+            state.running = false;
+
+            elements.btnRun.disabled = false;
+            elements.btnRerun.disabled = false;
+
+            const allPassed = state.failedTests === 0;
+            setStatus(allPassed ? 'complete' : 'error', allPassed ? 'ALL TESTS PASSED' : 'TESTS FAILED');
+
+            log(`─────────────────────────────────────────`, 'info');
+            log(`Test suite complete: ${state.passedTests}/${state.totalTests} passed in ${totalTime}ms`,
+                allPassed ? 'success' : 'error');
+
+            updateProgress(100, 100, allPassed ? 'All tests passed!' : `${state.failedTests} test(s) failed`);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Initialization
+        // ─────────────────────────────────────────────────────────────────────
+
+        function initialize() {
+            // Update timestamp every second
+            updateTimestamp();
+            setInterval(updateTimestamp, 1000);
+
+            // Detect device
+            detectDevice();
+
+            // Set version (attempt to read from package)
+            elements.versionBadge.textContent = 'v0.5.0';
+
+            // Set initial status
+            setStatus('ready', 'READY');
+            log('EdgeVec Mobile Test Suite initialized', 'success');
+            log(`Device: ${elements.devicePlatform.textContent} / ${elements.deviceBrowser.textContent}`, 'info');
+
+            // Event listeners
+            elements.btnRun.addEventListener('click', runTests);
+            elements.btnRerun.addEventListener('click', () => {
+                elements.progressSection.classList.remove('visible');
+                runTests();
+            });
+        }
+
+        // Start
+        initialize();
+    </script>
+</body>
+</html>
