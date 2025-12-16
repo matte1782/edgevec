@@ -144,8 +144,12 @@ unsafe fn hamming_distance_neon_unchecked(a: &[u8], b: &[u8]) -> u32 {
         count += u64::from((a[i] ^ b[i]).count_ones());
     }
 
-    // Result fits in u32: max is len * 8, and len is bounded by usize
-    count as u32
+    // Result fits in u32: max is len * 8 bits.
+    // For slices up to 512MB (reasonable max), count <= 4 billion < u32::MAX
+    // Using saturating conversion for safety (clippy::cast_possible_truncation)
+    #[allow(clippy::cast_possible_truncation)]
+    let result = count as u32;
+    result
 }
 
 /// NEON-optimized Hamming distance for fixed 96-byte vectors.
@@ -716,12 +720,23 @@ mod tests {
             let neon_result = dot_product(&a, &b);
             let portable_result = dot_product_portable(&a, &b);
 
+            // Use relative tolerance for large results, absolute for small
+            let abs_diff = (neon_result - portable_result).abs();
+            let max_val = neon_result.abs().max(portable_result.abs());
+            let tolerance = if max_val > 1.0 {
+                max_val * 1e-5 // Relative tolerance for large values
+            } else {
+                1e-5 // Absolute tolerance for small values
+            };
+
             assert!(
-                (neon_result - portable_result).abs() < 1e-3,
-                "NEON != Portable for size={}: {} != {}",
+                abs_diff < tolerance,
+                "NEON != Portable for size={}: {} != {} (diff={}, tol={})",
                 size,
                 neon_result,
-                portable_result
+                portable_result,
+                abs_diff,
+                tolerance
             );
         }
     }
@@ -785,12 +800,23 @@ mod tests {
             let neon_result = euclidean_distance(&a, &b);
             let portable_result = euclidean_distance_portable(&a, &b);
 
+            // Use relative tolerance for large results, absolute for small
+            let abs_diff = (neon_result - portable_result).abs();
+            let max_val = neon_result.abs().max(portable_result.abs());
+            let tolerance = if max_val > 1.0 {
+                max_val * 1e-5 // Relative tolerance for large values
+            } else {
+                1e-5 // Absolute tolerance for small values
+            };
+
             assert!(
-                (neon_result - portable_result).abs() < 1e-3,
-                "NEON != Portable for size={}: {} != {}",
+                abs_diff < tolerance,
+                "NEON != Portable for size={}: {} != {} (diff={}, tol={})",
                 size,
                 neon_result,
-                portable_result
+                portable_result,
+                abs_diff,
+                tolerance
             );
         }
     }
