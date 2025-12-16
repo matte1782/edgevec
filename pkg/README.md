@@ -51,7 +51,7 @@
 - **WASM-First** — Native browser support via WebAssembly
 - **Persistent Storage** — `IndexedDB` in browser, file system elsewhere
 - **Minimal Dependencies** — No C compiler required, WASM-ready
-- **Tiny Bundle** — 213 KB gzipped (57% under 500KB target)
+- **Tiny Bundle** — 227 KB gzipped (55% under 500KB target)
 
 ---
 
@@ -334,7 +334,7 @@ python -m http.server 8080
 - ✅ **Search Mean:** 0.23ms (4.3x under 1ms target)
 - ✅ **Search P99 (estimated):** <600µs (based on Mean + 2σ)
 - ✅ **Memory:** 832 MB for 1M vectors (17% under 1GB target)
-- ✅ **Bundle Size:** 213 KB (57% under 500KB target)
+- ✅ **Bundle Size:** 227 KB (55% under 500KB target)
 
 **What Works Now:**
 - ✅ **HNSW Indexing** — Sub-millisecond search at 100k scale
@@ -395,7 +395,7 @@ Measured using `index.memory_usage() + storage.memory_usage()` after building 10
 
 | Package | Size (Gzipped) | Target | Status |
 |:--------|:---------------|:-------|:-------|
-| `edgevec@0.4.0` | **213 KB** | <500 KB | ✅ **57% under** |
+| `edgevec@0.4.0` | **227 KB** | <500 KB | ✅ **55% under** |
 
 ### Competitive Comparison (10k vectors, 128 dimensions)
 
@@ -416,7 +416,7 @@ Native bindings (hnswlib-node) are faster but require C++ compilation and don't 
 - ✅ **Fastest pure-WASM solution** — 24x faster than voy
 - ✅ **Zero network latency** — runs 100% locally (browser, Node, edge)
 - ✅ **Privacy-preserving** — no data leaves the device
-- ✅ **Tiny bundle** — 213 KB gzipped
+- ✅ **Tiny bundle** — 227 KB gzipped
 - ✅ **No compilation required** — unlike native bindings
 
 ### Test Environment
