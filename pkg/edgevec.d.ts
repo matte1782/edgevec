@@ -141,6 +141,81 @@ export class EdgeVec {
    */
   softDelete(vector_id: number): boolean;
   /**
+   * Gets metadata for a vector.
+   *
+   * # Arguments
+   *
+   * * `vector_id` - The ID of the vector
+   * * `key` - The metadata key to retrieve
+   *
+   * # Returns
+   *
+   * The metadata value, or `undefined` if the key or vector doesn't exist.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const title = index.getMetadata(id, 'title');
+   * if (title) {
+   *     console.log('Title:', title.asString());
+   *     console.log('Type:', title.getType());
+   * }
+   * ```
+   */
+  getMetadata(vector_id: number, key: string): JsMetadataValue | undefined;
+  /**
+   * Checks if a metadata key exists for a vector.
+   *
+   * # Arguments
+   *
+   * * `vector_id` - The ID of the vector
+   * * `key` - The metadata key to check
+   *
+   * # Returns
+   *
+   * `true` if the key exists, `false` otherwise.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * if (index.hasMetadata(id, 'title')) {
+   *     console.log('Vector has title metadata');
+   * }
+   * ```
+   */
+  hasMetadata(vector_id: number, key: string): boolean;
+  /**
+   * Sets metadata for a vector (upsert operation).
+   *
+   * If the key already exists, its value is overwritten. If the key is new,
+   * it is added (subject to the 64-key-per-vector limit).
+   *
+   * # Arguments
+   *
+   * * `vector_id` - The ID of the vector to attach metadata to
+   * * `key` - The metadata key (alphanumeric + underscore, max 256 chars)
+   * * `value` - The metadata value (created via JsMetadataValue.fromX methods)
+   *
+   * # Errors
+   *
+   * Returns an error if:
+   * - Key is empty or contains invalid characters
+   * - Key exceeds 256 characters
+   * - Value validation fails (e.g., NaN float, string too long)
+   * - Vector already has 64 keys and this is a new key
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const id = index.insert(vector);
+   * index.setMetadata(id, 'title', JsMetadataValue.fromString('My Document'));
+   * index.setMetadata(id, 'page_count', JsMetadataValue.fromInteger(42));
+   * index.setMetadata(id, 'score', JsMetadataValue.fromFloat(0.95));
+   * index.setMetadata(id, 'verified', JsMetadataValue.fromBoolean(true));
+   * ```
+   */
+  setMetadata(vector_id: number, key: string, value: JsMetadataValue): void;
+  /**
    * Get the count of deleted (tombstoned) vectors.
    *
    * # Returns
@@ -148,6 +223,32 @@ export class EdgeVec {
    * The number of vectors that have been soft-deleted but not yet compacted.
    */
   deletedCount(): number;
+  /**
+   * Deletes a metadata key for a vector.
+   *
+   * This operation is idempotent - deleting a non-existent key is not an error.
+   *
+   * # Arguments
+   *
+   * * `vector_id` - The ID of the vector
+   * * `key` - The metadata key to delete
+   *
+   * # Returns
+   *
+   * `true` if the key existed and was deleted, `false` otherwise.
+   *
+   * # Errors
+   *
+   * Returns an error if the key is invalid (empty or contains invalid characters).
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const wasDeleted = index.deleteMetadata(id, 'title');
+   * console.log(wasDeleted); // true if key existed
+   * ```
+   */
+  deleteMetadata(vector_id: number, key: string): boolean;
   /**
    * Inserts multiple vectors using the new batch API (W12.3).
    *
@@ -200,6 +301,33 @@ export class EdgeVec {
    * 0.0 means no deletions, 1.0 means all vectors deleted.
    */
   tombstoneRatio(): number;
+  /**
+   * Gets all metadata for a vector as a JavaScript object.
+   *
+   * Returns a plain JavaScript object where keys are metadata keys and
+   * values are JavaScript-native types (string, number, boolean, string[]).
+   *
+   * # Arguments
+   *
+   * * `vector_id` - The ID of the vector
+   *
+   * # Returns
+   *
+   * A JavaScript object mapping keys to values, or `undefined` if the vector
+   * has no metadata.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const metadata = index.getAllMetadata(id);
+   * if (metadata) {
+   *     console.log(metadata.title);     // 'My Document'
+   *     console.log(metadata.page_count); // 42
+   *     console.log(Object.keys(metadata)); // ['title', 'page_count', ...]
+   * }
+   * ```
+   */
+  getAllMetadata(vector_id: number): any;
   /**
    * Check if compaction is recommended.
    *
@@ -299,6 +427,47 @@ export class EdgeVec {
    */
   compactionWarning(): string | undefined;
   /**
+   * Returns the number of metadata keys for a vector.
+   *
+   * # Arguments
+   *
+   * * `vector_id` - The ID of the vector
+   *
+   * # Returns
+   *
+   * The number of metadata keys, or 0 if the vector has no metadata.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const count = index.metadataKeyCount(id);
+   * console.log(`Vector has ${count} metadata keys`);
+   * ```
+   */
+  metadataKeyCount(vector_id: number): number;
+  /**
+   * Deletes all metadata for a vector.
+   *
+   * This operation is idempotent - deleting metadata for a vector without
+   * metadata is not an error.
+   *
+   * # Arguments
+   *
+   * * `vector_id` - The ID of the vector
+   *
+   * # Returns
+   *
+   * `true` if the vector had metadata that was deleted, `false` otherwise.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const hadMetadata = index.deleteAllMetadata(id);
+   * console.log(hadMetadata); // true if vector had any metadata
+   * ```
+   */
+  deleteAllMetadata(vector_id: number): boolean;
+  /**
    * Get the current compaction threshold.
    *
    * # Returns
@@ -307,6 +476,36 @@ export class EdgeVec {
    * Default is 0.3 (30%).
    */
   compactionThreshold(): number;
+  /**
+   * Returns the total number of metadata key-value pairs across all vectors.
+   *
+   * # Returns
+   *
+   * The total count of metadata entries.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const total = index.totalMetadataCount();
+   * console.log(`${total} total metadata entries`);
+   * ```
+   */
+  totalMetadataCount(): number;
+  /**
+   * Returns the total number of vectors with metadata.
+   *
+   * # Returns
+   *
+   * The count of vectors that have at least one metadata key.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const count = index.metadataVectorCount();
+   * console.log(`${count} vectors have metadata`);
+   * ```
+   */
+  metadataVectorCount(): number;
   /**
    * Set the compaction threshold.
    *
@@ -502,6 +701,132 @@ export class EdgeVecConfig {
   set m0(value: number);
 }
 
+export class JsMetadataValue {
+  private constructor();
+  free(): void;
+  [Symbol.dispose](): void;
+  /**
+   * Gets the value as a boolean.
+   *
+   * @returns The boolean value, or undefined if not a boolean
+   */
+  asBoolean(): boolean | undefined;
+  /**
+   * Gets the value as an integer.
+   *
+   * Note: Returns as f64 for JavaScript compatibility. Safe for integers up to ±2^53.
+   *
+   * @returns The integer value as a number, or undefined if not an integer
+   */
+  asInteger(): number | undefined;
+  /**
+   * Creates a float metadata value.
+   *
+   * @param value - The float value (must not be NaN or Infinity)
+   * @returns A new JsMetadataValue containing a float
+   */
+  static fromFloat(value: number): JsMetadataValue;
+  /**
+   * Checks if this value is a boolean.
+   */
+  isBoolean(): boolean;
+  /**
+   * Checks if this value is an integer.
+   */
+  isInteger(): boolean;
+  /**
+   * Creates a string metadata value.
+   *
+   * @param value - The string value
+   * @returns A new JsMetadataValue containing a string
+   */
+  static fromString(value: string): JsMetadataValue;
+  /**
+   * Creates a boolean metadata value.
+   *
+   * @param value - The boolean value
+   * @returns A new JsMetadataValue containing a boolean
+   */
+  static fromBoolean(value: boolean): JsMetadataValue;
+  /**
+   * Creates an integer metadata value.
+   *
+   * JavaScript numbers are always f64, so this method validates the input
+   * to ensure it's a valid integer within JavaScript's safe integer range.
+   *
+   * @param value - The integer value (must be within ±(2^53 - 1))
+   * @returns A new JsMetadataValue containing an integer
+   * @throws {Error} If value is outside safe integer range or has fractional part
+   *
+   * # Errors
+   *
+   * Returns an error if:
+   * - Value exceeds JavaScript's safe integer range (±9007199254740991)
+   * - Value has a fractional part (e.g., 3.14)
+   * - Value is NaN or Infinity
+   */
+  static fromInteger(value: number): JsMetadataValue;
+  /**
+   * Gets the value as a string array.
+   *
+   * @returns The string array, or undefined if not a string array
+   */
+  asStringArray(): any;
+  /**
+   * Checks if this value is a string array.
+   */
+  isStringArray(): boolean;
+  /**
+   * Creates a string array metadata value.
+   *
+   * @param value - An array of strings
+   * @returns A new JsMetadataValue containing a string array
+   *
+   * # Errors
+   *
+   * Returns an error if any array element is not a string.
+   */
+  static fromStringArray(value: Array<any>): JsMetadataValue;
+  /**
+   * Converts to a JavaScript-native value.
+   *
+   * Returns:
+   * - `string` for String values
+   * - `number` for Integer and Float values
+   * - `boolean` for Boolean values
+   * - `string[]` for StringArray values
+   *
+   * @returns The JavaScript-native value
+   */
+  toJS(): any;
+  /**
+   * Gets the value as a float.
+   *
+   * @returns The float value, or undefined if not a float
+   */
+  asFloat(): number | undefined;
+  /**
+   * Returns the type of this value.
+   *
+   * @returns One of: 'string', 'integer', 'float', 'boolean', 'string_array'
+   */
+  getType(): string;
+  /**
+   * Checks if this value is a float.
+   */
+  isFloat(): boolean;
+  /**
+   * Gets the value as a string.
+   *
+   * @returns The string value, or undefined if not a string
+   */
+  asString(): string | undefined;
+  /**
+   * Checks if this value is a string.
+   */
+  isString(): boolean;
+}
+
 export class PersistenceIterator {
   private constructor();
   free(): void;
@@ -594,6 +919,7 @@ export interface InitOutput {
   readonly __wbg_get_wasmcompactionresult_duration_ms: (a: number) => number;
   readonly __wbg_get_wasmcompactionresult_new_size: (a: number) => number;
   readonly __wbg_get_wasmcompactionresult_tombstones_removed: (a: number) => number;
+  readonly __wbg_jsmetadatavalue_free: (a: number, b: number) => void;
   readonly __wbg_persistenceiterator_free: (a: number, b: number) => void;
   readonly __wbg_set_edgevecconfig_dimensions: (a: number, b: number) => void;
   readonly __wbg_wasmbatchdeleteresult_free: (a: number, b: number) => void;
@@ -607,7 +933,12 @@ export interface InitOutput {
   readonly edgevec_compact: (a: number, b: number) => void;
   readonly edgevec_compactionThreshold: (a: number) => number;
   readonly edgevec_compactionWarning: (a: number, b: number) => void;
+  readonly edgevec_deleteAllMetadata: (a: number, b: number) => number;
+  readonly edgevec_deleteMetadata: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly edgevec_deletedCount: (a: number) => number;
+  readonly edgevec_getAllMetadata: (a: number, b: number) => number;
+  readonly edgevec_getMetadata: (a: number, b: number, c: number, d: number) => number;
+  readonly edgevec_hasMetadata: (a: number, b: number, c: number, d: number) => number;
   readonly edgevec_insert: (a: number, b: number, c: number) => void;
   readonly edgevec_insertBatch: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_insertBatchFlat: (a: number, b: number, c: number, d: number) => void;
@@ -615,22 +946,43 @@ export interface InitOutput {
   readonly edgevec_isDeleted: (a: number, b: number, c: number) => void;
   readonly edgevec_liveCount: (a: number) => number;
   readonly edgevec_load: (a: number, b: number) => number;
+  readonly edgevec_metadataKeyCount: (a: number, b: number) => number;
+  readonly edgevec_metadataVectorCount: (a: number) => number;
   readonly edgevec_needsCompaction: (a: number) => number;
   readonly edgevec_new: (a: number, b: number) => void;
   readonly edgevec_save: (a: number, b: number, c: number) => number;
   readonly edgevec_save_stream: (a: number, b: number) => number;
   readonly edgevec_search: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_setCompactionThreshold: (a: number, b: number) => void;
+  readonly edgevec_setMetadata: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_softDelete: (a: number, b: number, c: number) => void;
   readonly edgevec_softDeleteBatch: (a: number, b: number, c: number) => void;
   readonly edgevec_softDeleteBatchCompat: (a: number, b: number, c: number) => void;
   readonly edgevec_tombstoneRatio: (a: number) => number;
+  readonly edgevec_totalMetadataCount: (a: number) => number;
   readonly edgevecconfig_new: (a: number) => number;
   readonly edgevecconfig_set_ef_construction: (a: number, b: number) => void;
   readonly edgevecconfig_set_ef_search: (a: number, b: number) => void;
   readonly edgevecconfig_set_m: (a: number, b: number) => void;
   readonly edgevecconfig_set_m0: (a: number, b: number) => void;
   readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
+  readonly jsmetadatavalue_asBoolean: (a: number) => number;
+  readonly jsmetadatavalue_asFloat: (a: number, b: number) => void;
+  readonly jsmetadatavalue_asInteger: (a: number, b: number) => void;
+  readonly jsmetadatavalue_asString: (a: number, b: number) => void;
+  readonly jsmetadatavalue_asStringArray: (a: number) => number;
+  readonly jsmetadatavalue_fromBoolean: (a: number) => number;
+  readonly jsmetadatavalue_fromFloat: (a: number) => number;
+  readonly jsmetadatavalue_fromInteger: (a: number, b: number) => void;
+  readonly jsmetadatavalue_fromString: (a: number, b: number) => number;
+  readonly jsmetadatavalue_fromStringArray: (a: number, b: number) => void;
+  readonly jsmetadatavalue_getType: (a: number, b: number) => void;
+  readonly jsmetadatavalue_isBoolean: (a: number) => number;
+  readonly jsmetadatavalue_isFloat: (a: number) => number;
+  readonly jsmetadatavalue_isInteger: (a: number) => number;
+  readonly jsmetadatavalue_isString: (a: number) => number;
+  readonly jsmetadatavalue_isStringArray: (a: number) => number;
+  readonly jsmetadatavalue_toJS: (a: number) => number;
   readonly persistenceiterator_next_chunk: (a: number) => number;
   readonly wasmbatchdeleteresult_allValid: (a: number) => number;
   readonly wasmbatchdeleteresult_alreadyDeleted: (a: number) => number;
@@ -640,13 +992,13 @@ export interface InitOutput {
   readonly init_logging: () => void;
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
-  readonly __wasm_bindgen_func_elem_325: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_318: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_520: (a: number, b: number, c: number, d: number) => void;
-  readonly __wbindgen_export: (a: number) => void;
-  readonly __wbindgen_export2: (a: number, b: number, c: number) => void;
-  readonly __wbindgen_export3: (a: number, b: number) => number;
-  readonly __wbindgen_export4: (a: number, b: number, c: number, d: number) => number;
+  readonly __wasm_bindgen_func_elem_401: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_394: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_596: (a: number, b: number, c: number, d: number) => void;
+  readonly __wbindgen_export: (a: number, b: number) => number;
+  readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_export3: (a: number) => void;
+  readonly __wbindgen_export4: (a: number, b: number, c: number) => void;
   readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
 }
 

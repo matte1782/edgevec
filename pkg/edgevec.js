@@ -111,7 +111,7 @@ function handleError(f, args) {
     try {
         return f.apply(this, args);
     } catch (e) {
-        wasm.__wbindgen_export(addHeapObject(e));
+        wasm.__wbindgen_export3(addHeapObject(e));
     }
 }
 
@@ -224,12 +224,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_325(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_325(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_401(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_401(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_520(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_520(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_596(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_596(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -247,6 +247,10 @@ const EdgeVecFinalization = (typeof FinalizationRegistry === 'undefined')
 const EdgeVecConfigFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_edgevecconfig_free(ptr >>> 0, 1));
+
+const JsMetadataValueFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_jsmetadatavalue_free(ptr >>> 0, 1));
 
 const PersistenceIteratorFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -341,7 +345,7 @@ export class BatchInsertResult {
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
             var v1 = getArrayU64FromWasm0(r0, r1).slice();
-            wasm.__wbindgen_export2(r0, r1 * 8, 8);
+            wasm.__wbindgen_export4(r0, r1 * 8, 8);
             return v1;
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
@@ -415,7 +419,7 @@ export class EdgeVec {
      * @returns {Promise<EdgeVec>}
      */
     static load(name) {
-        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.edgevec_load(ptr0, len0);
         return takeObject(ret);
@@ -438,7 +442,7 @@ export class EdgeVec {
      * @returns {Promise<void>}
      */
     save(name) {
-        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.edgevec_save(this.__wbg_ptr, ptr0, len0);
         return takeObject(ret);
@@ -556,6 +560,115 @@ export class EdgeVec {
         }
     }
     /**
+     * Gets metadata for a vector.
+     *
+     * # Arguments
+     *
+     * * `vector_id` - The ID of the vector
+     * * `key` - The metadata key to retrieve
+     *
+     * # Returns
+     *
+     * The metadata value, or `undefined` if the key or vector doesn't exist.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const title = index.getMetadata(id, 'title');
+     * if (title) {
+     *     console.log('Title:', title.asString());
+     *     console.log('Type:', title.getType());
+     * }
+     * ```
+     * @param {number} vector_id
+     * @param {string} key
+     * @returns {JsMetadataValue | undefined}
+     */
+    getMetadata(vector_id, key) {
+        const ptr0 = passStringToWasm0(key, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.edgevec_getMetadata(this.__wbg_ptr, vector_id, ptr0, len0);
+        return ret === 0 ? undefined : JsMetadataValue.__wrap(ret);
+    }
+    /**
+     * Checks if a metadata key exists for a vector.
+     *
+     * # Arguments
+     *
+     * * `vector_id` - The ID of the vector
+     * * `key` - The metadata key to check
+     *
+     * # Returns
+     *
+     * `true` if the key exists, `false` otherwise.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * if (index.hasMetadata(id, 'title')) {
+     *     console.log('Vector has title metadata');
+     * }
+     * ```
+     * @param {number} vector_id
+     * @param {string} key
+     * @returns {boolean}
+     */
+    hasMetadata(vector_id, key) {
+        const ptr0 = passStringToWasm0(key, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.edgevec_hasMetadata(this.__wbg_ptr, vector_id, ptr0, len0);
+        return ret !== 0;
+    }
+    /**
+     * Sets metadata for a vector (upsert operation).
+     *
+     * If the key already exists, its value is overwritten. If the key is new,
+     * it is added (subject to the 64-key-per-vector limit).
+     *
+     * # Arguments
+     *
+     * * `vector_id` - The ID of the vector to attach metadata to
+     * * `key` - The metadata key (alphanumeric + underscore, max 256 chars)
+     * * `value` - The metadata value (created via JsMetadataValue.fromX methods)
+     *
+     * # Errors
+     *
+     * Returns an error if:
+     * - Key is empty or contains invalid characters
+     * - Key exceeds 256 characters
+     * - Value validation fails (e.g., NaN float, string too long)
+     * - Vector already has 64 keys and this is a new key
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const id = index.insert(vector);
+     * index.setMetadata(id, 'title', JsMetadataValue.fromString('My Document'));
+     * index.setMetadata(id, 'page_count', JsMetadataValue.fromInteger(42));
+     * index.setMetadata(id, 'score', JsMetadataValue.fromFloat(0.95));
+     * index.setMetadata(id, 'verified', JsMetadataValue.fromBoolean(true));
+     * ```
+     * @param {number} vector_id
+     * @param {string} key
+     * @param {JsMetadataValue} value
+     */
+    setMetadata(vector_id, key, value) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(key, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            _assertClass(value, JsMetadataValue);
+            wasm.edgevec_setMetadata(retptr, this.__wbg_ptr, vector_id, ptr0, len0, value.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            if (r1) {
+                throw takeObject(r0);
+            }
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Get the count of deleted (tombstoned) vectors.
      *
      * # Returns
@@ -566,6 +679,51 @@ export class EdgeVec {
     deletedCount() {
         const ret = wasm.edgevec_deletedCount(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * Deletes a metadata key for a vector.
+     *
+     * This operation is idempotent - deleting a non-existent key is not an error.
+     *
+     * # Arguments
+     *
+     * * `vector_id` - The ID of the vector
+     * * `key` - The metadata key to delete
+     *
+     * # Returns
+     *
+     * `true` if the key existed and was deleted, `false` otherwise.
+     *
+     * # Errors
+     *
+     * Returns an error if the key is invalid (empty or contains invalid characters).
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const wasDeleted = index.deleteMetadata(id, 'title');
+     * console.log(wasDeleted); // true if key existed
+     * ```
+     * @param {number} vector_id
+     * @param {string} key
+     * @returns {boolean}
+     */
+    deleteMetadata(vector_id, key) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(key, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.edgevec_deleteMetadata(retptr, this.__wbg_ptr, vector_id, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return r0 !== 0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Inserts multiple vectors using the new batch API (W12.3).
@@ -644,6 +802,38 @@ export class EdgeVec {
     tombstoneRatio() {
         const ret = wasm.edgevec_tombstoneRatio(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * Gets all metadata for a vector as a JavaScript object.
+     *
+     * Returns a plain JavaScript object where keys are metadata keys and
+     * values are JavaScript-native types (string, number, boolean, string[]).
+     *
+     * # Arguments
+     *
+     * * `vector_id` - The ID of the vector
+     *
+     * # Returns
+     *
+     * A JavaScript object mapping keys to values, or `undefined` if the vector
+     * has no metadata.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const metadata = index.getAllMetadata(id);
+     * if (metadata) {
+     *     console.log(metadata.title);     // 'My Document'
+     *     console.log(metadata.page_count); // 42
+     *     console.log(Object.keys(metadata)); // ['title', 'page_count', ...]
+     * }
+     * ```
+     * @param {number} vector_id
+     * @returns {any}
+     */
+    getAllMetadata(vector_id) {
+        const ret = wasm.edgevec_getAllMetadata(this.__wbg_ptr, vector_id);
+        return takeObject(ret);
     }
     /**
      * Check if compaction is recommended.
@@ -789,12 +979,63 @@ export class EdgeVec {
             let v1;
             if (r0 !== 0) {
                 v1 = getStringFromWasm0(r0, r1).slice();
-                wasm.__wbindgen_export2(r0, r1 * 1, 1);
+                wasm.__wbindgen_export4(r0, r1 * 1, 1);
             }
             return v1;
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
+    }
+    /**
+     * Returns the number of metadata keys for a vector.
+     *
+     * # Arguments
+     *
+     * * `vector_id` - The ID of the vector
+     *
+     * # Returns
+     *
+     * The number of metadata keys, or 0 if the vector has no metadata.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const count = index.metadataKeyCount(id);
+     * console.log(`Vector has ${count} metadata keys`);
+     * ```
+     * @param {number} vector_id
+     * @returns {number}
+     */
+    metadataKeyCount(vector_id) {
+        const ret = wasm.edgevec_metadataKeyCount(this.__wbg_ptr, vector_id);
+        return ret >>> 0;
+    }
+    /**
+     * Deletes all metadata for a vector.
+     *
+     * This operation is idempotent - deleting metadata for a vector without
+     * metadata is not an error.
+     *
+     * # Arguments
+     *
+     * * `vector_id` - The ID of the vector
+     *
+     * # Returns
+     *
+     * `true` if the vector had metadata that was deleted, `false` otherwise.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const hadMetadata = index.deleteAllMetadata(id);
+     * console.log(hadMetadata); // true if vector had any metadata
+     * ```
+     * @param {number} vector_id
+     * @returns {boolean}
+     */
+    deleteAllMetadata(vector_id) {
+        const ret = wasm.edgevec_deleteAllMetadata(this.__wbg_ptr, vector_id);
+        return ret !== 0;
     }
     /**
      * Get the current compaction threshold.
@@ -808,6 +1049,44 @@ export class EdgeVec {
     compactionThreshold() {
         const ret = wasm.edgevec_compactionThreshold(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * Returns the total number of metadata key-value pairs across all vectors.
+     *
+     * # Returns
+     *
+     * The total count of metadata entries.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const total = index.totalMetadataCount();
+     * console.log(`${total} total metadata entries`);
+     * ```
+     * @returns {number}
+     */
+    totalMetadataCount() {
+        const ret = wasm.edgevec_totalMetadataCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Returns the total number of vectors with metadata.
+     *
+     * # Returns
+     *
+     * The count of vectors that have at least one metadata key.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const count = index.metadataVectorCount();
+     * console.log(`${count} vectors have metadata`);
+     * ```
+     * @returns {number}
+     */
+    metadataVectorCount() {
+        const ret = wasm.edgevec_metadataVectorCount(this.__wbg_ptr);
+        return ret >>> 0;
     }
     /**
      * Set the compaction threshold.
@@ -1108,7 +1387,7 @@ export class EdgeVecConfig {
      * @param {string} metric
      */
     set metric(metric) {
-        const ptr0 = passStringToWasm0(metric, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const ptr0 = passStringToWasm0(metric, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len0 = WASM_VECTOR_LEN;
         wasm.edgevecconfig_set_metric(this.__wbg_ptr, ptr0, len0);
     }
@@ -1152,6 +1431,302 @@ export class EdgeVecConfig {
     }
 }
 if (Symbol.dispose) EdgeVecConfig.prototype[Symbol.dispose] = EdgeVecConfig.prototype.free;
+
+/**
+ * JavaScript-friendly metadata value representation.
+ *
+ * This type bridges Rust's `MetadataValue` enum to JavaScript objects.
+ * Use the static factory methods (`fromString`, `fromInteger`, etc.) to create
+ * values from JavaScript.
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const strValue = JsMetadataValue.fromString('hello');
+ * const intValue = JsMetadataValue.fromInteger(42);
+ * const floatValue = JsMetadataValue.fromFloat(3.14);
+ * const boolValue = JsMetadataValue.fromBoolean(true);
+ * const arrValue = JsMetadataValue.fromStringArray(['a', 'b', 'c']);
+ *
+ * console.log(strValue.getType()); // 'string'
+ * console.log(intValue.toJS());    // 42
+ * ```
+ */
+export class JsMetadataValue {
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(JsMetadataValue.prototype);
+        obj.__wbg_ptr = ptr;
+        JsMetadataValueFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        JsMetadataValueFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_jsmetadatavalue_free(ptr, 0);
+    }
+    /**
+     * Gets the value as a boolean.
+     *
+     * @returns The boolean value, or undefined if not a boolean
+     * @returns {boolean | undefined}
+     */
+    asBoolean() {
+        const ret = wasm.jsmetadatavalue_asBoolean(this.__wbg_ptr);
+        return ret === 0xFFFFFF ? undefined : ret !== 0;
+    }
+    /**
+     * Gets the value as an integer.
+     *
+     * Note: Returns as f64 for JavaScript compatibility. Safe for integers up to ±2^53.
+     *
+     * @returns The integer value as a number, or undefined if not an integer
+     * @returns {number | undefined}
+     */
+    asInteger() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.jsmetadatavalue_asInteger(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r2 = getDataViewMemory0().getFloat64(retptr + 8 * 1, true);
+            return r0 === 0 ? undefined : r2;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Creates a float metadata value.
+     *
+     * @param value - The float value (must not be NaN or Infinity)
+     * @returns A new JsMetadataValue containing a float
+     * @param {number} value
+     * @returns {JsMetadataValue}
+     */
+    static fromFloat(value) {
+        const ret = wasm.jsmetadatavalue_fromFloat(value);
+        return JsMetadataValue.__wrap(ret);
+    }
+    /**
+     * Checks if this value is a boolean.
+     * @returns {boolean}
+     */
+    isBoolean() {
+        const ret = wasm.jsmetadatavalue_isBoolean(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Checks if this value is an integer.
+     * @returns {boolean}
+     */
+    isInteger() {
+        const ret = wasm.jsmetadatavalue_isInteger(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Creates a string metadata value.
+     *
+     * @param value - The string value
+     * @returns A new JsMetadataValue containing a string
+     * @param {string} value
+     * @returns {JsMetadataValue}
+     */
+    static fromString(value) {
+        const ptr0 = passStringToWasm0(value, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.jsmetadatavalue_fromString(ptr0, len0);
+        return JsMetadataValue.__wrap(ret);
+    }
+    /**
+     * Creates a boolean metadata value.
+     *
+     * @param value - The boolean value
+     * @returns A new JsMetadataValue containing a boolean
+     * @param {boolean} value
+     * @returns {JsMetadataValue}
+     */
+    static fromBoolean(value) {
+        const ret = wasm.jsmetadatavalue_fromBoolean(value);
+        return JsMetadataValue.__wrap(ret);
+    }
+    /**
+     * Creates an integer metadata value.
+     *
+     * JavaScript numbers are always f64, so this method validates the input
+     * to ensure it's a valid integer within JavaScript's safe integer range.
+     *
+     * @param value - The integer value (must be within ±(2^53 - 1))
+     * @returns A new JsMetadataValue containing an integer
+     * @throws {Error} If value is outside safe integer range or has fractional part
+     *
+     * # Errors
+     *
+     * Returns an error if:
+     * - Value exceeds JavaScript's safe integer range (±9007199254740991)
+     * - Value has a fractional part (e.g., 3.14)
+     * - Value is NaN or Infinity
+     * @param {number} value
+     * @returns {JsMetadataValue}
+     */
+    static fromInteger(value) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.jsmetadatavalue_fromInteger(retptr, value);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return JsMetadataValue.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Gets the value as a string array.
+     *
+     * @returns The string array, or undefined if not a string array
+     * @returns {any}
+     */
+    asStringArray() {
+        const ret = wasm.jsmetadatavalue_asStringArray(this.__wbg_ptr);
+        return takeObject(ret);
+    }
+    /**
+     * Checks if this value is a string array.
+     * @returns {boolean}
+     */
+    isStringArray() {
+        const ret = wasm.jsmetadatavalue_isStringArray(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Creates a string array metadata value.
+     *
+     * @param value - An array of strings
+     * @returns A new JsMetadataValue containing a string array
+     *
+     * # Errors
+     *
+     * Returns an error if any array element is not a string.
+     * @param {Array<any>} value
+     * @returns {JsMetadataValue}
+     */
+    static fromStringArray(value) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.jsmetadatavalue_fromStringArray(retptr, addHeapObject(value));
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return JsMetadataValue.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Converts to a JavaScript-native value.
+     *
+     * Returns:
+     * - `string` for String values
+     * - `number` for Integer and Float values
+     * - `boolean` for Boolean values
+     * - `string[]` for StringArray values
+     *
+     * @returns The JavaScript-native value
+     * @returns {any}
+     */
+    toJS() {
+        const ret = wasm.jsmetadatavalue_toJS(this.__wbg_ptr);
+        return takeObject(ret);
+    }
+    /**
+     * Gets the value as a float.
+     *
+     * @returns The float value, or undefined if not a float
+     * @returns {number | undefined}
+     */
+    asFloat() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.jsmetadatavalue_asFloat(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r2 = getDataViewMemory0().getFloat64(retptr + 8 * 1, true);
+            return r0 === 0 ? undefined : r2;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Returns the type of this value.
+     *
+     * @returns One of: 'string', 'integer', 'float', 'boolean', 'string_array'
+     * @returns {string}
+     */
+    getType() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.jsmetadatavalue_getType(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            deferred1_0 = r0;
+            deferred1_1 = r1;
+            return getStringFromWasm0(r0, r1);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * Checks if this value is a float.
+     * @returns {boolean}
+     */
+    isFloat() {
+        const ret = wasm.jsmetadatavalue_isFloat(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Gets the value as a string.
+     *
+     * @returns The string value, or undefined if not a string
+     * @returns {string | undefined}
+     */
+    asString() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.jsmetadatavalue_asString(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            let v1;
+            if (r0 !== 0) {
+                v1 = getStringFromWasm0(r0, r1).slice();
+                wasm.__wbindgen_export4(r0, r1 * 1, 1);
+            }
+            return v1;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Checks if this value is a string.
+     * @returns {boolean}
+     */
+    isString() {
+        const ret = wasm.jsmetadatavalue_isString(this.__wbg_ptr);
+        return ret !== 0;
+    }
+}
+if (Symbol.dispose) JsMetadataValue.prototype[Symbol.dispose] = JsMetadataValue.prototype.free;
 
 /**
  * Iterator for saving the database in chunks.
@@ -1384,6 +1959,10 @@ async function __wbg_load(module, imports) {
 function __wbg_get_imports() {
     const imports = {};
     imports.wbg = {};
+    imports.wbg.__wbg_Error_52673b7de5a0ca89 = function(arg0, arg1) {
+        const ret = Error(getStringFromWasm0(arg0, arg1));
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg___wbindgen_is_function_8d400b8b1af978cd = function(arg0) {
         const ret = typeof(getObject(arg0)) === 'function';
         return ret;
@@ -1391,6 +1970,14 @@ function __wbg_get_imports() {
     imports.wbg.__wbg___wbindgen_is_undefined_f6b95eab589e0269 = function(arg0) {
         const ret = getObject(arg0) === undefined;
         return ret;
+    };
+    imports.wbg.__wbg___wbindgen_string_get_a2a31e16edf96e42 = function(arg0, arg1) {
+        const obj = getObject(arg1);
+        const ret = typeof(obj) === 'string' ? obj : undefined;
+        var ptr1 = isLikeNone(ret) ? 0 : passStringToWasm0(ret, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        var len1 = WASM_VECTOR_LEN;
+        getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+        getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
     };
     imports.wbg.__wbg___wbindgen_throw_dd24417ed36fc46e = function(arg0, arg1) {
         throw new Error(getStringFromWasm0(arg0, arg1));
@@ -1425,7 +2012,7 @@ function __wbg_get_imports() {
             deferred0_1 = arg1;
             console.error(getStringFromWasm0(arg0, arg1));
         } finally {
-            wasm.__wbindgen_export2(deferred0_0, deferred0_1, 1);
+            wasm.__wbindgen_export4(deferred0_0, deferred0_1, 1);
         }
     };
     imports.wbg.__wbg_error_7bc7d576a6aaf855 = function(arg0) {
@@ -1465,6 +2052,10 @@ function __wbg_get_imports() {
         const ret = new Object();
         return addHeapObject(ret);
     };
+    imports.wbg.__wbg_new_25f239778d6112b9 = function() {
+        const ret = new Array();
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_new_6421f6084cc5bc5a = function(arg0) {
         const ret = new Uint8Array(getObject(arg0));
         return addHeapObject(ret);
@@ -1480,7 +2071,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_520(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_596(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -1519,6 +2110,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_prototypesetcall_dfe9b766cdc1f1fd = function(arg0, arg1, arg2) {
         Uint8Array.prototype.set.call(getArrayU8FromWasm0(arg0, arg1), getObject(arg2));
     };
+    imports.wbg.__wbg_push_7d9be8f38fc13975 = function(arg0, arg1) {
+        const ret = getObject(arg0).push(getObject(arg1));
+        return ret;
+    };
     imports.wbg.__wbg_queueMicrotask_9b549dfce8865860 = function(arg0) {
         const ret = getObject(arg0).queueMicrotask;
         return addHeapObject(ret);
@@ -1543,7 +2138,7 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg_stack_0ed75d68575b0f3c = function(arg0, arg1) {
         const ret = getObject(arg1).stack;
-        const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_export3, wasm.__wbindgen_export4);
+        const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_export, wasm.__wbindgen_export2);
         const len1 = WASM_VECTOR_LEN;
         getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
         getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
@@ -1584,9 +2179,9 @@ function __wbg_get_imports() {
         const ret = getStringFromWasm0(arg0, arg1);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_cast_644fd6eb3bcf11b4 = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 68, function: Function { arguments: [Externref], shim_idx: 69, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_318, __wasm_bindgen_func_elem_325);
+    imports.wbg.__wbindgen_cast_9802243c858d266f = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 71, function: Function { arguments: [Externref], shim_idx: 72, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_394, __wasm_bindgen_func_elem_401);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {
