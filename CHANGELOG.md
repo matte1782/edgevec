@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2025-12-17 — Hotfix: NPM Package Fix
+
+**Type:** HOTFIX (Critical Bug Fix)
+
+### Fixed
+
+- **NPM package missing `snippets` directory** — Build failures with Vite, webpack, and other bundlers due to missing `snippets` directory in published npm package. The `package.json` `files` array now correctly includes `"snippets"`. ([GitHub Issue #1](https://github.com/matte1782/edgevec/issues/1))
+
+### Upgrade
+
+```bash
+npm install edgevec@0.4.1
+```
+
+### Affected Versions
+
+| Version | Status |
+|:--------|:-------|
+| 0.4.0 | ❌ BROKEN (do not use with bundlers) |
+| 0.4.1 | ✅ FIXED |
+
+---
+
 ## [0.4.0] - 2025-12-20 — Documentation & Quality Sprint
 
 **Focus:** Production readiness — comprehensive documentation, P99 tracking, and quality hardening.
@@ -345,7 +368,8 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
-| 0.4.0 | 2025-12-20 | Documentation sprint, P99 tracking, chaos testing |
+| 0.4.1 | 2025-12-17 | **HOTFIX:** NPM package snippets fix |
+| 0.4.0 | 2025-12-16 | Documentation sprint, P99 tracking, chaos testing |
 | 0.3.0 | 2025-12-15 | Soft delete API, compaction, dual-license |
 | 0.2.1 | 2025-12-14 | Safety hardening, batch insert |
 | 0.2.0 | 2025-12-12 | Initial alpha release |
@@ -363,7 +387,8 @@ This version was internal only, not published to crates.io or npm.
 
 ---
 
-[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/matte1782/edgevec/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/matte1782/edgevec/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/matte1782/edgevec/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/matte1782/edgevec/compare/v0.2.0...v0.2.1
