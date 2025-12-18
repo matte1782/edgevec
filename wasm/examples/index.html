@@ -587,6 +587,390 @@
         }
 
         /* ═══════════════════════════════════════════════════════════════════════════
+           QUICK TRY SECTION - Interactive Search Demo with Filters
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .quick-try {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.03) 0%, rgba(255, 0, 255, 0.02) 100%);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 60px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quick-try::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--cyan));
+            background-size: 200% 100%;
+            animation: gradientMove 3s linear infinite;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
+        }
+
+        .quick-try-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .quick-try-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 8px;
+        }
+
+        .quick-try-subtitle {
+            font-size: 13px;
+            color: var(--gray-200);
+        }
+
+        .quick-try-controls {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr auto;
+            gap: 16px;
+            align-items: end;
+            margin-bottom: 24px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-200);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-label .filter-help {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: var(--cyan);
+            cursor: help;
+            transition: all 0.2s ease;
+        }
+
+        .control-label .filter-help:hover {
+            background: var(--cyan);
+            color: var(--bg-primary);
+            border-color: var(--cyan);
+        }
+
+        .control-input {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--white);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        .control-input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
+        }
+
+        .control-input::placeholder {
+            color: var(--gray-300);
+        }
+
+        .control-input.filter-input {
+            font-size: 12px;
+        }
+
+        .control-input.filter-input.valid {
+            border-color: var(--green);
+        }
+
+        .control-input.filter-input.invalid {
+            border-color: var(--red);
+        }
+
+        .btn-demo {
+            background: transparent;
+            border: 1px solid var(--cyan);
+            border-radius: 8px;
+            padding: 12px 24px;
+            color: var(--cyan);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .btn-demo:hover:not(:disabled) {
+            background: var(--cyan);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-demo:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-demo.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .btn-demo.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: btnSpin 0.8s linear infinite;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes btnSpin {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        .btn-load {
+            border-color: var(--magenta);
+            color: var(--magenta);
+        }
+
+        .btn-load:hover:not(:disabled) {
+            background: var(--magenta);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-magenta);
+        }
+
+        .quick-try-results {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 120px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .results-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-200);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-badge {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: rgba(0, 255, 255, 0.15);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            display: none;
+        }
+
+        .filter-badge.active {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .results-stats {
+            font-size: 11px;
+            color: var(--gray-300);
+            display: flex;
+            gap: 16px;
+        }
+
+        .results-stats span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .results-stats .value {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            border-left: 3px solid var(--cyan);
+            transition: all 0.2s ease;
+        }
+
+        .result-item:hover {
+            background: rgba(0, 255, 255, 0.05);
+            border-left-color: var(--magenta);
+        }
+
+        .result-rank {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--cyan);
+            width: 32px;
+        }
+
+        .result-id {
+            font-size: 12px;
+            color: var(--white);
+            flex: 1;
+        }
+
+        .result-meta {
+            font-size: 10px;
+            color: var(--gray-300);
+            display: flex;
+            gap: 12px;
+        }
+
+        .result-meta .category {
+            color: var(--magenta);
+        }
+
+        .result-distance {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--green);
+        }
+
+        .results-empty {
+            text-align: center;
+            padding: 32px;
+            color: var(--gray-300);
+            font-size: 13px;
+        }
+
+        .results-empty-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .demo-status {
+            text-align: center;
+            padding: 8px;
+            font-size: 11px;
+            color: var(--gray-300);
+            border-top: 1px solid var(--border);
+            margin-top: 16px;
+        }
+
+        .demo-status.ready {
+            color: var(--green);
+        }
+
+        .demo-status.error {
+            color: var(--red);
+        }
+
+        /* Tooltip for filter help */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip-content {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 11px;
+            color: var(--gray-100);
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--border);
+        }
+
+        .tooltip:hover .tooltip-content {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Responsive Quick Try */
+        @media (max-width: 900px) {
+            .quick-try-controls {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .btn-demo {
+                width: 100%;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
            QUICK START SECTION
            ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -890,7 +1274,7 @@
                 <div class="hero-stat-label">Search P50</div>
             </div>
             <div class="hero-stat">
-                <div class="hero-stat-value">5</div>
+                <div class="hero-stat-value">6</div>
                 <div class="hero-stat-label">Live Demos</div>
             </div>
         </div>
@@ -898,6 +1282,75 @@
 
     <!-- Main Content -->
     <main id="main-content" role="main">
+        <!-- Quick Try - Interactive Search with Filters -->
+        <section class="quick-try" aria-labelledby="quick-try-title">
+            <div class="quick-try-header">
+                <h2 id="quick-try-title" class="quick-try-title">Quick Try: Filtered Search</h2>
+                <p class="quick-try-subtitle">Load sample data, apply a filter, and search - all in your browser</p>
+            </div>
+
+            <div class="quick-try-controls">
+                <div class="control-group">
+                    <label class="control-label" for="vectorCount">Sample Vectors</label>
+                    <select id="vectorCount" class="control-input">
+                        <option value="100">100 vectors</option>
+                        <option value="500" selected>500 vectors</option>
+                        <option value="1000">1,000 vectors</option>
+                    </select>
+                </div>
+
+                <button id="loadDataBtn" class="btn-demo btn-load" aria-label="Load sample data into EdgeVec">
+                    Load Data
+                </button>
+
+                <div class="control-group">
+                    <label class="control-label" for="filterInput">
+                        Filter (optional)
+                        <span class="tooltip filter-help" aria-label="Filter syntax help">
+                            ?
+                            <span class="tooltip-content">
+                                Examples: category = "tech" • price &lt; 100 • rating &gt;= 4.0
+                            </span>
+                        </span>
+                    </label>
+                    <input
+                        type="text"
+                        id="filterInput"
+                        class="control-input filter-input"
+                        placeholder='e.g., category = "tech" AND price < 100'
+                        aria-describedby="filter-status"
+                    >
+                </div>
+
+                <button id="searchBtn" class="btn-demo" disabled aria-label="Run filtered search">
+                    Search
+                </button>
+            </div>
+
+            <div class="quick-try-results">
+                <div class="results-header">
+                    <div class="results-title">
+                        <span>Results</span>
+                        <span id="filterBadge" class="filter-badge">🔍 Filtered</span>
+                    </div>
+                    <div class="results-stats">
+                        <span>Vectors: <span id="statsVectors" class="value">0</span></span>
+                        <span>Time: <span id="statsTime" class="value">-</span></span>
+                        <span id="statsFiltered" style="display: none;">Matched: <span id="statsMatchCount" class="value">-</span></span>
+                    </div>
+                </div>
+                <div id="resultsList" class="results-list">
+                    <div class="results-empty">
+                        <div class="results-empty-icon">🔍</div>
+                        <div>Load sample data and click Search to see results</div>
+                    </div>
+                </div>
+                <div id="demoStatus" class="demo-status">
+                    WASM: <span id="wasmStatus">Loading...</span>
+                </div>
+            </div>
+        </section>
+
         <div class="section-header">
             <h2 class="section-title">Available Demos</h2>
             <p class="section-description">Click any card to launch the interactive demo</p>
@@ -1102,5 +1555,341 @@
             </p>
         </div>
     </footer>
+
+    <!-- Quick Try Search Demo JavaScript -->
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════════════════
+        // QUICK TRY - Interactive Filtered Search Demo
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        const WASM_PATHS = [
+            '../../pkg/edgevec.js',
+            '/pkg/edgevec.js',
+            '../pkg/edgevec.js'
+        ];
+
+        // State
+        let wasmModule = null;
+        let index = null;
+        let metadataStore = [];
+        const dimension = 64;
+
+        // DOM elements
+        const loadDataBtn = document.getElementById('loadDataBtn');
+        const searchBtn = document.getElementById('searchBtn');
+        const filterInput = document.getElementById('filterInput');
+        const vectorCountSelect = document.getElementById('vectorCount');
+        const resultsList = document.getElementById('resultsList');
+        const filterBadge = document.getElementById('filterBadge');
+        const statsVectors = document.getElementById('statsVectors');
+        const statsTime = document.getElementById('statsTime');
+        const statsFiltered = document.getElementById('statsFiltered');
+        const statsMatchCount = document.getElementById('statsMatchCount');
+        const wasmStatus = document.getElementById('wasmStatus');
+        const demoStatus = document.getElementById('demoStatus');
+
+        // Sample data categories
+        const categories = ['tech', 'books', 'music', 'games', 'home'];
+        const sampleProducts = ['Laptop', 'Phone', 'Tablet', 'Headphones', 'Watch', 'Camera', 'Speaker', 'Mouse', 'Keyboard', 'Monitor'];
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // WASM Module Loading
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        async function loadWasm() {
+            for (const path of WASM_PATHS) {
+                try {
+                    wasmModule = await import(path);
+                    await wasmModule.default();
+                    wasmStatus.textContent = 'Ready';
+                    wasmStatus.style.color = 'var(--green)';
+                    demoStatus.classList.add('ready');
+                    loadDataBtn.disabled = false;
+                    console.log('[QuickTry] WASM loaded from:', path);
+                    return true;
+                } catch (e) {
+                    console.warn('[QuickTry] Failed to load from:', path, e.message);
+                }
+            }
+            wasmStatus.textContent = 'Error - serve from project root';
+            wasmStatus.style.color = 'var(--red)';
+            demoStatus.classList.add('error');
+            return false;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Data Generation
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function generateVector() {
+            const vec = new Float32Array(dimension);
+            for (let i = 0; i < dimension; i++) {
+                vec[i] = Math.random() * 2 - 1;
+            }
+            return vec;
+        }
+
+        function generateMetadata(id) {
+            const category = categories[Math.floor(Math.random() * categories.length)];
+            const product = sampleProducts[Math.floor(Math.random() * sampleProducts.length)];
+            return {
+                id,
+                name: `${product} ${id}`,
+                category,
+                price: Math.floor(Math.random() * 500) + 10,
+                rating: (Math.random() * 4 + 1).toFixed(1),
+                inStock: Math.random() > 0.3
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Load Data Handler
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        async function loadData() {
+            const count = parseInt(vectorCountSelect.value);
+            loadDataBtn.classList.add('loading');
+            loadDataBtn.disabled = true;
+
+            try {
+                // Create new index
+                const config = new wasmModule.EdgeVecConfig(dimension);
+                index = new wasmModule.EdgeVec(config);
+                metadataStore = [];
+
+                // Insert vectors with metadata
+                for (let i = 0; i < count; i++) {
+                    const vector = generateVector();
+                    const id = index.insert(vector);
+                    const metadata = generateMetadata(id);
+                    metadataStore.push(metadata);
+                }
+
+                statsVectors.textContent = count.toLocaleString();
+                searchBtn.disabled = false;
+
+                resultsList.innerHTML = `
+                    <div class="results-empty">
+                        <div class="results-empty-icon">✅</div>
+                        <div>Loaded ${count.toLocaleString()} vectors. Try a filter like:<br>
+                        <code style="color: var(--cyan); background: var(--bg-primary); padding: 2px 8px; border-radius: 4px; margin-top: 8px; display: inline-block;">category = "tech" AND price < 200</code></div>
+                    </div>
+                `;
+
+                console.log('[QuickTry] Loaded', count, 'vectors');
+            } catch (e) {
+                console.error('[QuickTry] Load error:', e);
+                resultsList.innerHTML = `
+                    <div class="results-empty" style="color: var(--red);">
+                        <div class="results-empty-icon">❌</div>
+                        <div>Error loading data: ${e.message}</div>
+                    </div>
+                `;
+            } finally {
+                loadDataBtn.classList.remove('loading');
+                loadDataBtn.disabled = false;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Filter Parsing (Client-side metadata filter)
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function parseFilter(filterStr) {
+            if (!filterStr || filterStr.trim() === '') return null;
+
+            // Simple client-side filter parser for demo
+            // Supports: field = "value", field < num, field > num, field >= num, field <= num
+            // AND/OR logical operators
+            return (metadata) => {
+                try {
+                    let expr = filterStr.trim();
+
+                    // Handle AND
+                    if (expr.toLowerCase().includes(' and ')) {
+                        const parts = expr.split(/\s+and\s+/i);
+                        return parts.every(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    // Handle OR
+                    if (expr.toLowerCase().includes(' or ')) {
+                        const parts = expr.split(/\s+or\s+/i);
+                        return parts.some(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    // Handle comparison operators
+                    const match = expr.match(/^(\w+)\s*(=|!=|>=|<=|>|<)\s*(.+)$/);
+                    if (!match) return true;
+
+                    const [, field, op, rawValue] = match;
+                    const fieldLower = field.toLowerCase();
+
+                    // Get field value from metadata
+                    let fieldValue = metadata[fieldLower];
+                    if (fieldValue === undefined) {
+                        // Try exact case match
+                        fieldValue = metadata[field];
+                    }
+                    if (fieldValue === undefined) return false;
+
+                    // Parse the comparison value
+                    let compareValue = rawValue.trim();
+                    if (compareValue.startsWith('"') && compareValue.endsWith('"')) {
+                        compareValue = compareValue.slice(1, -1);
+                    } else if (compareValue === 'true') {
+                        compareValue = true;
+                    } else if (compareValue === 'false') {
+                        compareValue = false;
+                    } else if (!isNaN(parseFloat(compareValue))) {
+                        compareValue = parseFloat(compareValue);
+                    }
+
+                    // Perform comparison
+                    switch (op) {
+                        case '=': return String(fieldValue).toLowerCase() === String(compareValue).toLowerCase();
+                        case '!=': return String(fieldValue).toLowerCase() !== String(compareValue).toLowerCase();
+                        case '>': return parseFloat(fieldValue) > compareValue;
+                        case '<': return parseFloat(fieldValue) < compareValue;
+                        case '>=': return parseFloat(fieldValue) >= compareValue;
+                        case '<=': return parseFloat(fieldValue) <= compareValue;
+                        default: return true;
+                    }
+                } catch (e) {
+                    console.warn('[QuickTry] Filter parse error:', e);
+                    return true;
+                }
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Search Handler
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        async function runSearch() {
+            if (!index) return;
+
+            searchBtn.classList.add('loading');
+            searchBtn.disabled = true;
+
+            try {
+                const filterStr = filterInput.value.trim();
+                const filterFn = parseFilter(filterStr);
+                const hasFilter = filterStr.length > 0;
+
+                // Update filter badge
+                if (hasFilter) {
+                    filterBadge.classList.add('active');
+                    statsFiltered.style.display = 'inline';
+                } else {
+                    filterBadge.classList.remove('active');
+                    statsFiltered.style.display = 'none';
+                }
+
+                // Generate random query vector
+                const queryVector = generateVector();
+
+                // Time the search
+                const startTime = performance.now();
+                const rawResults = index.search(queryVector, 50); // Get more results for filtering
+                const searchTime = performance.now() - startTime;
+
+                // Apply metadata filter
+                let results = rawResults.map(r => ({
+                    ...r,
+                    metadata: metadataStore.find(m => m.id === r.id) || { id: r.id, name: `Vector ${r.id}` }
+                }));
+
+                if (filterFn) {
+                    results = results.filter(r => filterFn(r.metadata));
+                }
+
+                // Limit to top 5
+                results = results.slice(0, 5);
+
+                // Update stats
+                statsTime.textContent = `${searchTime.toFixed(2)}ms`;
+                if (hasFilter) {
+                    statsMatchCount.textContent = `${results.length}/${rawResults.length}`;
+                }
+
+                // Render results
+                if (results.length === 0) {
+                    resultsList.innerHTML = `
+                        <div class="results-empty">
+                            <div class="results-empty-icon">🔍</div>
+                            <div>No vectors match your filter. Try adjusting the criteria.</div>
+                        </div>
+                    `;
+                } else {
+                    resultsList.innerHTML = results.map((r, i) => `
+                        <div class="result-item">
+                            <span class="result-rank">#${i + 1}</span>
+                            <span class="result-id">${escapeHtml(r.metadata.name)}</span>
+                            <span class="result-meta">
+                                <span class="category">${escapeHtml(r.metadata.category || '-')}</span>
+                                <span>$${r.metadata.price || '-'}</span>
+                                <span>★${r.metadata.rating || '-'}</span>
+                            </span>
+                            <span class="result-distance">${r.score.toFixed(4)}</span>
+                        </div>
+                    `).join('');
+                }
+
+                // Validate filter input visual feedback
+                if (hasFilter && results.length > 0) {
+                    filterInput.classList.remove('invalid');
+                    filterInput.classList.add('valid');
+                } else if (hasFilter && results.length === 0) {
+                    filterInput.classList.remove('valid');
+                    filterInput.classList.add('invalid');
+                } else {
+                    filterInput.classList.remove('valid', 'invalid');
+                }
+
+            } catch (e) {
+                console.error('[QuickTry] Search error:', e);
+                resultsList.innerHTML = `
+                    <div class="results-empty" style="color: var(--red);">
+                        <div class="results-empty-icon">❌</div>
+                        <div>Search error: ${escapeHtml(e.message)}</div>
+                    </div>
+                `;
+            } finally {
+                searchBtn.classList.remove('loading');
+                searchBtn.disabled = false;
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // Event Listeners
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        loadDataBtn.addEventListener('click', loadData);
+        searchBtn.addEventListener('click', runSearch);
+
+        // Enter key in filter input triggers search
+        filterInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !searchBtn.disabled) {
+                runSearch();
+            }
+        });
+
+        // Clear validation styling when typing
+        filterInput.addEventListener('input', () => {
+            filterInput.classList.remove('valid', 'invalid');
+        });
+
+        // Initialize
+        loadWasm();
+    </script>
 </body>
 </html>

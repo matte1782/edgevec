@@ -719,6 +719,210 @@
         }
 
         /* ═══════════════════════════════════════════════════════════════════════════
+           FILTER BENCHMARK SECTION
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .filter-bench-section {
+            margin-bottom: 60px;
+        }
+
+        .filter-bench-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .filter-bench-header {
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .filter-bench-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--magenta);
+            font-weight: 600;
+        }
+
+        .filter-bench-badge {
+            font-size: 10px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .filter-bench-controls {
+            padding: 24px 28px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .filter-bench-control {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-bench-control label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-300);
+        }
+
+        .filter-bench-control select,
+        .filter-bench-control input {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--white);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            min-width: 150px;
+        }
+
+        .filter-bench-control input {
+            min-width: 300px;
+        }
+
+        .filter-bench-control select:focus,
+        .filter-bench-control input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
+        }
+
+        .filter-bench-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            border-radius: 8px;
+            padding: 10px 24px;
+            color: var(--green);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-bench-btn:hover:not(:disabled) {
+            background: var(--green);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-green);
+        }
+
+        .filter-bench-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .filter-bench-btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .filter-bench-btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .filter-bench-results {
+            padding: 20px 28px;
+            min-height: 60px;
+        }
+
+        .filter-bench-empty {
+            text-align: center;
+            color: var(--gray-300);
+            font-size: 13px;
+            padding: 20px;
+        }
+
+        .filter-bench-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 24px 28px;
+            background: rgba(0, 255, 255, 0.02);
+            border-top: 1px solid var(--border);
+        }
+
+        .filter-metric {
+            text-align: center;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .filter-metric.highlight {
+            border-color: var(--green);
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .filter-metric-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--cyan);
+            margin-bottom: 4px;
+        }
+
+        .filter-metric.highlight .filter-metric-value {
+            color: var(--green);
+        }
+
+        .filter-metric-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-300);
+        }
+
+        @media (max-width: 900px) {
+            .filter-bench-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-bench-control input {
+                min-width: 100%;
+            }
+
+            .filter-bench-metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .filter-bench-metrics {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
            LOADING & ERROR STATES
            ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1108,6 +1312,55 @@
                 </div>
             </div>
         </section>
+
+        <!-- Filter Performance Section -->
+        <section id="filter-bench" class="filter-bench-section">
+            <h2 class="section-title">Filter Performance (Live)</h2>
+            <div class="filter-bench-container">
+                <div class="filter-bench-header">
+                    <span class="filter-bench-title">EdgeVec Filter Benchmarks</span>
+                    <span class="filter-bench-badge">Interactive</span>
+                </div>
+                <div class="filter-bench-controls">
+                    <div class="filter-bench-control">
+                        <label>Vectors</label>
+                        <select id="filterBenchVectors">
+                            <option value="1000">1,000</option>
+                            <option value="5000" selected>5,000</option>
+                            <option value="10000">10,000</option>
+                        </select>
+                    </div>
+                    <div class="filter-bench-control">
+                        <label>Filter</label>
+                        <input type="text" id="filterBenchExpr" placeholder='category = "tech" AND price < 200' value='price < 100'>
+                    </div>
+                    <button id="runFilterBenchBtn" class="filter-bench-btn">Run Benchmark</button>
+                </div>
+                <div class="filter-bench-results" id="filterBenchResults">
+                    <div class="filter-bench-empty">
+                        Click "Run Benchmark" to measure filter performance
+                    </div>
+                </div>
+                <div class="filter-bench-metrics" id="filterBenchMetrics" style="display: none;">
+                    <div class="filter-metric">
+                        <div class="filter-metric-value" id="filterParseTime">-</div>
+                        <div class="filter-metric-label">Parse Time</div>
+                    </div>
+                    <div class="filter-metric">
+                        <div class="filter-metric-value" id="filterUnfilteredTime">-</div>
+                        <div class="filter-metric-label">Unfiltered Search</div>
+                    </div>
+                    <div class="filter-metric">
+                        <div class="filter-metric-value" id="filterFilteredTime">-</div>
+                        <div class="filter-metric-label">Filtered Search</div>
+                    </div>
+                    <div class="filter-metric highlight">
+                        <div class="filter-metric-value" id="filterOverhead">-</div>
+                        <div class="filter-metric-label">Filter Overhead</div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Footer -->
@@ -1125,5 +1378,206 @@
     </footer>
 
     <script src="benchmark-dashboard.js"></script>
+
+    <!-- Filter Benchmark Interactive Demo -->
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════════════════
+        // FILTER BENCHMARK - Live WASM Performance Testing
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        const WASM_PATHS = [
+            '../../pkg/edgevec.js',
+            '/pkg/edgevec.js',
+            '../pkg/edgevec.js'
+        ];
+
+        let wasmModule = null;
+        const dimension = 64;
+
+        // Sample data
+        const categories = ['tech', 'books', 'music', 'games', 'home', 'sports'];
+
+        async function loadWasm() {
+            for (const path of WASM_PATHS) {
+                try {
+                    wasmModule = await import(path);
+                    await wasmModule.default();
+                    console.log('[FilterBench] WASM loaded from:', path);
+                    document.getElementById('runFilterBenchBtn').disabled = false;
+                    return true;
+                } catch (e) {
+                    console.warn('[FilterBench] Failed to load from:', path);
+                }
+            }
+            document.getElementById('filterBenchResults').innerHTML = `
+                <div class="filter-bench-empty" style="color: var(--red);">
+                    WASM not available. Start server from project root.
+                </div>
+            `;
+            return false;
+        }
+
+        function generateVector() {
+            const vec = new Float32Array(dimension);
+            for (let i = 0; i < dimension; i++) {
+                vec[i] = Math.random() * 2 - 1;
+            }
+            return vec;
+        }
+
+        function generateMetadata(id) {
+            return {
+                id,
+                category: categories[Math.floor(Math.random() * categories.length)],
+                price: Math.floor(Math.random() * 500) + 10,
+                rating: (Math.random() * 4 + 1).toFixed(1)
+            };
+        }
+
+        function parseFilter(filterStr) {
+            if (!filterStr || filterStr.trim() === '') return null;
+
+            return (metadata) => {
+                try {
+                    let expr = filterStr.trim();
+
+                    if (expr.toLowerCase().includes(' and ')) {
+                        const parts = expr.split(/\s+and\s+/i);
+                        return parts.every(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    if (expr.toLowerCase().includes(' or ')) {
+                        const parts = expr.split(/\s+or\s+/i);
+                        return parts.some(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    const match = expr.match(/^(\w+)\s*(=|!=|>=|<=|>|<)\s*(.+)$/);
+                    if (!match) return true;
+
+                    const [, field, op, rawValue] = match;
+                    let fieldValue = metadata[field.toLowerCase()] ?? metadata[field];
+                    if (fieldValue === undefined) return false;
+
+                    let compareValue = rawValue.trim();
+                    if (compareValue.startsWith('"') && compareValue.endsWith('"')) {
+                        compareValue = compareValue.slice(1, -1);
+                    } else if (!isNaN(parseFloat(compareValue))) {
+                        compareValue = parseFloat(compareValue);
+                    }
+
+                    switch (op) {
+                        case '=': return String(fieldValue).toLowerCase() === String(compareValue).toLowerCase();
+                        case '!=': return String(fieldValue).toLowerCase() !== String(compareValue).toLowerCase();
+                        case '>': return parseFloat(fieldValue) > compareValue;
+                        case '<': return parseFloat(fieldValue) < compareValue;
+                        case '>=': return parseFloat(fieldValue) >= compareValue;
+                        case '<=': return parseFloat(fieldValue) <= compareValue;
+                        default: return true;
+                    }
+                } catch (e) {
+                    return true;
+                }
+            };
+        }
+
+        async function runFilterBenchmark() {
+            const btn = document.getElementById('runFilterBenchBtn');
+            const resultsDiv = document.getElementById('filterBenchResults');
+            const metricsDiv = document.getElementById('filterBenchMetrics');
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            try {
+                const vectorCount = parseInt(document.getElementById('filterBenchVectors').value);
+                const filterExpr = document.getElementById('filterBenchExpr').value.trim();
+
+                resultsDiv.innerHTML = `<div class="filter-bench-empty">Creating index with ${vectorCount.toLocaleString()} vectors...</div>`;
+
+                // Create index and metadata
+                const config = new wasmModule.EdgeVecConfig(dimension);
+                const index = new wasmModule.EdgeVec(config);
+                const metadataStore = {};
+
+                for (let i = 0; i < vectorCount; i++) {
+                    const vector = generateVector();
+                    const id = index.insert(vector);
+                    metadataStore[id] = generateMetadata(id);
+                }
+
+                resultsDiv.innerHTML = `<div class="filter-bench-empty">Running benchmarks...</div>`;
+
+                // Parse filter and measure time
+                const parseStart = performance.now();
+                const filterFn = parseFilter(filterExpr);
+                const parseTime = performance.now() - parseStart;
+
+                // Benchmark unfiltered search (10 iterations)
+                const query = generateVector();
+                const unfilteredTimes = [];
+                for (let i = 0; i < 10; i++) {
+                    const start = performance.now();
+                    index.search(query, 10);
+                    unfilteredTimes.push(performance.now() - start);
+                }
+                const unfilteredP50 = unfilteredTimes.sort((a, b) => a - b)[5];
+
+                // Benchmark filtered search (10 iterations)
+                const filteredTimes = [];
+                let matchedCount = 0;
+                for (let i = 0; i < 10; i++) {
+                    const start = performance.now();
+                    const results = index.search(query, 50);
+                    const filtered = results.map(r => ({
+                        ...r,
+                        metadata: metadataStore[r.id] || {}
+                    })).filter(r => filterFn ? filterFn(r.metadata) : true);
+                    filteredTimes.push(performance.now() - start);
+                    matchedCount = filtered.length;
+                }
+                const filteredP50 = filteredTimes.sort((a, b) => a - b)[5];
+
+                // Calculate overhead
+                const overhead = ((filteredP50 - unfilteredP50) / unfilteredP50 * 100).toFixed(1);
+
+                // Update results
+                resultsDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--green);">✓ Benchmark complete for ${vectorCount.toLocaleString()} vectors</span>
+                        <span style="color: var(--gray-300); font-size: 11px;">Filter: "${filterExpr}" (${matchedCount}/50 matched)</span>
+                    </div>
+                `;
+
+                // Update metrics
+                metricsDiv.style.display = 'grid';
+                document.getElementById('filterParseTime').textContent = `${parseTime.toFixed(3)}ms`;
+                document.getElementById('filterUnfilteredTime').textContent = `${unfilteredP50.toFixed(2)}ms`;
+                document.getElementById('filterFilteredTime').textContent = `${filteredP50.toFixed(2)}ms`;
+                document.getElementById('filterOverhead').textContent = `+${overhead}%`;
+
+                // Color code overhead
+                const overheadEl = document.getElementById('filterOverhead');
+                if (parseFloat(overhead) < 10) {
+                    overheadEl.style.color = 'var(--green)';
+                } else if (parseFloat(overhead) < 30) {
+                    overheadEl.style.color = 'var(--yellow)';
+                } else {
+                    overheadEl.style.color = 'var(--red)';
+                }
+
+            } catch (e) {
+                console.error('[FilterBench] Error:', e);
+                resultsDiv.innerHTML = `<div class="filter-bench-empty" style="color: var(--red);">Error: ${e.message}</div>`;
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+
+        // Initialize
+        document.getElementById('runFilterBenchBtn').disabled = true;
+        document.getElementById('runFilterBenchBtn').addEventListener('click', runFilterBenchmark);
+        loadWasm();
+    </script>
 </body>
 </html>

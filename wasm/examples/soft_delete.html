@@ -501,6 +501,66 @@
             color: var(--white);
         }
 
+        /* Filter Input Styles */
+        .filter-input {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: var(--white);
+            font-family: inherit;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        .filter-input::placeholder {
+            color: var(--gray);
+            font-size: 10px;
+        }
+
+        .filter-input.valid {
+            border-color: var(--green);
+        }
+
+        .filter-input.invalid {
+            border-color: var(--red);
+        }
+
+        .btn-delete-filter {
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .btn-delete-filter:hover:not(:disabled) {
+            background: var(--orange);
+            color: var(--bg-primary);
+            box-shadow: 0 0 20px rgba(255, 136, 0, 0.4);
+        }
+
+        /* Filter badge in results */
+        .filter-badge {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: rgba(0, 255, 255, 0.15);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            margin-left: 8px;
+        }
+
+        .filter-badge.active {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
         /* ═══════════════════════════════════════════════════════════════════
            VISUALIZATION AREA (CENTER)
            ═══════════════════════════════════════════════════════════════════ */
@@ -1091,10 +1151,21 @@
                 </button>
             </div>
 
-            <div class="section-title">Search & Compact</div>
+            <div class="section-title">Filter-Based Delete</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="deleteFilterInput" class="filter-input" placeholder='e.g., category = "tech"' aria-label="Filter expression for deletion">
+                <button class="btn btn-delete-filter" onclick="deleteByFilter()" aria-label="Delete vectors matching filter">
+                    <span>Delete Matching Filter</span>
+                </button>
+            </div>
+
+            <div class="section-title">Filtered Search</div>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+                <input type="text" id="searchFilterInput" class="filter-input" placeholder='e.g., price < 100 AND category = "tech"' aria-label="Filter expression for search">
+            </div>
             <div class="btn-grid" role="group" aria-label="Search and maintenance buttons">
                 <button class="btn btn-search" onclick="searchVectors()" aria-label="Search for top 10 nearest neighbors">
-                    <span>Search Top 10 Nearest</span>
+                    <span>Search Top 10</span>
                 </button>
                 <button class="btn btn-compact" id="compactBtn" onclick="runCompaction()" aria-label="Run index compaction to reclaim space">
                     <span>Run Compaction</span>
@@ -1210,7 +1281,87 @@
         let index = null;
         const dimension = 128;
         let insertedIds = [];
+        let metadataStore = {}; // Maps vector ID to metadata
         let logCount = 0;
+
+        // Sample data for metadata generation
+        const categories = ['tech', 'books', 'music', 'games', 'home', 'sports'];
+        const brands = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'];
+
+        // ═══════════════════════════════════════════════════════════════════
+        // METADATA GENERATION
+        // ═══════════════════════════════════════════════════════════════════
+
+        function generateMetadata(id) {
+            return {
+                id,
+                category: categories[Math.floor(Math.random() * categories.length)],
+                brand: brands[Math.floor(Math.random() * brands.length)],
+                price: Math.floor(Math.random() * 500) + 10,
+                rating: (Math.random() * 4 + 1).toFixed(1),
+                inStock: Math.random() > 0.3
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // FILTER PARSING
+        // ═══════════════════════════════════════════════════════════════════
+
+        function parseFilter(filterStr) {
+            if (!filterStr || filterStr.trim() === '') return null;
+
+            return (metadata) => {
+                try {
+                    let expr = filterStr.trim();
+
+                    // Handle AND
+                    if (expr.toLowerCase().includes(' and ')) {
+                        const parts = expr.split(/\s+and\s+/i);
+                        return parts.every(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    // Handle OR
+                    if (expr.toLowerCase().includes(' or ')) {
+                        const parts = expr.split(/\s+or\s+/i);
+                        return parts.some(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    // Handle comparison operators
+                    const match = expr.match(/^(\w+)\s*(=|!=|>=|<=|>|<)\s*(.+)$/);
+                    if (!match) return true;
+
+                    const [, field, op, rawValue] = match;
+                    const fieldLower = field.toLowerCase();
+
+                    let fieldValue = metadata[fieldLower] ?? metadata[field];
+                    if (fieldValue === undefined) return false;
+
+                    let compareValue = rawValue.trim();
+                    if (compareValue.startsWith('"') && compareValue.endsWith('"')) {
+                        compareValue = compareValue.slice(1, -1);
+                    } else if (compareValue === 'true') {
+                        compareValue = true;
+                    } else if (compareValue === 'false') {
+                        compareValue = false;
+                    } else if (!isNaN(parseFloat(compareValue))) {
+                        compareValue = parseFloat(compareValue);
+                    }
+
+                    switch (op) {
+                        case '=': return String(fieldValue).toLowerCase() === String(compareValue).toLowerCase();
+                        case '!=': return String(fieldValue).toLowerCase() !== String(compareValue).toLowerCase();
+                        case '>': return parseFloat(fieldValue) > compareValue;
+                        case '<': return parseFloat(fieldValue) < compareValue;
+                        case '>=': return parseFloat(fieldValue) >= compareValue;
+                        case '<=': return parseFloat(fieldValue) <= compareValue;
+                        default: return true;
+                    }
+                } catch (e) {
+                    console.warn('[Filter] Parse error:', e);
+                    return true;
+                }
+            };
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // PARTICLE SYSTEM
@@ -1424,10 +1575,12 @@
                 }
                 const id = index.insert(vector);
                 insertedIds.push(id);
+                // Store metadata for filtering
+                metadataStore[id] = generateMetadata(id);
             }
 
             const elapsed = (performance.now() - start).toFixed(1);
-            log(`Inserted ${count.toLocaleString()} vectors in ${elapsed}ms`, 'success');
+            log(`Inserted ${count.toLocaleString()} vectors with metadata in ${elapsed}ms`, 'success');
 
             // Spawn green particles
             const btn = document.querySelector('.btn-insert');
@@ -1485,45 +1638,147 @@
         };
 
         window.searchVectors = function() {
+            const filterStr = document.getElementById('searchFilterInput').value.trim();
+            const filterFn = parseFilter(filterStr);
+            const hasFilter = filterStr.length > 0;
+
             const query = new Float32Array(dimension);
             for (let i = 0; i < dimension; i++) {
                 query[i] = Math.random() * 2 - 1;
             }
 
             const start = performance.now();
-            const results = index.search(query, 10);
-            const elapsed = (performance.now() - start).toFixed(2);
+            // Get more results if filtering, so we can apply filter and still have 10
+            const rawResults = index.search(query, hasFilter ? 50 : 10);
+            const searchTime = performance.now() - start;
 
-            document.getElementById('searchTime').textContent = `${elapsed}ms`;
+            // Apply metadata filter
+            let results = rawResults.map(r => ({
+                ...r,
+                metadata: metadataStore[r.id] || { id: r.id }
+            }));
+
+            if (filterFn) {
+                results = results.filter(r => filterFn(r.metadata));
+            }
+
+            // Limit to top 10
+            results = results.slice(0, 10);
+
+            const elapsed = searchTime.toFixed(2);
+            const filterBadge = hasFilter ? `<span class="filter-badge active">🔍 Filtered</span>` : '';
+            document.getElementById('searchTime').textContent = `${elapsed}ms ${hasFilter ? `(${results.length}/${rawResults.length} matched)` : ''}`;
 
             const resultsList = document.getElementById('resultsList');
             resultsList.innerHTML = '';
 
+            // Update filter input styling
+            const filterInput = document.getElementById('searchFilterInput');
+            if (hasFilter && results.length > 0) {
+                filterInput.classList.remove('invalid');
+                filterInput.classList.add('valid');
+            } else if (hasFilter && results.length === 0) {
+                filterInput.classList.remove('valid');
+                filterInput.classList.add('invalid');
+            } else {
+                filterInput.classList.remove('valid', 'invalid');
+            }
+
             if (results.length === 0) {
                 resultsList.innerHTML = `
                     <div style="color: var(--gray); font-size: 12px; text-align: center; padding: 20px;">
-                        No results found (all vectors deleted?)
+                        ${hasFilter ? 'No vectors match filter criteria' : 'No results found (all vectors deleted?)'}
                     </div>
                 `;
             } else {
                 results.forEach((r, i) => {
+                    const meta = r.metadata;
                     const item = document.createElement('div');
                     item.className = 'result-item';
                     item.innerHTML = `
                         <span class="result-rank">#${i + 1}</span>
-                        <span class="result-id">Vector ID: ${r.id}</span>
+                        <span class="result-id" style="flex: 1;">
+                            ID: ${r.id}
+                            <span style="color: var(--gray); font-size: 10px; margin-left: 8px;">
+                                ${meta.category || ''} · $${meta.price || '-'} · ★${meta.rating || '-'}
+                            </span>
+                        </span>
                         <span class="result-distance">${r.score.toFixed(6)}</span>
                     `;
                     resultsList.appendChild(item);
                 });
             }
 
-            log(`Search returned ${results.length} results in ${elapsed}ms`, 'info');
+            log(`Search${hasFilter ? ' (filtered)' : ''}: ${results.length} results in ${elapsed}ms`, 'info');
 
             // Spawn cyan particles
             const btn = document.querySelector('.btn-search');
             const rect = btn.getBoundingClientRect();
             spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#00ffff', 12);
+        };
+
+        window.deleteByFilter = function() {
+            const filterStr = document.getElementById('deleteFilterInput').value.trim();
+            if (!filterStr) {
+                log('Enter a filter expression to delete matching vectors', 'warning');
+                return;
+            }
+
+            const filterFn = parseFilter(filterStr);
+            if (!filterFn) {
+                log('Invalid filter expression', 'error');
+                return;
+            }
+
+            // Find live vectors matching the filter
+            const liveIds = insertedIds.filter(id => {
+                try {
+                    if (index.isDeleted(id)) return false;
+                    const meta = metadataStore[id];
+                    return meta && filterFn(meta);
+                } catch (e) {
+                    return false;
+                }
+            });
+
+            if (liveIds.length === 0) {
+                log(`No live vectors match filter: ${filterStr}`, 'warning');
+                document.getElementById('deleteFilterInput').classList.add('invalid');
+                return;
+            }
+
+            // Confirm deletion
+            if (!confirm(`Delete ${liveIds.length} vectors matching "${filterStr}"?`)) {
+                return;
+            }
+
+            const start = performance.now();
+            let deleted = 0;
+
+            for (const id of liveIds) {
+                try {
+                    if (index.softDelete(id)) {
+                        deleted++;
+                    }
+                } catch (e) {
+                    console.warn(`[EdgeVec] Failed to delete vector ${id}:`, e.message || e);
+                }
+            }
+
+            const elapsed = (performance.now() - start).toFixed(1);
+            log(`Filter delete: ${deleted.toLocaleString()} vectors matching "${filterStr}" in ${elapsed}ms`, 'warning');
+
+            // Update UI
+            document.getElementById('deleteFilterInput').classList.remove('invalid');
+            document.getElementById('deleteFilterInput').classList.add('valid');
+
+            // Spawn orange particles
+            const btn = document.querySelector('.btn-delete-filter');
+            const rect = btn.getBoundingClientRect();
+            spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#ff8800', 20);
+
+            updateStats();
+            updateVectorGrid();
         };
 
         window.runCompaction = async function() {
@@ -1584,10 +1839,17 @@
             }
 
             insertedIds = [];
+            metadataStore = {}; // Clear metadata
             const config = new wasmModule.EdgeVecConfig(dimension);
             index = new wasmModule.EdgeVec(config);
 
-            log('Index reset', 'info');
+            // Clear filter inputs
+            document.getElementById('searchFilterInput').value = '';
+            document.getElementById('searchFilterInput').classList.remove('valid', 'invalid');
+            document.getElementById('deleteFilterInput').value = '';
+            document.getElementById('deleteFilterInput').classList.remove('valid', 'invalid');
+
+            log('Index reset (metadata cleared)', 'info');
             updateStats();
             updateVectorGrid();
         };
