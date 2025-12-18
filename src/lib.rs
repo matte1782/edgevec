@@ -121,6 +121,9 @@ pub mod simd;
 /// Metadata storage for vector annotations.
 pub mod metadata;
 
+/// Filter expression parsing and evaluation.
+pub mod filter;
+
 pub use batch::BatchInsertable;
 pub use error::BatchError;
 pub use hnsw::{BatchDeleteError, BatchDeleteResult, HnswConfig, HnswIndex, SearchResult};

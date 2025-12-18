@@ -1,0 +1,191 @@
+// EdgeVec Filter Expression Grammar
+// ==================================
+// Version: 1.0.0
+// Week 23 Task W23.1.2
+//
+// This grammar defines the filter expression syntax for EdgeVec queries.
+// It supports 27 AST node types across comparison, string, array, range,
+// logical, and null-check operators.
+//
+// Grammar follows SQL-style syntax with case-insensitive keywords.
+
+// =============================================================================
+// TOP-LEVEL RULES
+// =============================================================================
+
+/// Root rule: a complete filter expression
+filter = { SOI ~ logical_expr ~ EOI }
+
+// =============================================================================
+// LOGICAL EXPRESSIONS (Precedence: OR < AND < NOT)
+// =============================================================================
+
+/// Logical expression (OR is lowest precedence)
+logical_expr = { or_expr }
+
+/// OR expression: left-associative chain of AND expressions
+or_expr = { and_expr ~ (or_op ~ and_expr)* }
+
+/// AND expression: left-associative chain of NOT expressions
+and_expr = { not_expr ~ (and_op ~ not_expr)* }
+
+/// NOT expression: unary NOT or primary expression
+not_expr = { not_op ~ not_expr | primary_expr }
+
+// =============================================================================
+// PRIMARY EXPRESSIONS
+// =============================================================================
+
+/// Primary expression: the building blocks of filter expressions
+/// Order matters for PEG parsing - more specific patterns first
+primary_expr = {
+    grouped_expr
+    | null_check
+    | between_expr
+    | array_op_expr
+    | string_op_expr
+    | set_op_expr
+    | comparison_expr
+}
+
+/// Grouped expression: parentheses for precedence override
+grouped_expr = { "(" ~ logical_expr ~ ")" }
+
+// =============================================================================
+// COMPARISON EXPRESSIONS
+// =============================================================================
+
+/// Comparison: field comparison_operator value
+comparison_expr = { field ~ comp_op ~ value }
+
+/// Comparison operators (order matters: longer operators first)
+comp_op = { "<=" | ">=" | "!=" | "<" | ">" | "=" }
+
+// =============================================================================
+// STRING OPERATIONS
+// =============================================================================
+
+/// String operation: field string_operator string_literal
+string_op_expr = { field ~ string_op ~ string_literal }
+
+/// String operators (case-insensitive)
+string_op = {
+    ^"contains"
+    | ^"starts_with"
+    | ^"ends_with"
+    | ^"like"
+}
+
+// =============================================================================
+// SET OPERATIONS (IN, NOT IN)
+// =============================================================================
+
+/// Set operation: field set_operator array_literal
+set_op_expr = { field ~ set_op ~ array_literal }
+
+/// Set operators (case-insensitive, order matters: NOT IN before IN)
+set_op = { not_in_op | in_op }
+
+/// NOT IN operator (compound keyword)
+not_in_op = @{ ^"not" ~ WHITESPACE+ ~ ^"in" }
+
+/// IN operator
+in_op = @{ ^"in" }
+
+// =============================================================================
+// ARRAY OPERATIONS (ANY, ALL, NONE)
+// =============================================================================
+
+/// Array operation: field array_operator array_literal
+array_op_expr = { field ~ array_op ~ array_literal }
+
+/// Array operators (case-insensitive)
+/// These operate on array-valued metadata fields
+array_op = {
+    ^"any"
+    | ^"all"
+    | ^"none"
+}
+
+// =============================================================================
+// RANGE OPERATIONS
+// =============================================================================
+
+/// Between expression: field BETWEEN low AND high
+between_expr = { field ~ between_op ~ value ~ and_keyword ~ value }
+
+/// BETWEEN operator (case-insensitive)
+between_op = @{ ^"between" }
+
+/// AND keyword for BETWEEN (case-insensitive)
+and_keyword = @{ ^"and" }
+
+// =============================================================================
+// NULL CHECKS
+// =============================================================================
+
+/// Null check: field IS NULL or field IS NOT NULL
+null_check = { field ~ is_null_op }
+
+/// IS NULL / IS NOT NULL operators (order matters: IS NOT NULL before IS NULL)
+is_null_op = { is_not_null_op | is_null_only_op }
+
+/// IS NOT NULL (compound keyword)
+is_not_null_op = @{ ^"is" ~ WHITESPACE+ ~ ^"not" ~ WHITESPACE+ ~ ^"null" }
+
+/// IS NULL (compound keyword)
+is_null_only_op = @{ ^"is" ~ WHITESPACE+ ~ ^"null" }
+
+// =============================================================================
+// LOGICAL OPERATORS
+// =============================================================================
+
+/// OR operator (case-insensitive or symbol)
+or_op = _{ ^"or" | "||" }
+
+/// AND operator (case-insensitive or symbol)
+and_op = _{ ^"and" | "&&" }
+
+/// NOT operator (case-insensitive or symbol)
+not_op = _{ ^"not" | "!" }
+
+// =============================================================================
+// VALUES AND LITERALS
+// =============================================================================
+
+/// Value: any valid right-hand-side value
+value = { string_literal | number | boolean | field }
+
+/// String literal: double-quoted with escape sequences
+string_literal = @{ "\"" ~ inner_string ~ "\"" }
+
+/// Inner string: content between quotes
+inner_string = @{ (!("\"" | "\\") ~ ANY | escape_seq)* }
+
+/// Escape sequences: \", \\, \n, \r, \t
+escape_seq = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
+
+/// Number: integer or floating-point
+number = @{ "-"? ~ integer_part ~ decimal_part? }
+
+/// Integer part of number
+integer_part = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+
+/// Decimal part of number (optional)
+decimal_part = @{ "." ~ ASCII_DIGIT+ }
+
+/// Boolean literal (case-insensitive)
+boolean = { ^"true" | ^"false" }
+
+/// Array literal: square brackets with comma-separated values
+array_literal = { "[" ~ (value ~ ("," ~ value)*)? ~ "]" }
+
+/// Field name: identifier starting with letter or underscore
+field = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// =============================================================================
+// WHITESPACE (implicit - automatically skipped between tokens)
+// =============================================================================
+
+/// Whitespace characters (automatically handled by pest)
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }

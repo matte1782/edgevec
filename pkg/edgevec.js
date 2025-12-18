@@ -224,12 +224,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_401(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_401(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_601(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_601(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_596(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_596(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_859(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_859(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -788,6 +788,90 @@ export class EdgeVec {
             return BatchInsertResult.__wrap(r0);
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Execute a filtered search on the index.
+     *
+     * Combines HNSW vector search with metadata filtering using configurable
+     * strategies (pre-filter, post-filter, hybrid, auto).
+     *
+     * # Arguments
+     *
+     * * `query` - A Float32Array containing the query vector
+     * * `k` - Number of results to return
+     * * `options_json` - JSON object with search options:
+     *   ```json
+     *   {
+     *     "filter": "category = \"gpu\"",  // optional filter expression
+     *     "strategy": "auto",              // "auto" | "pre" | "post" | "hybrid"
+     *     "oversampleFactor": 3.0,         // for post/hybrid strategies
+     *     "includeMetadata": true,         // include metadata in results
+     *     "includeVectors": false          // include vectors in results
+     *   }
+     *   ```
+     *
+     * # Returns
+     *
+     * JSON string with search results:
+     * ```json
+     * {
+     *   "results": [{ "id": 42, "score": 0.95, "metadata": {...}, "vector": [...] }],
+     *   "complete": true,
+     *   "observedSelectivity": 0.15,
+     *   "strategyUsed": "hybrid",
+     *   "vectorsEvaluated": 150,
+     *   "filterTimeMs": 2.5,
+     *   "totalTimeMs": 8.3
+     * }
+     * ```
+     *
+     * # Errors
+     *
+     * Returns an error if:
+     * - Query dimensions don't match index
+     * - Filter expression is invalid
+     * - Options JSON is malformed
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const query = new Float32Array([0.1, 0.2, ...]);
+     * const result = JSON.parse(index.searchFiltered(query, 10, JSON.stringify({
+     *     filter: 'category = "gpu" AND price < 500',
+     *     strategy: 'auto'
+     * })));
+     * console.log(`Found ${result.results.length} results`);
+     * ```
+     * @param {Float32Array} query
+     * @param {number} k
+     * @param {string} options_json
+     * @returns {string}
+     */
+    searchFiltered(query, k, options_json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(options_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.edgevec_searchFiltered(retptr, this.__wbg_ptr, addHeapObject(query), k, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            var ptr2 = r0;
+            var len2 = r1;
+            if (r3) {
+                ptr2 = 0; len2 = 0;
+                throw takeObject(r2);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
         }
     }
     /**
@@ -1918,10 +2002,199 @@ export class WasmCompactionResult {
 if (Symbol.dispose) WasmCompactionResult.prototype[Symbol.dispose] = WasmCompactionResult.prototype.free;
 
 /**
+ * Get filter information (complexity, fields, operators).
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression to analyze
+ *
+ * # Returns
+ *
+ * JSON string with filter info:
+ * ```json
+ * {
+ *   "nodeCount": 5,
+ *   "depth": 3,
+ *   "fields": ["category", "price"],
+ *   "operators": ["eq", "lt", "and"],
+ *   "complexity": 3
+ * }
+ * ```
+ *
+ * # Errors
+ *
+ * Returns error if filter parsing fails.
+ * @param {string} filter_str
+ * @returns {string}
+ */
+export function get_filter_info_js(filter_str) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(filter_str, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.get_filter_info_js(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr2 = r0;
+        var len2 = r1;
+        if (r3) {
+            ptr2 = 0; len2 = 0;
+            throw takeObject(r2);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
  * Initialize logging hooks.
  */
 export function init_logging() {
     wasm.init_logging();
+}
+
+/**
+ * Parse a filter expression string into a compiled filter.
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression in EdgeVec syntax
+ *
+ * # Returns
+ *
+ * JSON string representation of the parsed filter AST.
+ *
+ * # Errors
+ *
+ * Returns a JsValue error with structured JSON containing:
+ * - `code`: Error code (e.g., "E001")
+ * - `message`: Human-readable error message
+ * - `position`: Position information (if available)
+ * - `suggestion`: Fix suggestion (if available)
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * try {
+ *     const filterJson = parse_filter_js('category = "gpu" AND price < 500');
+ *     console.log(JSON.parse(filterJson));
+ * } catch (e) {
+ *     console.error('Parse error:', JSON.parse(e).message);
+ * }
+ * ```
+ * @param {string} filter_str
+ * @returns {string}
+ */
+export function parse_filter_js(filter_str) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(filter_str, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.parse_filter_js(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+        var ptr2 = r0;
+        var len2 = r1;
+        if (r3) {
+            ptr2 = 0; len2 = 0;
+            throw takeObject(r2);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
+ * Try to parse a filter string, returning null on error.
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression to parse
+ *
+ * # Returns
+ *
+ * JSON string of parsed filter, or null if invalid.
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const filter = try_parse_filter_js(userInput);
+ * if (filter !== null) {
+ *     // Valid filter
+ * }
+ * ```
+ * @param {string} filter_str
+ * @returns {any}
+ */
+export function try_parse_filter_js(filter_str) {
+    const ptr0 = passStringToWasm0(filter_str, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.try_parse_filter_js(ptr0, len0);
+    return takeObject(ret);
+}
+
+/**
+ * Validate a filter string without fully returning the AST.
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression to validate
+ *
+ * # Returns
+ *
+ * JSON string with validation result:
+ * ```json
+ * {
+ *   "valid": true,
+ *   "errors": [],
+ *   "warnings": []
+ * }
+ * ```
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const result = JSON.parse(validate_filter_js('price <'));
+ * if (!result.valid) {
+ *     console.log('Errors:', result.errors);
+ * }
+ * ```
+ * @param {string} filter_str
+ * @returns {string}
+ */
+export function validate_filter_js(filter_str) {
+    let deferred2_0;
+    let deferred2_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passStringToWasm0(filter_str, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.validate_filter_js(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        deferred2_0 = r0;
+        deferred2_1 = r1;
+        return getStringFromWasm0(r0, r1);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred2_0, deferred2_1, 1);
+    }
 }
 
 const EXPECTED_RESPONSE_TYPES = new Set(['basic', 'cors', 'default']);
@@ -2025,6 +2298,16 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_info_ce6bcc489c22f6f0 = function(arg0) {
         console.info(getObject(arg0));
     };
+    imports.wbg.__wbg_instanceof_Window_b5cf7783caa68180 = function(arg0) {
+        let result;
+        try {
+            result = getObject(arg0) instanceof Window;
+        } catch (_) {
+            result = false;
+        }
+        const ret = result;
+        return ret;
+    };
     imports.wbg.__wbg_length_22ac23eaec9d8053 = function(arg0) {
         const ret = getObject(arg0).length;
         return ret;
@@ -2071,7 +2354,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_596(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_859(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -2097,6 +2380,14 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_new_with_length_12c6de4fac33117a = function(arg0) {
         const ret = new Array(arg0 >>> 0);
         return addHeapObject(ret);
+    };
+    imports.wbg.__wbg_now_8cf15d6e317793e1 = function(arg0) {
+        const ret = getObject(arg0).now();
+        return ret;
+    };
+    imports.wbg.__wbg_performance_c77a440eff2efd9b = function(arg0) {
+        const ret = getObject(arg0).performance;
+        return isLikeNone(ret) ? 0 : addHeapObject(ret);
     };
     imports.wbg.__wbg_prototypesetcall_6a0ca140cebe5ef8 = function(arg0, arg1, arg2) {
         Uint32Array.prototype.set.call(getArrayU32FromWasm0(arg0, arg1), getObject(arg2));
@@ -2174,14 +2465,14 @@ function __wbg_get_imports() {
         const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getArrayU8FromWasm0(arg2, arg3));
         return addHeapObject(ret);
     }, arguments) };
+    imports.wbg.__wbindgen_cast_1e9af41a93765cab = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 88, function: Function { arguments: [Externref], shim_idx: 89, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_594, __wasm_bindgen_func_elem_601);
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbindgen_cast_2241b6af4c4b2941 = function(arg0, arg1) {
         // Cast intrinsic for `Ref(String) -> Externref`.
         const ret = getStringFromWasm0(arg0, arg1);
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbindgen_cast_9802243c858d266f = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 71, function: Function { arguments: [Externref], shim_idx: 72, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_394, __wasm_bindgen_func_elem_401);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {

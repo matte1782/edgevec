@@ -1,0 +1,53 @@
+Bug Description
+When using edgevec v0.4.0 from npm in a Vite project, the build fails because the snippets directory is not included in the npm package.
+
+Error Message
+Could not resolve "./snippets/edgevec-e9d90602e6bb6c2c/src/js/storage.js"
+Root Cause
+The pkg/package.json files array doesn't include the snippets directory:
+
+"files": [
+  "edgevec_bg.wasm",
+  "edgevec.js",
+  "edgevec.d.ts",
+  "LICENSE-APACHE",
+  "LICENSE-MIT"
+]
+However, the package references it in sideEffects:
+
+"sideEffects": ["./snippets/*"]
+And the WASM bundle imports from ./snippets/edgevec-HASH/src/js/storage.js.
+
+Reproduction
+Create a new Vite + React project
+Install edgevec: npm install edgevec
+Import and use EdgeVec
+Run vite build
+Build fails with the above error
+Suggested Fix
+Add "snippets" to the files array in pkg/package.json:
+
+"files": [
+  "edgevec_bg.wasm",
+  "edgevec.js",
+  "edgevec.d.ts",
+  "snippets",
+  "LICENSE-APACHE",
+  "LICENSE-MIT"
+]
+Workaround
+As a temporary workaround, I'm using a postinstall script that creates the missing file:
+
+// scripts/postinstall.js
+import { mkdir, writeFile } from 'fs/promises'
+
+const snippetsDir = 'node_modules/edgevec/snippets/edgevec-e9d90602e6bb6c2c/src/js'
+await mkdir(snippetsDir, { recursive: true })
+await writeFile(`${snippetsDir}/storage.js`, `// content from src/js/storage.js`)
+Environment
+edgevec: 0.4.0
+Vite: 7.x
+Node: 22.x
+OS: Linux
+Notes
+I noticed that the GitHub main branch has the pkg/snippets directory with the correct storage.js file, but since it's not in the files array, it won't be published to npm.

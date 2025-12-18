@@ -14,6 +14,7 @@ use std::sync::{
 use wasm_bindgen::prelude::*;
 
 mod batch;
+pub mod filter;
 mod iterator;
 mod metadata;
 
@@ -1157,6 +1158,187 @@ impl EdgeVec {
     pub fn total_metadata_count(&self) -> usize {
         self.metadata.total_key_count()
     }
+
+    // =========================================================================
+    // FILTERED SEARCH API (v0.5.0 — Week 23)
+    // =========================================================================
+
+    /// Execute a filtered search on the index.
+    ///
+    /// Combines HNSW vector search with metadata filtering using configurable
+    /// strategies (pre-filter, post-filter, hybrid, auto).
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A Float32Array containing the query vector
+    /// * `k` - Number of results to return
+    /// * `options_json` - JSON object with search options:
+    ///   ```json
+    ///   {
+    ///     "filter": "category = \"gpu\"",  // optional filter expression
+    ///     "strategy": "auto",              // "auto" | "pre" | "post" | "hybrid"
+    ///     "oversampleFactor": 3.0,         // for post/hybrid strategies
+    ///     "includeMetadata": true,         // include metadata in results
+    ///     "includeVectors": false          // include vectors in results
+    ///   }
+    ///   ```
+    ///
+    /// # Returns
+    ///
+    /// JSON string with search results:
+    /// ```json
+    /// {
+    ///   "results": [{ "id": 42, "score": 0.95, "metadata": {...}, "vector": [...] }],
+    ///   "complete": true,
+    ///   "observedSelectivity": 0.15,
+    ///   "strategyUsed": "hybrid",
+    ///   "vectorsEvaluated": 150,
+    ///   "filterTimeMs": 2.5,
+    ///   "totalTimeMs": 8.3
+    /// }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Query dimensions don't match index
+    /// - Filter expression is invalid
+    /// - Options JSON is malformed
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const query = new Float32Array([0.1, 0.2, ...]);
+    /// const result = JSON.parse(index.searchFiltered(query, 10, JSON.stringify({
+    ///     filter: 'category = "gpu" AND price < 500',
+    ///     strategy: 'auto'
+    /// })));
+    /// console.log(`Found ${result.results.length} results`);
+    /// ```
+    #[wasm_bindgen(js_name = "searchFiltered")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn search_filtered(
+        &mut self,
+        query: Float32Array,
+        k: usize,
+        options_json: &str,
+    ) -> Result<String, JsValue> {
+        use crate::filter::{parse, FilterStrategy, FilteredSearcher};
+
+        // Start total timing
+        let total_start = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now());
+
+        // Validate query dimensions
+        let len = query.length();
+        if len != self.inner.config.dimensions {
+            return Err(EdgeVecError::Graph(GraphError::DimensionMismatch {
+                expected: self.inner.config.dimensions as usize,
+                actual: len as usize,
+            })
+            .into());
+        }
+
+        let query_vec = query.to_vec();
+        if query_vec.iter().any(|v| !v.is_finite()) {
+            return Err(EdgeVecError::Validation(
+                "Query vector contains non-finite values".to_string(),
+            )
+            .into());
+        }
+
+        // Parse options
+        let options: SearchFilteredOptions = serde_json::from_str(options_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid options JSON: {e}")))?;
+
+        // Parse filter if provided (and time it)
+        let filter_start = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now());
+
+        let filter = match &options.filter {
+            Some(filter_str) => {
+                Some(parse(filter_str).map_err(|e| filter::filter_error_to_jsvalue(&e))?)
+            }
+            None => None,
+        };
+
+        // Convert strategy
+        let strategy = match options.strategy.as_deref() {
+            Some("pre") => FilterStrategy::PreFilter,
+            Some("post") => FilterStrategy::PostFilter {
+                oversample: options.oversample_factor.unwrap_or(3.0),
+            },
+            Some("hybrid") => FilterStrategy::Hybrid {
+                oversample_min: 1.5,
+                oversample_max: options.oversample_factor.unwrap_or(10.0),
+            },
+            _ => FilterStrategy::Auto,
+        };
+
+        // Create metadata store adapter
+        let metadata_adapter = EdgeVecMetadataAdapter::new(&self.metadata, self.inner.len());
+
+        // Execute filtered search
+        let mut searcher = FilteredSearcher::new(&self.inner, &self.storage, &metadata_adapter);
+        let result = searcher
+            .search_filtered(&query_vec, k, filter.as_ref(), strategy)
+            .map_err(|e| JsValue::from_str(&format!("Search failed: {e}")))?;
+
+        // Calculate filter time (includes parsing + evaluation)
+        let filter_time_ms = match (
+            filter_start,
+            web_sys::window().and_then(|w| w.performance()),
+        ) {
+            (Some(start), Some(perf)) => perf.now() - start,
+            _ => 0.0,
+        };
+
+        // Check if metadata/vectors should be included
+        let include_metadata = options.include_metadata.unwrap_or(false);
+        let include_vectors = options.include_vectors.unwrap_or(false);
+
+        // Build response
+        let response = SearchFilteredResult {
+            results: result
+                .results
+                .iter()
+                .map(|r| {
+                    let id = r.vector_id.0 as u32;
+                    SearchFilteredItem {
+                        id,
+                        score: r.distance,
+                        metadata: if include_metadata {
+                            self.metadata
+                                .get_all(id)
+                                .and_then(|m| serde_json::to_value(m).ok())
+                        } else {
+                            None
+                        },
+                        vector: if include_vectors {
+                            Some(self.storage.get_vector(r.vector_id).to_vec())
+                        } else {
+                            None
+                        },
+                    }
+                })
+                .collect(),
+            complete: result.complete,
+            observed_selectivity: result.observed_selectivity,
+            strategy_used: strategy_to_string(&result.strategy_used),
+            vectors_evaluated: result.vectors_evaluated,
+            filter_time_ms,
+            total_time_ms: match (total_start, web_sys::window().and_then(|w| w.performance())) {
+                (Some(start), Some(perf)) => perf.now() - start,
+                _ => 0.0,
+            },
+        };
+
+        serde_json::to_string(&response)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {e}")))
+    }
 }
 
 /// Result of a compaction operation (v0.3.0).
@@ -1245,5 +1427,105 @@ impl WasmBatchDeleteResult {
     #[must_use]
     pub fn any_deleted(&self) -> bool {
         self.deleted > 0
+    }
+}
+
+// =============================================================================
+// FILTERED SEARCH HELPER TYPES (Week 23 Day 4)
+// =============================================================================
+
+use crate::filter::FilterStrategy;
+use crate::metadata::MetadataValue;
+use std::collections::HashMap;
+
+/// Adapter that wraps EdgeVec's MetadataStore to implement filter::MetadataStore trait.
+///
+/// This struct provides the bridge between EdgeVec's HashMap-based metadata storage
+/// and the filter system's trait requirements.
+struct EdgeVecMetadataAdapter<'a> {
+    store: &'a crate::metadata::MetadataStore,
+    /// Total number of vectors in the index (needed for len()).
+    total_vectors: usize,
+}
+
+impl<'a> EdgeVecMetadataAdapter<'a> {
+    fn new(store: &'a crate::metadata::MetadataStore, total_vectors: usize) -> Self {
+        Self {
+            store,
+            total_vectors,
+        }
+    }
+}
+
+impl crate::filter::MetadataStore for EdgeVecMetadataAdapter<'_> {
+    #[allow(clippy::cast_possible_truncation)]
+    fn get_metadata(&self, id: usize) -> Option<&HashMap<String, MetadataValue>> {
+        // EdgeVec uses u32 for vector IDs, cast from usize
+        self.store.get_all(id as u32)
+    }
+
+    fn len(&self) -> usize {
+        self.total_vectors
+    }
+}
+
+/// Options for filtered search (JSON deserialization).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SearchFilteredOptions {
+    /// Optional filter expression string.
+    filter: Option<String>,
+    /// Strategy override ("auto", "pre", "post", "hybrid").
+    strategy: Option<String>,
+    /// Oversample factor for post/hybrid strategies.
+    oversample_factor: Option<f32>,
+    /// Whether to include metadata in results.
+    include_metadata: Option<bool>,
+    /// Whether to include vectors in results.
+    include_vectors: Option<bool>,
+}
+
+/// Result from filtered search (JSON serialization).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SearchFilteredResult {
+    /// Search results.
+    results: Vec<SearchFilteredItem>,
+    /// Whether full k results were found.
+    complete: bool,
+    /// Observed filter selectivity (0.0 - 1.0).
+    observed_selectivity: f32,
+    /// Strategy actually used.
+    strategy_used: String,
+    /// Number of vectors evaluated.
+    vectors_evaluated: usize,
+    /// Time spent on filter evaluation (milliseconds).
+    filter_time_ms: f64,
+    /// Total search time (milliseconds).
+    total_time_ms: f64,
+}
+
+/// Single result item from filtered search.
+#[derive(Serialize)]
+struct SearchFilteredItem {
+    /// Vector ID.
+    id: u32,
+    /// Distance/similarity score.
+    score: f32,
+    /// Metadata (if requested).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<serde_json::Value>,
+    /// Vector data (if requested).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vector: Option<Vec<f32>>,
+}
+
+/// Convert FilterStrategy to string for JSON response.
+fn strategy_to_string(strategy: &FilterStrategy) -> String {
+    match strategy {
+        FilterStrategy::PreFilter => "pre".to_string(),
+        FilterStrategy::PostFilter { .. } => "post".to_string(),
+        FilterStrategy::Hybrid { .. } => "hybrid".to_string(),
+        FilterStrategy::Auto => "auto".to_string(),
     }
 }

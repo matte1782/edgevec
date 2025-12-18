@@ -27,7 +27,8 @@
       "Bash(cargo clean:*)",
       "Bash(npm test)",
       "Bash(bash:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:milvus.io)"
     ]
   }
 }

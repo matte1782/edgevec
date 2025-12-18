@@ -293,6 +293,61 @@ export class EdgeVec {
    */
   insertBatch(vectors: Array<any>, config?: BatchInsertConfig | null): BatchInsertResult;
   /**
+   * Execute a filtered search on the index.
+   *
+   * Combines HNSW vector search with metadata filtering using configurable
+   * strategies (pre-filter, post-filter, hybrid, auto).
+   *
+   * # Arguments
+   *
+   * * `query` - A Float32Array containing the query vector
+   * * `k` - Number of results to return
+   * * `options_json` - JSON object with search options:
+   *   ```json
+   *   {
+   *     "filter": "category = \"gpu\"",  // optional filter expression
+   *     "strategy": "auto",              // "auto" | "pre" | "post" | "hybrid"
+   *     "oversampleFactor": 3.0,         // for post/hybrid strategies
+   *     "includeMetadata": true,         // include metadata in results
+   *     "includeVectors": false          // include vectors in results
+   *   }
+   *   ```
+   *
+   * # Returns
+   *
+   * JSON string with search results:
+   * ```json
+   * {
+   *   "results": [{ "id": 42, "score": 0.95, "metadata": {...}, "vector": [...] }],
+   *   "complete": true,
+   *   "observedSelectivity": 0.15,
+   *   "strategyUsed": "hybrid",
+   *   "vectorsEvaluated": 150,
+   *   "filterTimeMs": 2.5,
+   *   "totalTimeMs": 8.3
+   * }
+   * ```
+   *
+   * # Errors
+   *
+   * Returns an error if:
+   * - Query dimensions don't match index
+   * - Filter expression is invalid
+   * - Options JSON is malformed
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const query = new Float32Array([0.1, 0.2, ...]);
+   * const result = JSON.parse(index.searchFiltered(query, 10, JSON.stringify({
+   *     filter: 'category = "gpu" AND price < 500',
+   *     strategy: 'auto'
+   * })));
+   * console.log(`Found ${result.results.length} results`);
+   * ```
+   */
+  searchFiltered(query: Float32Array, k: number, options_json: string): string;
+  /**
    * Get the ratio of deleted to total vectors.
    *
    * # Returns
@@ -903,9 +958,118 @@ export class WasmCompactionResult {
 }
 
 /**
+ * Get filter information (complexity, fields, operators).
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression to analyze
+ *
+ * # Returns
+ *
+ * JSON string with filter info:
+ * ```json
+ * {
+ *   "nodeCount": 5,
+ *   "depth": 3,
+ *   "fields": ["category", "price"],
+ *   "operators": ["eq", "lt", "and"],
+ *   "complexity": 3
+ * }
+ * ```
+ *
+ * # Errors
+ *
+ * Returns error if filter parsing fails.
+ */
+export function get_filter_info_js(filter_str: string): string;
+
+/**
  * Initialize logging hooks.
  */
 export function init_logging(): void;
+
+/**
+ * Parse a filter expression string into a compiled filter.
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression in EdgeVec syntax
+ *
+ * # Returns
+ *
+ * JSON string representation of the parsed filter AST.
+ *
+ * # Errors
+ *
+ * Returns a JsValue error with structured JSON containing:
+ * - `code`: Error code (e.g., "E001")
+ * - `message`: Human-readable error message
+ * - `position`: Position information (if available)
+ * - `suggestion`: Fix suggestion (if available)
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * try {
+ *     const filterJson = parse_filter_js('category = "gpu" AND price < 500');
+ *     console.log(JSON.parse(filterJson));
+ * } catch (e) {
+ *     console.error('Parse error:', JSON.parse(e).message);
+ * }
+ * ```
+ */
+export function parse_filter_js(filter_str: string): string;
+
+/**
+ * Try to parse a filter string, returning null on error.
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression to parse
+ *
+ * # Returns
+ *
+ * JSON string of parsed filter, or null if invalid.
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const filter = try_parse_filter_js(userInput);
+ * if (filter !== null) {
+ *     // Valid filter
+ * }
+ * ```
+ */
+export function try_parse_filter_js(filter_str: string): any;
+
+/**
+ * Validate a filter string without fully returning the AST.
+ *
+ * # Arguments
+ *
+ * * `filter_str` - Filter expression to validate
+ *
+ * # Returns
+ *
+ * JSON string with validation result:
+ * ```json
+ * {
+ *   "valid": true,
+ *   "errors": [],
+ *   "warnings": []
+ * }
+ * ```
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const result = JSON.parse(validate_filter_js('price <'));
+ * if (!result.valid) {
+ *     console.log('Errors:', result.errors);
+ * }
+ * ```
+ */
+export function validate_filter_js(filter_str: string): string;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -953,6 +1117,7 @@ export interface InitOutput {
   readonly edgevec_save: (a: number, b: number, c: number) => number;
   readonly edgevec_save_stream: (a: number, b: number) => number;
   readonly edgevec_search: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_setCompactionThreshold: (a: number, b: number) => void;
   readonly edgevec_setMetadata: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_softDelete: (a: number, b: number, c: number) => void;
@@ -966,6 +1131,7 @@ export interface InitOutput {
   readonly edgevecconfig_set_m: (a: number, b: number) => void;
   readonly edgevecconfig_set_m0: (a: number, b: number) => void;
   readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
+  readonly get_filter_info_js: (a: number, b: number, c: number) => void;
   readonly jsmetadatavalue_asBoolean: (a: number) => number;
   readonly jsmetadatavalue_asFloat: (a: number, b: number) => void;
   readonly jsmetadatavalue_asInteger: (a: number, b: number) => void;
@@ -983,7 +1149,10 @@ export interface InitOutput {
   readonly jsmetadatavalue_isString: (a: number) => number;
   readonly jsmetadatavalue_isStringArray: (a: number) => number;
   readonly jsmetadatavalue_toJS: (a: number) => number;
+  readonly parse_filter_js: (a: number, b: number, c: number) => void;
   readonly persistenceiterator_next_chunk: (a: number) => number;
+  readonly try_parse_filter_js: (a: number, b: number) => number;
+  readonly validate_filter_js: (a: number, b: number, c: number) => void;
   readonly wasmbatchdeleteresult_allValid: (a: number) => number;
   readonly wasmbatchdeleteresult_alreadyDeleted: (a: number) => number;
   readonly wasmbatchdeleteresult_anyDeleted: (a: number) => number;
@@ -992,9 +1161,9 @@ export interface InitOutput {
   readonly init_logging: () => void;
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
-  readonly __wasm_bindgen_func_elem_401: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_394: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_596: (a: number, b: number, c: number, d: number) => void;
+  readonly __wasm_bindgen_func_elem_601: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_594: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_859: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export3: (a: number) => void;

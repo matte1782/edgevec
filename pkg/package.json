@@ -2,7 +2,7 @@
   "name": "edgevec",
   "type": "module",
   "description": "High-performance embedded vector database for Browser, Node, and Edge",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
@@ -12,11 +12,36 @@
     "edgevec_bg.wasm",
     "edgevec.js",
     "edgevec.d.ts",
+    "edgevec_bg.wasm.d.ts",
+    "snippets",
+    "index.ts",
+    "filter.ts",
+    "filter-builder.ts",
+    "edgevec-wrapper.ts",
+    "edgevec-types.d.ts",
     "LICENSE-APACHE",
     "LICENSE-MIT"
   ],
   "main": "edgevec.js",
   "types": "edgevec.d.ts",
+  "exports": {
+    ".": {
+      "types": "./edgevec-types.d.ts",
+      "import": "./index.ts"
+    },
+    "./filter": {
+      "types": "./filter.ts",
+      "import": "./filter.ts"
+    },
+    "./filter-builder": {
+      "types": "./filter-builder.ts",
+      "import": "./filter-builder.ts"
+    },
+    "./wrapper": {
+      "types": "./edgevec-wrapper.ts",
+      "import": "./edgevec-wrapper.ts"
+    }
+  },
   "sideEffects": [
     "./snippets/*"
   ],
@@ -25,6 +50,11 @@
     "database",
     "wasm",
     "hnsw",
-    "similarity-search"
-  ]
+    "similarity-search",
+    "filtered-search",
+    "metadata-filtering"
+  ],
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
 }

@@ -84,3 +84,15 @@ name = "wal_replay"
 path = "fuzz_targets/wal_replay/target.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "filter_simple"
+path = "fuzz_targets/filter_simple/target.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "filter_deep"
+path = "fuzz_targets/filter_deep/target.rs"
+test = false
+doc = false
