@@ -1,7 +1,7 @@
 {
   "name": "edgevec",
   "type": "module",
-  "description": "High-performance embedded vector database for Browser, Node, and Edge",
+  "description": "WASM-native vector database with SQL-like filtering, persistence, and soft delete",
   "version": "0.5.0",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -46,13 +46,22 @@
     "./snippets/*"
   ],
   "keywords": [
-    "vector",
-    "database",
-    "wasm",
+    "vector-database",
+    "vector-search",
     "hnsw",
-    "similarity-search",
+    "wasm",
+    "webassembly",
     "filtered-search",
-    "metadata-filtering"
+    "metadata-filtering",
+    "similarity-search",
+    "embeddings",
+    "semantic-search",
+    "browser",
+    "edge-computing",
+    "offline-first",
+    "indexeddb",
+    "soft-delete",
+    "persistence"
   ],
   "devDependencies": {
     "typescript": "^5.0.0"
