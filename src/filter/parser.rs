@@ -144,7 +144,10 @@ fn generate_suggestion(message: &str, input: &str, position: usize) -> Option<St
     // Check for common typos
     if message.contains("expected") {
         // Look for common operator typos
-        if position < input.len() {
+        // SAFETY: Ensure position is a valid char boundary before slicing.
+        // If position is not on a char boundary (can happen with multi-byte UTF-8),
+        // we skip suggestions rather than panic.
+        if position < input.len() && input.is_char_boundary(position) {
             let remaining = &input[position..];
             if remaining.starts_with(':') {
                 return Some("Did you mean '=' instead of ':'?".to_string());
@@ -1024,5 +1027,64 @@ mod tests {
     fn test_newline_handling() {
         let input = "a = 1\nAND\nb = 2";
         assert!(parse(input).is_ok());
+    }
+
+    // =========================================================================
+    // FUZZ REGRESSION TESTS
+    // =========================================================================
+
+    /// Regression test for fuzz crash: byte index not on char boundary.
+    /// Crash input: v="ss\xde\x83\xc2\x83"|"
+    /// Issue: generate_suggestion() sliced at non-char-boundary position.
+    /// Fix: Added is_char_boundary() check before slicing.
+    #[test]
+    fn test_fuzz_regression_non_char_boundary() {
+        // The exact crash input from fuzzer (hex: 76 3d 22 73 73 de 83 c2 83 22 7c 22)
+        // This contains invalid UTF-8 sequences that create multi-byte chars
+        let crash_input = "v=\"ss\u{07C3}\u{0083}\"|\"";
+        // Should not panic, should return an error
+        let result = parse(crash_input);
+        assert!(result.is_err());
+    }
+
+    /// Additional fuzz regression: raw bytes from crash artifact
+    #[test]
+    fn test_fuzz_regression_raw_bytes() {
+        // Raw bytes: [0x76, 0x3d, 0x22, 0x73, 0x73, 0xde, 0x83, 0xc2, 0x83, 0x22, 0x7c, 0x22]
+        // Note: \xde\x83 is invalid UTF-8 start, \xc2\x83 is valid (ƒ)
+        // When converted to string via lossy conversion, it becomes different
+        let bytes: &[u8] = &[
+            0x76, 0x3d, 0x22, 0x73, 0x73, 0xde, 0x83, 0xc2, 0x83, 0x22, 0x7c, 0x22,
+        ];
+        let input = String::from_utf8_lossy(bytes);
+        // Should not panic regardless of content
+        let _ = parse(&input);
+    }
+
+    /// Test various multi-byte UTF-8 characters in filter expressions
+    #[test]
+    fn test_multibyte_utf8_handling() {
+        // Various multi-byte UTF-8 characters
+        let inputs = [
+            "x = \"日本語\"",    // Japanese (3-byte chars)
+            "x = \"émoji: 🦀\"", // Emoji (4-byte char)
+            "field_名前 = 1",    // Non-ASCII in field name
+            "x = \"Москва\"",    // Cyrillic (2-byte chars)
+            "x = \"🦀\"",        // Crab emoji directly
+        ];
+
+        for input in inputs {
+            // Should not panic - may succeed or fail depending on grammar
+            let _ = parse(input);
+        }
+    }
+
+    /// Test edge cases with positions near multi-byte boundaries
+    #[test]
+    fn test_error_position_multibyte() {
+        // Error occurs after multi-byte char
+        let result = parse("名前 : 1"); // colon is invalid, should give suggestion
+        assert!(result.is_err());
+        // Key: should not panic even if error position is after multi-byte char
     }
 }
