@@ -2,9 +2,7 @@
 //!
 //! Tests end-to-end filtered search functionality with real HNSW indexes.
 
-use edgevec::filter::{
-    parse, FilterStrategy, FilteredSearcher, VectorMetadataStore,
-};
+use edgevec::filter::{parse, FilterStrategy, FilteredSearcher, VectorMetadataStore};
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::metadata::MetadataValue;
 use edgevec::storage::VectorStorage;
@@ -190,7 +188,10 @@ fn test_filtered_search_compound_and() {
                 matches!(cat, Some(MetadataValue::String(s)) if s == "gpu"),
                 "Expected gpu"
             );
-            assert!(matches!(active, Some(MetadataValue::Boolean(true))), "Expected active");
+            assert!(
+                matches!(active, Some(MetadataValue::Boolean(true))),
+                "Expected active"
+            );
         }
     }
 }
@@ -211,7 +212,8 @@ fn test_filtered_search_compound_or() {
         let meta = metadata_store.get(res.vector_id.0 as usize - 1);
         if let Some(meta) = meta {
             let cat = meta.get("category");
-            let is_valid = matches!(cat, Some(MetadataValue::String(s)) if s == "gpu" || s == "cpu");
+            let is_valid =
+                matches!(cat, Some(MetadataValue::String(s)) if s == "gpu" || s == "cpu");
             assert!(is_valid, "Expected gpu or cpu, got {:?}", cat);
         }
     }
@@ -245,10 +247,18 @@ fn test_filtered_search_postfilter_strategy() {
     let query: Vec<f32> = (0..64).map(|_| 0.5).collect();
 
     let result = searcher
-        .search_filtered(&query, 5, Some(&filter), FilterStrategy::PostFilter { oversample: 2.0 })
+        .search_filtered(
+            &query,
+            5,
+            Some(&filter),
+            FilterStrategy::PostFilter { oversample: 2.0 },
+        )
         .expect("Search failed");
 
-    assert!(matches!(result.strategy_used, FilterStrategy::PostFilter { .. }));
+    assert!(matches!(
+        result.strategy_used,
+        FilterStrategy::PostFilter { .. }
+    ));
 }
 
 #[test]
@@ -271,7 +281,10 @@ fn test_filtered_search_hybrid_strategy() {
         )
         .expect("Search failed");
 
-    assert!(matches!(result.strategy_used, FilterStrategy::Hybrid { .. }));
+    assert!(matches!(
+        result.strategy_used,
+        FilterStrategy::Hybrid { .. }
+    ));
 }
 
 #[test]
@@ -393,7 +406,8 @@ fn test_filtered_search_in_operator() {
         let meta = metadata_store.get(res.vector_id.0 as usize - 1);
         if let Some(meta) = meta {
             let cat = meta.get("category");
-            let is_valid = matches!(cat, Some(MetadataValue::String(s)) if s == "gpu" || s == "cpu");
+            let is_valid =
+                matches!(cat, Some(MetadataValue::String(s)) if s == "gpu" || s == "cpu");
             assert!(is_valid, "Expected gpu or cpu, got {:?}", cat);
         }
     }
@@ -409,7 +423,8 @@ fn test_multi_field_three_field_and() {
     let mut searcher = FilteredSearcher::new(&index, &storage, &metadata_store);
 
     // Three field AND: category = "gpu" AND price < 500 AND active = true
-    let filter = parse(r#"category = "gpu" AND price < 500 AND active = true"#).expect("Parse failed");
+    let filter =
+        parse(r#"category = "gpu" AND price < 500 AND active = true"#).expect("Parse failed");
     let query: Vec<f32> = (0..64).map(|_| 0.5).collect();
 
     let result = searcher
@@ -421,7 +436,10 @@ fn test_multi_field_three_field_and() {
         if let Some(meta) = meta {
             assert!(matches!(meta.get("category"), Some(MetadataValue::String(s)) if s == "gpu"));
             assert!(matches!(meta.get("price"), Some(MetadataValue::Integer(p)) if *p < 500));
-            assert!(matches!(meta.get("active"), Some(MetadataValue::Boolean(true))));
+            assert!(matches!(
+                meta.get("active"),
+                Some(MetadataValue::Boolean(true))
+            ));
         }
     }
 }
@@ -446,12 +464,12 @@ fn test_multi_field_three_field_or() {
             let cat = meta.get("category");
             let price = meta.get("price");
 
-            let match1 = matches!(cat, Some(MetadataValue::String(s)) if s == "gpu") &&
-                        matches!(price, Some(MetadataValue::Integer(50)));
-            let match2 = matches!(cat, Some(MetadataValue::String(s)) if s == "cpu") &&
-                        matches!(price, Some(MetadataValue::Integer(60)));
-            let match3 = matches!(cat, Some(MetadataValue::String(s)) if s == "memory") &&
-                        matches!(price, Some(MetadataValue::Integer(70)));
+            let match1 = matches!(cat, Some(MetadataValue::String(s)) if s == "gpu")
+                && matches!(price, Some(MetadataValue::Integer(50)));
+            let match2 = matches!(cat, Some(MetadataValue::String(s)) if s == "cpu")
+                && matches!(price, Some(MetadataValue::Integer(60)));
+            let match3 = matches!(cat, Some(MetadataValue::String(s)) if s == "memory")
+                && matches!(price, Some(MetadataValue::Integer(70)));
 
             assert!(match1 || match2 || match3, "No condition matched");
         }
@@ -464,7 +482,8 @@ fn test_multi_field_mixed_and_or() {
     let mut searcher = FilteredSearcher::new(&index, &storage, &metadata_store);
 
     // (category = "gpu" OR category = "cpu") AND price < 300
-    let filter = parse(r#"(category = "gpu" OR category = "cpu") AND price < 300"#).expect("Parse failed");
+    let filter =
+        parse(r#"(category = "gpu" OR category = "cpu") AND price < 300"#).expect("Parse failed");
     let query: Vec<f32> = (0..64).map(|_| 0.5).collect();
 
     let result = searcher
@@ -477,7 +496,8 @@ fn test_multi_field_mixed_and_or() {
             let cat = meta.get("category");
             let price = meta.get("price");
 
-            let valid_cat = matches!(cat, Some(MetadataValue::String(s)) if s == "gpu" || s == "cpu");
+            let valid_cat =
+                matches!(cat, Some(MetadataValue::String(s)) if s == "gpu" || s == "cpu");
             let valid_price = matches!(price, Some(MetadataValue::Integer(p)) if *p < 300);
 
             assert!(valid_cat && valid_price, "Filter not satisfied");
@@ -505,10 +525,10 @@ fn test_multi_field_nested_parentheses() {
             let active = meta.get("active");
             let price = meta.get("price");
 
-            let match1 = matches!(cat, Some(MetadataValue::String(s)) if s == "gpu") &&
-                        matches!(active, Some(MetadataValue::Boolean(true)));
-            let match2 = matches!(cat, Some(MetadataValue::String(s)) if s == "cpu") &&
-                        matches!(active, Some(MetadataValue::Boolean(false)));
+            let match1 = matches!(cat, Some(MetadataValue::String(s)) if s == "gpu")
+                && matches!(active, Some(MetadataValue::Boolean(true)));
+            let match2 = matches!(cat, Some(MetadataValue::String(s)) if s == "cpu")
+                && matches!(active, Some(MetadataValue::Boolean(false)));
             let price_ok = matches!(price, Some(MetadataValue::Integer(p)) if *p < 400);
 
             assert!((match1 || match2) && price_ok, "Filter not satisfied");
@@ -623,7 +643,8 @@ fn test_multi_field_all_four_fields() {
     let mut searcher = FilteredSearcher::new(&index, &storage, &metadata_store);
 
     // category = "gpu" AND price > 50 AND active = true AND id < 50
-    let filter = parse(r#"category = "gpu" AND price > 50 AND active = true AND id < 50"#).expect("Parse failed");
+    let filter = parse(r#"category = "gpu" AND price > 50 AND active = true AND id < 50"#)
+        .expect("Parse failed");
     let query: Vec<f32> = (0..64).map(|_| 0.5).collect();
 
     let result = searcher
@@ -635,7 +656,10 @@ fn test_multi_field_all_four_fields() {
         if let Some(meta) = meta {
             assert!(matches!(meta.get("category"), Some(MetadataValue::String(s)) if s == "gpu"));
             assert!(matches!(meta.get("price"), Some(MetadataValue::Integer(p)) if *p > 50));
-            assert!(matches!(meta.get("active"), Some(MetadataValue::Boolean(true))));
+            assert!(matches!(
+                meta.get("active"),
+                Some(MetadataValue::Boolean(true))
+            ));
             assert!(matches!(meta.get("id"), Some(MetadataValue::Integer(id)) if *id < 50));
         }
     }
@@ -647,7 +671,8 @@ fn test_multi_field_double_range() {
     let mut searcher = FilteredSearcher::new(&index, &storage, &metadata_store);
 
     // price >= 100 AND price <= 300 AND id >= 10 AND id <= 50
-    let filter = parse("price >= 100 AND price <= 300 AND id >= 10 AND id <= 50").expect("Parse failed");
+    let filter =
+        parse("price >= 100 AND price <= 300 AND id >= 10 AND id <= 50").expect("Parse failed");
     let query: Vec<f32> = (0..64).map(|_| 0.5).collect();
 
     let result = searcher
@@ -657,8 +682,12 @@ fn test_multi_field_double_range() {
     for res in &result.results {
         let meta = metadata_store.get(res.vector_id.0 as usize - 1);
         if let Some(meta) = meta {
-            assert!(matches!(meta.get("price"), Some(MetadataValue::Integer(p)) if *p >= 100 && *p <= 300));
-            assert!(matches!(meta.get("id"), Some(MetadataValue::Integer(id)) if *id >= 10 && *id <= 50));
+            assert!(
+                matches!(meta.get("price"), Some(MetadataValue::Integer(p)) if *p >= 100 && *p <= 300)
+            );
+            assert!(
+                matches!(meta.get("id"), Some(MetadataValue::Integer(id)) if *id >= 10 && *id <= 50)
+            );
         }
     }
 }

@@ -239,7 +239,10 @@ mod integer_literals {
     fn test_int_i64_max() {
         let result = parse("x = 9223372036854775807").unwrap();
         if let FilterExpr::Eq(_, right) = result {
-            assert!(matches!(*right, FilterExpr::LiteralInt(9223372036854775807)));
+            assert!(matches!(
+                *right,
+                FilterExpr::LiteralInt(9223372036854775807)
+            ));
         } else {
             panic!("Expected Eq");
         }
@@ -249,7 +252,10 @@ mod integer_literals {
     fn test_int_i64_min() {
         let result = parse("x = -9223372036854775808").unwrap();
         if let FilterExpr::Eq(_, right) = result {
-            assert!(matches!(*right, FilterExpr::LiteralInt(-9223372036854775808)));
+            assert!(matches!(
+                *right,
+                FilterExpr::LiteralInt(-9223372036854775808)
+            ));
         } else {
             panic!("Expected Eq");
         }
@@ -2438,7 +2444,9 @@ mod complex_expressions {
     #[test]
     fn test_all_string_ops() {
         // Grammar uses starts_with and ends_with (underscore), not STARTS WITH / ENDS WITH
-        let result = parse(r#"a LIKE "%" AND b CONTAINS "x" AND c starts_with "y" AND d ends_with "z""#).unwrap();
+        let result =
+            parse(r#"a LIKE "%" AND b CONTAINS "x" AND c starts_with "y" AND d ends_with "z""#)
+                .unwrap();
         assert!(matches!(result, FilterExpr::And(_, _)));
     }
 
@@ -2469,9 +2477,8 @@ mod complex_expressions {
 
     #[test]
     fn test_deeply_complex() {
-        let result = parse(
-            "(a = 1 OR b = 2) AND (c = 3 OR d = 4) AND NOT (e = 5 AND f = 6)"
-        ).unwrap();
+        let result =
+            parse("(a = 1 OR b = 2) AND (c = 3 OR d = 4) AND NOT (e = 5 AND f = 6)").unwrap();
         assert!(matches!(result, FilterExpr::And(_, _)));
     }
 }

@@ -17,9 +17,8 @@
 
 use edgevec::filter::parse;
 use edgevec::filter::strategy::{
-    calculate_oversample, is_contradiction, is_tautology, select_strategy,
-    FilterStrategy, SelectivityEstimate,
-    DEFAULT_OVERSAMPLE, EF_CAP, MAX_OVERSAMPLE, POSTFILTER_THRESHOLD,
+    calculate_oversample, is_contradiction, is_tautology, select_strategy, FilterStrategy,
+    SelectivityEstimate, DEFAULT_OVERSAMPLE, EF_CAP, MAX_OVERSAMPLE, POSTFILTER_THRESHOLD,
     PREFILTER_THRESHOLD, SELECTIVITY_SAMPLE_SIZE,
 };
 use edgevec::filter::FilterExpr;
@@ -34,128 +33,211 @@ mod strategy_validation {
     // PostFilter validation
     #[test]
     fn test_postfilter_oversample_1_0() {
-        assert!(FilterStrategy::PostFilter { oversample: 1.0 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 1.0 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_oversample_1_5() {
-        assert!(FilterStrategy::PostFilter { oversample: 1.5 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 1.5 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_oversample_2_0() {
-        assert!(FilterStrategy::PostFilter { oversample: 2.0 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 2.0 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_oversample_3_0() {
-        assert!(FilterStrategy::PostFilter { oversample: 3.0 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 3.0 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_oversample_5_0() {
-        assert!(FilterStrategy::PostFilter { oversample: 5.0 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 5.0 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_oversample_7_5() {
-        assert!(FilterStrategy::PostFilter { oversample: 7.5 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 7.5 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_oversample_10_0() {
-        assert!(FilterStrategy::PostFilter { oversample: 10.0 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 10.0 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_oversample_0_99_invalid() {
-        assert!(FilterStrategy::PostFilter { oversample: 0.99 }.validate().is_err());
+        assert!(FilterStrategy::PostFilter { oversample: 0.99 }
+            .validate()
+            .is_err());
     }
 
     #[test]
     fn test_postfilter_oversample_0_5_invalid() {
-        assert!(FilterStrategy::PostFilter { oversample: 0.5 }.validate().is_err());
+        assert!(FilterStrategy::PostFilter { oversample: 0.5 }
+            .validate()
+            .is_err());
     }
 
     #[test]
     fn test_postfilter_oversample_0_0_invalid() {
-        assert!(FilterStrategy::PostFilter { oversample: 0.0 }.validate().is_err());
+        assert!(FilterStrategy::PostFilter { oversample: 0.0 }
+            .validate()
+            .is_err());
     }
 
     #[test]
     fn test_postfilter_oversample_negative_invalid() {
-        assert!(FilterStrategy::PostFilter { oversample: -1.0 }.validate().is_err());
+        assert!(FilterStrategy::PostFilter { oversample: -1.0 }
+            .validate()
+            .is_err());
     }
 
     #[test]
     fn test_postfilter_oversample_10_01_invalid() {
-        assert!(FilterStrategy::PostFilter { oversample: 10.01 }.validate().is_err());
+        assert!(FilterStrategy::PostFilter { oversample: 10.01 }
+            .validate()
+            .is_err());
     }
 
     #[test]
     fn test_postfilter_oversample_15_0_invalid() {
-        assert!(FilterStrategy::PostFilter { oversample: 15.0 }.validate().is_err());
+        assert!(FilterStrategy::PostFilter { oversample: 15.0 }
+            .validate()
+            .is_err());
     }
 
     #[test]
     fn test_postfilter_oversample_100_0_invalid() {
-        assert!(FilterStrategy::PostFilter { oversample: 100.0 }.validate().is_err());
+        assert!(FilterStrategy::PostFilter { oversample: 100.0 }
+            .validate()
+            .is_err());
     }
 
     // Hybrid validation
     #[test]
     fn test_hybrid_min_1_max_10_valid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 1.0, oversample_max: 10.0 }.validate().is_ok());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 1.0,
+            oversample_max: 10.0
+        }
+        .validate()
+        .is_ok());
     }
 
     #[test]
     fn test_hybrid_min_1_max_5_valid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 1.0, oversample_max: 5.0 }.validate().is_ok());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 1.0,
+            oversample_max: 5.0
+        }
+        .validate()
+        .is_ok());
     }
 
     #[test]
     fn test_hybrid_min_1_5_max_5_valid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 1.5, oversample_max: 5.0 }.validate().is_ok());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 1.5,
+            oversample_max: 5.0
+        }
+        .validate()
+        .is_ok());
     }
 
     #[test]
     fn test_hybrid_min_2_max_8_valid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 2.0, oversample_max: 8.0 }.validate().is_ok());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 2.0,
+            oversample_max: 8.0
+        }
+        .validate()
+        .is_ok());
     }
 
     #[test]
     fn test_hybrid_min_equals_max_valid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 5.0, oversample_max: 5.0 }.validate().is_ok());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 5.0,
+            oversample_max: 5.0
+        }
+        .validate()
+        .is_ok());
     }
 
     #[test]
     fn test_hybrid_min_0_5_invalid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 0.5, oversample_max: 5.0 }.validate().is_err());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 0.5,
+            oversample_max: 5.0
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]
     fn test_hybrid_min_0_0_invalid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 0.0, oversample_max: 5.0 }.validate().is_err());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 0.0,
+            oversample_max: 5.0
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]
     fn test_hybrid_min_negative_invalid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: -1.0, oversample_max: 5.0 }.validate().is_err());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: -1.0,
+            oversample_max: 5.0
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]
     fn test_hybrid_max_less_than_min_invalid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 5.0, oversample_max: 3.0 }.validate().is_err());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 5.0,
+            oversample_max: 3.0
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]
     fn test_hybrid_max_exceeds_limit_invalid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 1.0, oversample_max: 15.0 }.validate().is_err());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 1.0,
+            oversample_max: 15.0
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]
     fn test_hybrid_max_exceeds_limit_11_invalid() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 1.0, oversample_max: 11.0 }.validate().is_err());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 1.0,
+            oversample_max: 11.0
+        }
+        .validate()
+        .is_err());
     }
 
     // PreFilter and Auto validation
@@ -172,13 +254,18 @@ mod strategy_validation {
     // Constants
     #[test]
     fn test_post_filter_default_value() {
-        let expected = FilterStrategy::PostFilter { oversample: DEFAULT_OVERSAMPLE };
+        let expected = FilterStrategy::PostFilter {
+            oversample: DEFAULT_OVERSAMPLE,
+        };
         assert_eq!(FilterStrategy::POST_FILTER_DEFAULT, expected);
     }
 
     #[test]
     fn test_hybrid_default_value() {
-        let expected = FilterStrategy::Hybrid { oversample_min: 1.5, oversample_max: MAX_OVERSAMPLE };
+        let expected = FilterStrategy::Hybrid {
+            oversample_min: 1.5,
+            oversample_max: MAX_OVERSAMPLE,
+        };
         assert_eq!(FilterStrategy::HYBRID_DEFAULT, expected);
     }
 
@@ -204,22 +291,40 @@ mod strategy_validation {
 
     #[test]
     fn test_hybrid_equality() {
-        let a = FilterStrategy::Hybrid { oversample_min: 1.5, oversample_max: 10.0 };
-        let b = FilterStrategy::Hybrid { oversample_min: 1.5, oversample_max: 10.0 };
+        let a = FilterStrategy::Hybrid {
+            oversample_min: 1.5,
+            oversample_max: 10.0,
+        };
+        let b = FilterStrategy::Hybrid {
+            oversample_min: 1.5,
+            oversample_max: 10.0,
+        };
         assert_eq!(a, b);
     }
 
     #[test]
     fn test_hybrid_inequality_min() {
-        let a = FilterStrategy::Hybrid { oversample_min: 1.0, oversample_max: 10.0 };
-        let b = FilterStrategy::Hybrid { oversample_min: 2.0, oversample_max: 10.0 };
+        let a = FilterStrategy::Hybrid {
+            oversample_min: 1.0,
+            oversample_max: 10.0,
+        };
+        let b = FilterStrategy::Hybrid {
+            oversample_min: 2.0,
+            oversample_max: 10.0,
+        };
         assert_ne!(a, b);
     }
 
     #[test]
     fn test_hybrid_inequality_max() {
-        let a = FilterStrategy::Hybrid { oversample_min: 1.5, oversample_max: 8.0 };
-        let b = FilterStrategy::Hybrid { oversample_min: 1.5, oversample_max: 10.0 };
+        let a = FilterStrategy::Hybrid {
+            oversample_min: 1.5,
+            oversample_max: 8.0,
+        };
+        let b = FilterStrategy::Hybrid {
+            oversample_min: 1.5,
+            oversample_max: 10.0,
+        };
         assert_ne!(a, b);
     }
 
@@ -246,7 +351,10 @@ mod strategy_validation {
 
     #[test]
     fn test_hybrid_not_equal_to_auto() {
-        let hybrid = FilterStrategy::Hybrid { oversample_min: 1.5, oversample_max: 10.0 };
+        let hybrid = FilterStrategy::Hybrid {
+            oversample_min: 1.5,
+            oversample_max: 10.0,
+        };
         assert_ne!(hybrid, FilterStrategy::Auto);
     }
 
@@ -260,7 +368,10 @@ mod strategy_validation {
 
     #[test]
     fn test_hybrid_clone() {
-        let original = FilterStrategy::Hybrid { oversample_min: 2.0, oversample_max: 8.0 };
+        let original = FilterStrategy::Hybrid {
+            oversample_min: 2.0,
+            oversample_max: 8.0,
+        };
         let cloned = original;
         assert_eq!(original, cloned);
     }
@@ -282,22 +393,38 @@ mod strategy_validation {
     // Boundary validation
     #[test]
     fn test_postfilter_at_exact_min() {
-        assert!(FilterStrategy::PostFilter { oversample: 1.0 }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter { oversample: 1.0 }
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn test_postfilter_at_exact_max() {
-        assert!(FilterStrategy::PostFilter { oversample: MAX_OVERSAMPLE }.validate().is_ok());
+        assert!(FilterStrategy::PostFilter {
+            oversample: MAX_OVERSAMPLE
+        }
+        .validate()
+        .is_ok());
     }
 
     #[test]
     fn test_hybrid_min_at_1() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 1.0, oversample_max: MAX_OVERSAMPLE }.validate().is_ok());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 1.0,
+            oversample_max: MAX_OVERSAMPLE
+        }
+        .validate()
+        .is_ok());
     }
 
     #[test]
     fn test_hybrid_max_at_cap() {
-        assert!(FilterStrategy::Hybrid { oversample_min: 1.0, oversample_max: MAX_OVERSAMPLE }.validate().is_ok());
+        assert!(FilterStrategy::Hybrid {
+            oversample_min: 1.0,
+            oversample_max: MAX_OVERSAMPLE
+        }
+        .validate()
+        .is_ok());
     }
 }
 
@@ -340,7 +467,7 @@ mod calculate_oversample_tests {
 
     #[test]
     fn test_selectivity_0_333() {
-        let result = calculate_oversample(1.0/3.0);
+        let result = calculate_oversample(1.0 / 3.0);
         assert!(result > 2.9 && result < 3.1);
     }
 
@@ -576,100 +703,157 @@ mod select_strategy_tests {
     // At boundary 0.8 -> Hybrid (not PreFilter, threshold is >0.8)
     #[test]
     fn test_select_strategy_exactly_0_8() {
-        assert!(matches!(select_strategy(0.8), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.8),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     // Low selectivity -> PostFilter
     #[test]
     fn test_select_strategy_0_04() {
-        assert!(matches!(select_strategy(0.04), FilterStrategy::PostFilter { .. }));
+        assert!(matches!(
+            select_strategy(0.04),
+            FilterStrategy::PostFilter { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_03() {
-        assert!(matches!(select_strategy(0.03), FilterStrategy::PostFilter { .. }));
+        assert!(matches!(
+            select_strategy(0.03),
+            FilterStrategy::PostFilter { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_02() {
-        assert!(matches!(select_strategy(0.02), FilterStrategy::PostFilter { .. }));
+        assert!(matches!(
+            select_strategy(0.02),
+            FilterStrategy::PostFilter { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_01() {
-        assert!(matches!(select_strategy(0.01), FilterStrategy::PostFilter { .. }));
+        assert!(matches!(
+            select_strategy(0.01),
+            FilterStrategy::PostFilter { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_001() {
-        assert!(matches!(select_strategy(0.001), FilterStrategy::PostFilter { .. }));
+        assert!(matches!(
+            select_strategy(0.001),
+            FilterStrategy::PostFilter { .. }
+        ));
     }
 
     // At boundary 0.05 -> Hybrid (not PostFilter, threshold is <0.05)
     #[test]
     fn test_select_strategy_exactly_0_05() {
-        assert!(matches!(select_strategy(0.05), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.05),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     // Medium selectivity -> Hybrid
     #[test]
     fn test_select_strategy_0_5() {
-        assert!(matches!(select_strategy(0.5), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.5),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_4() {
-        assert!(matches!(select_strategy(0.4), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.4),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_3() {
-        assert!(matches!(select_strategy(0.3), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.3),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_2() {
-        assert!(matches!(select_strategy(0.2), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.2),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_15() {
-        assert!(matches!(select_strategy(0.15), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.15),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_1() {
-        assert!(matches!(select_strategy(0.1), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.1),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_07() {
-        assert!(matches!(select_strategy(0.07), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.07),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_06() {
-        assert!(matches!(select_strategy(0.06), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.06),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_6() {
-        assert!(matches!(select_strategy(0.6), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.6),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_7() {
-        assert!(matches!(select_strategy(0.7), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.7),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_75() {
-        assert!(matches!(select_strategy(0.75), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.75),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_select_strategy_0_79() {
-        assert!(matches!(select_strategy(0.79), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.79),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     // PostFilter oversample values
@@ -707,7 +891,10 @@ mod select_strategy_tests {
     #[test]
     fn test_hybrid_bounds_at_0_5() {
         match select_strategy(0.5) {
-            FilterStrategy::Hybrid { oversample_min, oversample_max } => {
+            FilterStrategy::Hybrid {
+                oversample_min,
+                oversample_max,
+            } => {
                 assert!((oversample_min - 1.5).abs() < 0.001);
                 assert!((oversample_max - 2.0).abs() < 0.001);
             }
@@ -718,7 +905,10 @@ mod select_strategy_tests {
     #[test]
     fn test_hybrid_bounds_at_0_3() {
         match select_strategy(0.3) {
-            FilterStrategy::Hybrid { oversample_min, oversample_max } => {
+            FilterStrategy::Hybrid {
+                oversample_min,
+                oversample_max,
+            } => {
                 assert!((oversample_min - 1.5).abs() < 0.001);
                 assert!(oversample_max > 3.3 && oversample_max < 3.4);
             }
@@ -729,7 +919,10 @@ mod select_strategy_tests {
     #[test]
     fn test_hybrid_bounds_at_0_2() {
         match select_strategy(0.2) {
-            FilterStrategy::Hybrid { oversample_min, oversample_max } => {
+            FilterStrategy::Hybrid {
+                oversample_min,
+                oversample_max,
+            } => {
                 assert!((oversample_min - 1.5).abs() < 0.001);
                 assert!((oversample_max - 5.0).abs() < 0.001);
             }
@@ -740,7 +933,10 @@ mod select_strategy_tests {
     #[test]
     fn test_hybrid_bounds_at_0_1() {
         match select_strategy(0.1) {
-            FilterStrategy::Hybrid { oversample_min, oversample_max } => {
+            FilterStrategy::Hybrid {
+                oversample_min,
+                oversample_max,
+            } => {
                 assert!((oversample_min - 1.5).abs() < 0.001);
                 assert_eq!(oversample_max, MAX_OVERSAMPLE);
             }
@@ -786,17 +982,26 @@ mod select_strategy_tests {
 
     #[test]
     fn test_strategy_just_below_prefilter_threshold() {
-        assert!(matches!(select_strategy(0.799), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.799),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_strategy_just_above_postfilter_threshold() {
-        assert!(matches!(select_strategy(0.051), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.051),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_strategy_just_below_postfilter_threshold() {
-        assert!(matches!(select_strategy(0.049), FilterStrategy::PostFilter { .. }));
+        assert!(matches!(
+            select_strategy(0.049),
+            FilterStrategy::PostFilter { .. }
+        ));
     }
 
     // Multiple calls with same input
@@ -820,7 +1025,10 @@ mod select_strategy_tests {
     fn test_full_range_hybrid() {
         for i in 5..=80 {
             let selectivity = i as f32 / 100.0;
-            assert!(matches!(select_strategy(selectivity), FilterStrategy::Hybrid { .. }));
+            assert!(matches!(
+                select_strategy(selectivity),
+                FilterStrategy::Hybrid { .. }
+            ));
         }
     }
 
@@ -828,7 +1036,10 @@ mod select_strategy_tests {
     fn test_full_range_postfilter() {
         for i in 1..5 {
             let selectivity = i as f32 / 100.0;
-            assert!(matches!(select_strategy(selectivity), FilterStrategy::PostFilter { .. }));
+            assert!(matches!(
+                select_strategy(selectivity),
+                FilterStrategy::PostFilter { .. }
+            ));
         }
     }
 }
@@ -1737,7 +1948,10 @@ mod constants_tests {
     #[test]
     fn test_select_strategy_uses_prefilter_threshold() {
         // Just above threshold -> PreFilter
-        assert_eq!(select_strategy(PREFILTER_THRESHOLD + 0.001), FilterStrategy::PreFilter);
+        assert_eq!(
+            select_strategy(PREFILTER_THRESHOLD + 0.001),
+            FilterStrategy::PreFilter
+        );
     }
 
     #[test]
@@ -1826,7 +2040,8 @@ mod real_world_scenarios {
 
     #[test]
     fn test_ecommerce_combined() {
-        let filter = parse(r#"category = "electronics" AND price < 500 AND in_stock = true"#).unwrap();
+        let filter =
+            parse(r#"category = "electronics" AND price < 500 AND in_stock = true"#).unwrap();
         assert!(!is_tautology(&filter));
     }
 
@@ -2053,13 +2268,19 @@ mod real_world_scenarios {
     #[test]
     fn test_strategy_for_common_category() {
         // Category filters often have ~10-30% selectivity -> Hybrid
-        assert!(matches!(select_strategy(0.2), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.2),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_strategy_for_rare_status() {
         // Rare status (e.g., "error") has low selectivity -> PostFilter
-        assert!(matches!(select_strategy(0.02), FilterStrategy::PostFilter { .. }));
+        assert!(matches!(
+            select_strategy(0.02),
+            FilterStrategy::PostFilter { .. }
+        ));
     }
 
     #[test]
@@ -2071,13 +2292,19 @@ mod real_world_scenarios {
     #[test]
     fn test_strategy_for_date_range() {
         // Date range depends on range size, often medium selectivity
-        assert!(matches!(select_strategy(0.3), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.3),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     #[test]
     fn test_strategy_for_boolean_filter() {
         // Boolean with even split is ~50%
-        assert!(matches!(select_strategy(0.5), FilterStrategy::Hybrid { .. }));
+        assert!(matches!(
+            select_strategy(0.5),
+            FilterStrategy::Hybrid { .. }
+        ));
     }
 
     // Deeply nested expressions

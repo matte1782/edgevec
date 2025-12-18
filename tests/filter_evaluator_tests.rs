@@ -1371,7 +1371,10 @@ mod string_contains {
     #[test]
     fn test_contains_unicode() {
         let filter = parse(r#"title CONTAINS "日本""#).unwrap();
-        let meta = make_metadata(&[("title", MetadataValue::String("私は日本語を話します".into()))]);
+        let meta = make_metadata(&[(
+            "title",
+            MetadataValue::String("私は日本語を話します".into()),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3076,7 +3079,10 @@ mod string_starts_with {
     #[test]
     fn test_starts_with_multiple_words() {
         let filter = parse(r#"sentence starts_with "the quick""#).unwrap();
-        let meta = make_metadata(&[("sentence", MetadataValue::String("the quick brown fox".into()))]);
+        let meta = make_metadata(&[(
+            "sentence",
+            MetadataValue::String("the quick brown fox".into()),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3300,21 +3306,30 @@ mod array_any {
     #[test]
     fn test_any_match_first() {
         let filter = parse(r#"tags ANY ["rust", "python"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_any_match_last() {
         let filter = parse(r#"tags ANY ["python", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_any_no_match() {
         let filter = parse(r#"tags ANY ["python", "java"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
@@ -3342,7 +3357,10 @@ mod array_any {
     #[test]
     fn test_any_multiple_matches() {
         let filter = parse(r#"tags ANY ["rust", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3393,7 +3411,10 @@ mod array_any {
     #[test]
     fn test_any_with_empty_string() {
         let filter = parse(r#"tags ANY [""]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["".into(), "a".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["".into(), "a".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3414,7 +3435,10 @@ mod array_any {
     #[test]
     fn test_any_duplicates_in_field() {
         let filter = parse(r#"tags ANY ["rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "rust".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "rust".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3443,21 +3467,30 @@ mod array_any {
     #[test]
     fn test_any_partial_overlap() {
         let filter = parse(r#"tags ANY ["x", "y", "rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_any_no_overlap() {
         let filter = parse(r#"tags ANY ["x", "y", "z"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
     #[test]
     fn test_any_single_pattern_multiple_field() {
         let filter = parse(r#"tags ANY ["rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 }
@@ -3469,14 +3502,20 @@ mod array_all {
     fn test_all_match() {
         // ALL checks if ALL values in pattern are in field
         let filter = parse(r#"tags ALL ["rust", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_missing_one() {
         let filter = parse(r#"tags ALL ["rust", "python"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
@@ -3513,14 +3552,20 @@ mod array_all {
     #[test]
     fn test_all_exact_match() {
         let filter = parse(r#"tags ALL ["rust", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_superset_field() {
         let filter = parse(r#"tags ALL ["rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3534,7 +3579,10 @@ mod array_all {
     #[test]
     fn test_all_unicode() {
         let filter = parse(r#"tags ALL ["日本語", "英語"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["日本語".into(), "英語".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["日本語".into(), "英語".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3564,7 +3612,10 @@ mod array_all {
     #[test]
     fn test_all_with_empty_string() {
         let filter = parse(r#"tags ALL ["", "a"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["".into(), "a".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["".into(), "a".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3578,14 +3629,20 @@ mod array_all {
     #[test]
     fn test_all_duplicates_in_field() {
         let filter = parse(r#"tags ALL ["rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "rust".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "rust".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_many_pattern_values() {
         let filter = parse(r#"tags ALL ["a", "b", "c"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["a".into(), "b".into(), "c".into(), "d".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["a".into(), "b".into(), "c".into(), "d".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -3600,28 +3657,40 @@ mod array_all {
     #[test]
     fn test_all_order_independent() {
         let filter = parse(r#"tags ALL ["wasm", "rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_partial_match_fails() {
         let filter = parse(r#"tags ALL ["rust", "wasm", "go"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
     #[test]
     fn test_all_special_chars() {
         let filter = parse(r##"tags ALL ["@user", "#tag"]"##).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["@user".into(), "#tag".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["@user".into(), "#tag".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_whitespace() {
         let filter = parse(r#"tags ALL [" ", "  "]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec![" ".into(), "  ".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec![" ".into(), "  ".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 }
@@ -3633,21 +3702,30 @@ mod array_none {
     fn test_none_match() {
         // NONE checks that NONE of the pattern values are in field
         let filter = parse(r#"tags NONE ["python", "java"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_none_one_matches() {
         let filter = parse(r#"tags NONE ["rust", "python"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
     #[test]
     fn test_none_all_match() {
         let filter = parse(r#"tags NONE ["rust", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
@@ -3721,14 +3799,20 @@ mod array_none {
     #[test]
     fn test_none_with_empty_string() {
         let filter = parse(r#"tags NONE [""]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["a".into(), "b".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["a".into(), "b".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_none_with_empty_string_present() {
         let filter = parse(r#"tags NONE [""]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["".into(), "a".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["".into(), "a".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
@@ -3742,21 +3826,30 @@ mod array_none {
     #[test]
     fn test_none_duplicates_in_field() {
         let filter = parse(r#"tags NONE ["python"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "rust".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "rust".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_none_many_pattern_values_no_match() {
         let filter = parse(r#"tags NONE ["x", "y", "z"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["a".into(), "b".into(), "c".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["a".into(), "b".into(), "c".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_none_many_pattern_values_one_match() {
         let filter = parse(r#"tags NONE ["x", "y", "a"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["a".into(), "b".into(), "c".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["a".into(), "b".into(), "c".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
@@ -3785,7 +3878,10 @@ mod array_none {
     #[test]
     fn test_none_partial_overlap_fails() {
         let filter = parse(r#"tags NONE ["rust", "python"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 }
@@ -4083,10 +4179,10 @@ mod complex_nested {
         // Strict mode: all referenced fields must exist
         let filter = parse("((a = 1) OR (b = 2)) OR ((c = 3) OR (d = 4))").unwrap();
         let meta = make_metadata(&[
-            ("a", MetadataValue::Integer(0)),  // false
-            ("b", MetadataValue::Integer(0)),  // false
-            ("c", MetadataValue::Integer(0)),  // false
-            ("d", MetadataValue::Integer(4)),  // true
+            ("a", MetadataValue::Integer(0)), // false
+            ("b", MetadataValue::Integer(0)), // false
+            ("c", MetadataValue::Integer(0)), // false
+            ("d", MetadataValue::Integer(4)), // true
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -4096,10 +4192,10 @@ mod complex_nested {
         // Strict mode: all referenced fields must exist
         let filter = parse("(a = 1 AND b = 2) OR (c = 3 AND d = 4)").unwrap();
         let meta = make_metadata(&[
-            ("a", MetadataValue::Integer(0)),  // false
-            ("b", MetadataValue::Integer(0)),  // false
-            ("c", MetadataValue::Integer(3)),  // true
-            ("d", MetadataValue::Integer(4)),  // true
+            ("a", MetadataValue::Integer(0)), // false
+            ("b", MetadataValue::Integer(0)), // false
+            ("c", MetadataValue::Integer(3)), // true
+            ("d", MetadataValue::Integer(4)), // true
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -4109,10 +4205,10 @@ mod complex_nested {
         // Strict mode: all referenced fields must exist
         let filter = parse("(a = 1 OR b = 2) AND (c = 3 OR d = 4)").unwrap();
         let meta = make_metadata(&[
-            ("a", MetadataValue::Integer(1)),  // true
-            ("b", MetadataValue::Integer(0)),  // false
-            ("c", MetadataValue::Integer(0)),  // false
-            ("d", MetadataValue::Integer(4)),  // true
+            ("a", MetadataValue::Integer(1)), // true
+            ("b", MetadataValue::Integer(0)), // false
+            ("c", MetadataValue::Integer(0)), // false
+            ("d", MetadataValue::Integer(4)), // true
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -4184,7 +4280,8 @@ mod complex_nested {
 
     #[test]
     fn test_multiple_fields_complex() {
-        let filter = parse(r#"(status = "active" AND priority > 5) OR (status = "critical")"#).unwrap();
+        let filter =
+            parse(r#"(status = "active" AND priority > 5) OR (status = "critical")"#).unwrap();
         let meta = make_metadata(&[
             ("status", MetadataValue::String("active".into())),
             ("priority", MetadataValue::Integer(7)),
@@ -4233,7 +4330,10 @@ mod complex_nested {
     #[test]
     fn test_contains_in_complex() {
         let filter = parse(r#"description contains "important" OR priority = 1"#).unwrap();
-        let meta = make_metadata(&[("description", MetadataValue::String("this is important".into()))]);
+        let meta = make_metadata(&[(
+            "description",
+            MetadataValue::String("this is important".into()),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -4242,25 +4342,28 @@ mod complex_nested {
         // Strict mode: all referenced fields must exist
         let filter = parse("((a = 1 OR b = 2) AND (c = 3 OR d = 4)) OR e = 5").unwrap();
         let meta = make_metadata(&[
-            ("a", MetadataValue::Integer(0)),  // false
-            ("b", MetadataValue::Integer(0)),  // false
-            ("c", MetadataValue::Integer(0)),  // false
-            ("d", MetadataValue::Integer(0)),  // false
-            ("e", MetadataValue::Integer(5)),  // true
+            ("a", MetadataValue::Integer(0)), // false
+            ("b", MetadataValue::Integer(0)), // false
+            ("c", MetadataValue::Integer(0)), // false
+            ("d", MetadataValue::Integer(0)), // false
+            ("e", MetadataValue::Integer(5)), // true
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_operators_combined() {
-        let filter = parse(r#"
+        let filter = parse(
+            r#"
             x = 1 AND
             y != 2 AND
             z > 0 AND
             w < 100 AND
             a >= 5 AND
             b <= 10
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         let meta = make_metadata(&[
             ("x", MetadataValue::Integer(1)),
             ("y", MetadataValue::Integer(3)),
@@ -4279,9 +4382,9 @@ mod complex_nested {
         // Strict mode: all referenced fields must exist
         let filter = parse("a = 1 AND (b = 2 OR c = 3)").unwrap();
         let meta = make_metadata(&[
-            ("a", MetadataValue::Integer(1)),  // true
-            ("b", MetadataValue::Integer(0)),  // false
-            ("c", MetadataValue::Integer(3)),  // true
+            ("a", MetadataValue::Integer(1)), // true
+            ("b", MetadataValue::Integer(0)), // false
+            ("c", MetadataValue::Integer(3)), // true
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -4297,7 +4400,10 @@ mod complex_nested {
     fn test_complex_with_array_ops() {
         let filter = parse(r#"tags ANY ["rust", "wasm"] AND priority > 5"#).unwrap();
         let meta = make_metadata(&[
-            ("tags", MetadataValue::StringArray(vec!["rust".into(), "go".into()])),
+            (
+                "tags",
+                MetadataValue::StringArray(vec!["rust".into(), "go".into()]),
+            ),
             ("priority", MetadataValue::Integer(7)),
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
@@ -4356,7 +4462,8 @@ mod multi_field {
 
     #[test]
     fn test_mixed_types_all_match() {
-        let filter = parse(r#"name = "test" AND count = 5 AND active = true AND score = 3.5"#).unwrap();
+        let filter =
+            parse(r#"name = "test" AND count = 5 AND active = true AND score = 3.5"#).unwrap();
         let meta = make_metadata(&[
             ("name", MetadataValue::String("test".into())),
             ("count", MetadataValue::Integer(5)),
@@ -4385,8 +4492,8 @@ mod multi_field {
         // Strict mode: all referenced fields must exist
         let filter = parse("a = 1 OR b = 2").unwrap();
         let meta = make_metadata(&[
-            ("a", MetadataValue::Integer(0)),  // false
-            ("b", MetadataValue::Integer(2)),  // true
+            ("a", MetadataValue::Integer(0)), // false
+            ("b", MetadataValue::Integer(2)), // true
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -4417,9 +4524,7 @@ mod multi_field {
     fn test_field_comparison_order_or() {
         // First field succeeds, second not evaluated (short-circuit)
         let filter = parse("a = 1 OR b = 99").unwrap();
-        let meta = make_metadata(&[
-            ("a", MetadataValue::Integer(1)),
-        ]);
+        let meta = make_metadata(&[("a", MetadataValue::Integer(1))]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -4440,7 +4545,10 @@ mod multi_field {
     #[test]
     fn test_long_field_name() {
         let filter = parse("very_long_field_name_for_testing = 1").unwrap();
-        let meta = make_metadata(&[("very_long_field_name_for_testing", MetadataValue::Integer(1))]);
+        let meta = make_metadata(&[(
+            "very_long_field_name_for_testing",
+            MetadataValue::Integer(1),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -4496,12 +4604,15 @@ mod multi_field {
 
     #[test]
     fn test_all_types_present() {
-        let filter = parse(r#"
+        let filter = parse(
+            r#"
             str_field = "value" AND
             int_field = 42 AND
             float_field = 3.14 AND
             bool_field = true
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         let meta = make_metadata(&[
             ("str_field", MetadataValue::String("value".into())),
             ("int_field", MetadataValue::Integer(42)),
@@ -4604,8 +4715,8 @@ mod boolean_field {
         // Strict mode: all referenced fields must exist
         let filter = parse("a = true OR b = true").unwrap();
         let meta = make_metadata(&[
-            ("a", MetadataValue::Boolean(false)),  // false
-            ("b", MetadataValue::Boolean(true)),   // true
+            ("a", MetadataValue::Boolean(false)), // false
+            ("b", MetadataValue::Boolean(true)),  // true
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -5396,31 +5507,51 @@ mod array_operators_advanced {
     #[test]
     fn test_any_large_array() {
         let filter = parse(r#"tags ANY ["target"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec![
-            "a".into(), "b".into(), "c".into(), "d".into(), "e".into(),
-            "f".into(), "g".into(), "h".into(), "i".into(), "target".into(),
-        ]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec![
+                "a".into(),
+                "b".into(),
+                "c".into(),
+                "d".into(),
+                "e".into(),
+                "f".into(),
+                "g".into(),
+                "h".into(),
+                "i".into(),
+                "target".into(),
+            ]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_any_all_values_match() {
         let filter = parse(r#"tags ANY ["rust", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_any_first_element_matches() {
         let filter = parse(r#"tags ANY ["rust", "go"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "python".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "python".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_any_last_element_matches() {
         let filter = parse(r#"tags ANY ["go", "rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["python".into(), "rust".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["python".into(), "rust".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -5435,28 +5566,40 @@ mod array_operators_advanced {
     #[test]
     fn test_all_exact_match() {
         let filter = parse(r#"tags ALL ["rust", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_superset_array() {
         let filter = parse(r#"tags ALL ["rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into(), "go".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_all_one_missing() {
         let filter = parse(r#"tags ALL ["rust", "wasm", "go"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
     #[test]
     fn test_all_partial_overlap() {
         let filter = parse(r#"tags ALL ["rust", "python"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
@@ -5471,21 +5614,30 @@ mod array_operators_advanced {
     #[test]
     fn test_none_multiple_not_present() {
         let filter = parse(r#"tags NONE ["go", "python", "java"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
     #[test]
     fn test_none_one_present() {
         let filter = parse(r#"tags NONE ["rust", "go"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
     #[test]
     fn test_none_all_present() {
         let filter = parse(r#"tags NONE ["rust", "wasm"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(false));
     }
 
@@ -5537,8 +5689,14 @@ mod array_operators_advanced {
     fn test_multiple_array_conditions() {
         let filter = parse(r#"tags ANY ["rust"] AND categories ALL ["tech"]"#).unwrap();
         let meta = make_metadata(&[
-            ("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()])),
-            ("categories", MetadataValue::StringArray(vec!["tech".into(), "programming".into()])),
+            (
+                "tags",
+                MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+            ),
+            (
+                "categories",
+                MetadataValue::StringArray(vec!["tech".into(), "programming".into()]),
+            ),
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -5584,7 +5742,10 @@ mod array_operators_advanced {
     #[test]
     fn test_any_with_duplicates_in_field() {
         let filter = parse(r#"tags ANY ["rust"]"#).unwrap();
-        let meta = make_metadata(&[("tags", MetadataValue::StringArray(vec!["rust".into(), "rust".into()]))]);
+        let meta = make_metadata(&[(
+            "tags",
+            MetadataValue::StringArray(vec!["rust".into(), "rust".into()]),
+        )]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
 
@@ -6029,7 +6190,10 @@ mod compound_conditions {
     fn test_any_and_comparison() {
         let filter = parse(r#"tags ANY ["rust"] AND priority >= 5"#).unwrap();
         let meta = make_metadata(&[
-            ("tags", MetadataValue::StringArray(vec!["rust".into(), "wasm".into()])),
+            (
+                "tags",
+                MetadataValue::StringArray(vec!["rust".into(), "wasm".into()]),
+            ),
             ("priority", MetadataValue::Integer(7)),
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
@@ -6288,7 +6452,7 @@ mod field_references {
     #[test]
     fn test_field_named_and_lower() {
         // "and" as field name (lowercase) - might conflict with keyword
-        let filter = parse("x = 1").unwrap();  // Using simple test
+        let filter = parse("x = 1").unwrap(); // Using simple test
         let meta = make_metadata(&[("x", MetadataValue::Integer(1))]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));
     }
@@ -6375,10 +6539,18 @@ mod additional_coverage {
 
     #[test]
     fn test_mixed_array_ops_complex() {
-        let filter = parse(r#"(tags ANY ["rust"]) AND (cats ALL ["tech"]) AND (banned NONE ["spam"])"#).unwrap();
+        let filter =
+            parse(r#"(tags ANY ["rust"]) AND (cats ALL ["tech"]) AND (banned NONE ["spam"])"#)
+                .unwrap();
         let meta = make_metadata(&[
-            ("tags", MetadataValue::StringArray(vec!["rust".into(), "go".into()])),
-            ("cats", MetadataValue::StringArray(vec!["tech".into(), "programming".into()])),
+            (
+                "tags",
+                MetadataValue::StringArray(vec!["rust".into(), "go".into()]),
+            ),
+            (
+                "cats",
+                MetadataValue::StringArray(vec!["tech".into(), "programming".into()]),
+            ),
             ("banned", MetadataValue::StringArray(vec!["clean".into()])),
         ]);
         assert_eq!(evaluate(&filter, &meta), Ok(true));

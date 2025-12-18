@@ -1353,8 +1353,7 @@ mod tests {
                 let expr_a = parse(a).unwrap();
                 let expr_b = parse(b).unwrap();
 
-                let and_ab =
-                    FilterExpr::And(Box::new(expr_a.clone()), Box::new(expr_b.clone()));
+                let and_ab = FilterExpr::And(Box::new(expr_a.clone()), Box::new(expr_b.clone()));
                 let and_ba = FilterExpr::And(Box::new(expr_b), Box::new(expr_a));
 
                 let result_ab = evaluate(&and_ab, &metadata).unwrap();
@@ -1623,12 +1622,10 @@ mod tests {
             ];
 
             for metadata in &test_cases {
-                let expr_is_null = FilterExpr::IsNull(Box::new(FilterExpr::Field(
-                    "field".to_string(),
-                )));
-                let expr_is_not_null = FilterExpr::IsNotNull(Box::new(FilterExpr::Field(
-                    "field".to_string(),
-                )));
+                let expr_is_null =
+                    FilterExpr::IsNull(Box::new(FilterExpr::Field("field".to_string())));
+                let expr_is_not_null =
+                    FilterExpr::IsNotNull(Box::new(FilterExpr::Field("field".to_string())));
 
                 let result_is_null = evaluate(&expr_is_null, metadata).unwrap();
                 let result_is_not_null = evaluate(&expr_is_not_null, metadata).unwrap();
