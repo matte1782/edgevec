@@ -300,7 +300,7 @@ EdgeVec is NOT suitable for:
 - [x] W24.6.2: README rewritten
 - [x] W24.6.3: COMPARISON.md created
 - [x] W24.6.4: npm keywords updated
-- [x] W24.6.5: Screenshots captured (guide created, manual capture required)
+- [x] W24.6.5: Screenshots captured (automated script + 4/5 screenshots)
 
 ## Day 6 Exit Criteria
 
@@ -361,3 +361,14 @@ Before Day 7, verify:
    - Capture instructions
    - Image optimization guide
    - Alt text for accessibility
+
+6. **scripts/capture-screenshots.js** (automated)
+   - Puppeteer-based screenshot automation
+   - Captures 5 demo pages with setup states
+   - Uses absolute path resolution for output
+   - 4/5 screenshots captured:
+     - playground-dark.png (216 KB)
+     - playground-light.png (215 KB)
+     - dashboard.png (611 KB)
+     - demo-catalog.png (1114 KB)
+   - soft-delete.png pending (script fixed, requires server re-run)
