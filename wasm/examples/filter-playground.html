@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="EdgeVec Filter Playground - Interactive filter expression builder and validator for EdgeVec vector database.">
+    <meta name="keywords" content="EdgeVec, filter, query builder, vector database, WASM, metadata filtering">
+    <meta name="author" content="EdgeVec Contributors">
+    <meta name="theme-color" content="#00ffff">
+
+    <title>EdgeVec | Filter Playground</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a0f' width='100' height='100'/><polygon fill='%2300ffff' points='50,10 90,30 90,70 50,90 10,70 10,30'/><polygon fill='%230a0a0f' points='50,25 75,37 75,63 50,75 25,63 25,37'/><circle fill='%23ff00ff' cx='50' cy='50' r='8'/></svg>">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════════════
+           EDGEVEC FILTER PLAYGROUND - CYBERPUNK THEME
+           Version: 1.0.0 | Week 24 Day 4
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           CSS CUSTOM PROPERTIES - DARK THEME (DEFAULT)
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        :root {
+            /* Backgrounds */
+            --bg-void: #030306;
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #0f0f18;
+            --bg-tertiary: #151520;
+            --bg-card: #12121c;
+            --bg-input: #0d0d14;
+
+            /* Neon Colors */
+            --cyan: #00ffff;
+            --cyan-bright: #40ffff;
+            --cyan-dim: #00aaaa;
+            --magenta: #ff00ff;
+            --magenta-dim: #aa00aa;
+            --green: #00ff88;
+            --green-bright: #40ffa0;
+            --red: #ff3366;
+            --red-dim: #aa2244;
+            --orange: #ff6600;
+            --yellow: #ffff00;
+            --purple: #9945ff;
+
+            /* Neutrals */
+            --white: #e8e8f0;
+            --gray-100: #b0b0c0;
+            --gray-200: #8080a0;
+            --gray-300: #606080;
+            --gray-400: #404060;
+            --border: #252535;
+            --border-glow: #353550;
+
+            /* Glows */
+            --glow-cyan: 0 0 20px rgba(0, 255, 255, 0.3), 0 0 40px rgba(0, 255, 255, 0.15);
+            --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-red: 0 0 20px rgba(255, 51, 102, 0.3);
+
+            /* Text Shadows */
+            --text-glow-cyan: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4);
+
+            /* Transitions */
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.25s ease;
+        }
+
+        /* Light theme overrides */
+        [data-theme="light"] {
+            --bg-void: #f5f5f8;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f0f0f5;
+            --bg-tertiary: #e8e8f0;
+            --bg-card: #ffffff;
+            --bg-input: #fafafa;
+
+            --cyan: #0088aa;
+            --cyan-bright: #00aacc;
+            --cyan-dim: #006688;
+            --magenta: #cc00cc;
+            --green: #00aa66;
+            --red: #cc2244;
+            --orange: #cc5500;
+
+            --white: #1a1a2e;
+            --gray-100: #404060;
+            --gray-200: #606080;
+            --gray-300: #8080a0;
+            --gray-400: #b0b0c0;
+            --border: #d0d0e0;
+            --border-glow: #c0c0d0;
+
+            --glow-cyan: 0 0 10px rgba(0, 136, 170, 0.2);
+            --glow-green: 0 0 10px rgba(0, 170, 102, 0.2);
+            --glow-red: 0 0 10px rgba(204, 34, 68, 0.2);
+
+            --text-glow-cyan: none;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           RESET & BASE
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 16px;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: var(--bg-void);
+            color: var(--white);
+            min-height: 100vh;
+            line-height: 1.6;
+            transition: background var(--transition-normal), color var(--transition-normal);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           ANIMATED BACKGROUND
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(90deg, rgba(0, 255, 255, 0.015) 1px, transparent 1px),
+                linear-gradient(rgba(0, 255, 255, 0.015) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+            animation: gridPulse 6s ease-in-out infinite;
+        }
+
+        [data-theme="light"] .bg-grid {
+            background:
+                linear-gradient(90deg, rgba(0, 136, 170, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0, 136, 170, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        @keyframes gridPulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           LAYOUT
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                padding: 2rem;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           HEADER
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+        }
+
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cyan);
+            text-shadow: var(--text-glow-cyan);
+            letter-spacing: 2px;
+        }
+
+        .logo-subtitle {
+            font-size: 0.75rem;
+            color: var(--gray-200);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           BUTTONS
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--cyan);
+            background: transparent;
+            border: 1px solid var(--cyan-dim);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .btn:hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: var(--cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn:focus {
+            outline: 2px solid var(--cyan);
+            outline-offset: 2px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--cyan);
+            color: var(--bg-void);
+            border-color: var(--cyan);
+        }
+
+        .btn-primary:hover {
+            background: var(--cyan-bright);
+        }
+
+        .btn-small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 50%;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           CARDS / PANELS
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+
+        .panel:focus-within {
+            border-color: var(--cyan-dim);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--cyan);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           FILTER INPUT
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .filter-input-container {
+            position: relative;
+        }
+
+        .filter-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            color: var(--white);
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            resize: vertical;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .filter-input::placeholder {
+            color: var(--gray-300);
+        }
+
+        .filter-input.error {
+            border-color: var(--red);
+            box-shadow: var(--glow-red);
+        }
+
+        .filter-input.valid {
+            border-color: var(--green);
+            box-shadow: var(--glow-green);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           STATUS BAR
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .status-icon {
+            font-size: 1.125rem;
+        }
+
+        .status-valid {
+            color: var(--green);
+        }
+
+        .status-error {
+            color: var(--red);
+        }
+
+        .status-info {
+            color: var(--gray-200);
+        }
+
+        .status-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           OUTPUT AREA
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .output-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.25rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--gray-200);
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all var(--transition-fast);
+        }
+
+        .tab-btn:hover {
+            color: var(--cyan);
+        }
+
+        .tab-btn.active {
+            color: var(--cyan);
+            border-bottom-color: var(--cyan);
+        }
+
+        .tab-btn:focus {
+            outline: 2px solid var(--cyan);
+            outline-offset: -2px;
+        }
+
+        .output-content {
+            min-height: 200px;
+            max-height: 400px;
+            overflow: auto;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8125rem;
+            line-height: 1.6;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           EXAMPLES SECTION
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .example-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 0.75rem 1rem;
+            font-family: inherit;
+            font-size: 0.8125rem;
+            text-align: left;
+            color: var(--white);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .example-btn:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--cyan-dim);
+        }
+
+        .example-btn:focus {
+            outline: 2px solid var(--cyan);
+            outline-offset: 2px;
+        }
+
+        .example-name {
+            font-weight: 600;
+            color: var(--cyan);
+            margin-bottom: 0.25rem;
+        }
+
+        .example-desc {
+            font-size: 0.75rem;
+            color: var(--gray-200);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           ERROR DISPLAY
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .error-display {
+            padding: 1rem;
+            background: rgba(255, 51, 102, 0.1);
+            border: 1px solid var(--red-dim);
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        .error-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: var(--red);
+            margin-bottom: 0.75rem;
+        }
+
+        .error-position {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            padding: 0.75rem;
+            background: var(--bg-input);
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        .error-line {
+            color: var(--gray-100);
+        }
+
+        .error-marker {
+            color: var(--red);
+            font-weight: bold;
+        }
+
+        .error-suggestion {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 4px;
+        }
+
+        .error-suggestion-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--green);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        .error-suggestion-text {
+            color: var(--white);
+        }
+
+        .error-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           FILTER INFO
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .filter-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .info-card {
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        .info-label {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--gray-200);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--cyan);
+        }
+
+        .info-list {
+            font-size: 0.8125rem;
+            color: var(--white);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           JSON SYNTAX HIGHLIGHTING
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .json-key {
+            color: var(--cyan);
+        }
+
+        .json-string {
+            color: var(--green);
+        }
+
+        .json-number {
+            color: var(--orange);
+        }
+
+        .json-boolean {
+            color: var(--magenta);
+        }
+
+        .json-null {
+            color: var(--gray-200);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .footer {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--gray-300);
+            font-size: 0.75rem;
+        }
+
+        .footer a {
+            color: var(--cyan-dim);
+            transition: color var(--transition-fast);
+        }
+
+        .footer a:hover {
+            color: var(--cyan);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           LOADING STATE
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            color: var(--gray-200);
+        }
+
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           ACCESSIBILITY
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Skip link */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--cyan);
+            color: var(--bg-void);
+            padding: 8px;
+            z-index: 100;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+    </style>
+</head>
+<body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <!-- Background Effects -->
+    <div class="bg-grid" aria-hidden="true"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 100 100" aria-hidden="true">
+                    <rect fill="var(--bg-primary)" width="100" height="100"/>
+                    <polygon fill="var(--cyan)" points="50,10 90,30 90,70 50,90 10,70 10,30"/>
+                    <polygon fill="var(--bg-primary)" points="50,25 75,37 75,63 50,75 25,63 25,37"/>
+                    <circle fill="var(--magenta)" cx="50" cy="50" r="8"/>
+                </svg>
+                <div>
+                    <div class="logo-text">EdgeVec</div>
+                    <div class="logo-subtitle">Filter Playground</div>
+                </div>
+            </div>
+            <div class="header-controls">
+                <a href="index.html" class="btn btn-small" title="Back to Examples">
+                    <span aria-hidden="true">&larr;</span> Examples
+                </a>
+                <button id="theme-toggle" class="btn btn-icon" title="Toggle theme" aria-label="Toggle dark/light theme">
+                    <span id="theme-icon" aria-hidden="true">&#9790;</span>
+                </button>
+            </div>
+        </header>
+
+        <main id="main">
+            <!-- Filter Input Panel -->
+            <section class="panel" aria-labelledby="input-title">
+                <div class="panel-header">
+                    <h1 id="input-title" class="panel-title">Filter Expression</h1>
+                </div>
+
+                <div class="filter-input-container">
+                    <label for="filter-input" class="sr-only">Enter your filter expression</label>
+                    <textarea
+                        id="filter-input"
+                        class="filter-input"
+                        placeholder='Enter filter expression, e.g.: category = "electronics" AND price < 100'
+                        spellcheck="false"
+                        aria-describedby="status-message"
+                    ></textarea>
+                </div>
+
+                <div class="status-bar" role="status" aria-live="polite">
+                    <div class="status-indicator">
+                        <span id="status-icon" class="status-icon" aria-hidden="true">&#9679;</span>
+                        <span id="status-message">Enter a filter expression</span>
+                    </div>
+                    <div class="status-actions">
+                        <button id="btn-parse" class="btn btn-small btn-primary">Parse</button>
+                        <button id="btn-clear" class="btn btn-small">Clear</button>
+                    </div>
+                </div>
+
+                <div id="error-display" class="error-display" style="display: none;" role="alert">
+                    <!-- Error details will be populated by JS -->
+                </div>
+            </section>
+
+            <!-- Examples Panel -->
+            <section class="panel" aria-labelledby="examples-title">
+                <div class="panel-header">
+                    <h2 id="examples-title" class="panel-title">Quick Examples</h2>
+                </div>
+
+                <div id="examples-grid" class="examples-grid" role="list">
+                    <!-- Examples populated by JS -->
+                </div>
+            </section>
+
+            <!-- Output Panel -->
+            <section class="panel" aria-labelledby="output-title">
+                <div class="panel-header">
+                    <h2 id="output-title" class="panel-title">Parse Result</h2>
+                </div>
+
+                <div class="output-tabs" role="tablist" aria-label="Output views">
+                    <button id="tab-ast" class="tab-btn active" role="tab" aria-selected="true" aria-controls="content-ast">AST</button>
+                    <button id="tab-info" class="tab-btn" role="tab" aria-selected="false" aria-controls="content-info">Info</button>
+                    <button id="tab-json" class="tab-btn" role="tab" aria-selected="false" aria-controls="content-json">Raw JSON</button>
+                </div>
+
+                <div id="content-ast" class="tab-content active" role="tabpanel" aria-labelledby="tab-ast">
+                    <div id="ast-output" class="output-content">
+                        <div class="loading" id="loading-placeholder">
+                            <div class="loading-spinner" aria-hidden="true"></div>
+                            <span>Loading WASM module...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="content-info" class="tab-content" role="tabpanel" aria-labelledby="tab-info" hidden>
+                    <div id="filter-info" class="filter-info">
+                        <!-- Filter info populated by JS -->
+                    </div>
+                </div>
+
+                <div id="content-json" class="tab-content" role="tabpanel" aria-labelledby="tab-json" hidden>
+                    <div id="json-output" class="output-content"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>
+                EdgeVec v0.5.0 |
+                <a href="https://github.com/edgevec/edgevec" target="_blank" rel="noopener noreferrer">GitHub</a> |
+                <a href="../docs/api/FILTER_SYNTAX.md" target="_blank">Filter Syntax Docs</a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- Load WASM module -->
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════════════════
+        // EDGEVEC FILTER PLAYGROUND - JAVASCRIPT
+        // Version: 1.0.0 | Week 24 Day 4
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // EXAMPLE TEMPLATES LIBRARY (W24.4.3)
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        const EXAMPLES = [
+            {
+                name: "Simple Equals",
+                filter: 'category = "electronics"',
+                description: "Match exact string value"
+            },
+            {
+                name: "Numeric Range",
+                filter: 'price >= 10 AND price <= 100',
+                description: "Price between 10 and 100"
+            },
+            {
+                name: "BETWEEN",
+                filter: 'price BETWEEN 10 AND 100',
+                description: "Inclusive range (cleaner syntax)"
+            },
+            {
+                name: "IN List",
+                filter: 'status IN ["active", "pending", "review"]',
+                description: "Match any value in array"
+            },
+            {
+                name: "NOT IN",
+                filter: 'category NOT IN ["deleted", "archived"]',
+                description: "Exclude values in array"
+            },
+            {
+                name: "Boolean Logic",
+                filter: 'category = "books" AND price < 20 AND rating > 4.0',
+                description: "Multiple AND conditions"
+            },
+            {
+                name: "OR Conditions",
+                filter: 'category = "books" OR category = "movies"',
+                description: "Match either condition"
+            },
+            {
+                name: "NOT Negation",
+                filter: 'NOT (status = "deleted")',
+                description: "Negate a condition"
+            },
+            {
+                name: "String CONTAINS",
+                filter: 'description CONTAINS "vector"',
+                description: "Substring match"
+            },
+            {
+                name: "STARTS_WITH",
+                filter: 'name STARTS_WITH "GPU"',
+                description: "Prefix match"
+            },
+            {
+                name: "ENDS_WITH",
+                filter: 'filename ENDS_WITH ".pdf"',
+                description: "Suffix match"
+            },
+            {
+                name: "LIKE Pattern",
+                filter: 'sku LIKE "GPU_%"',
+                description: "SQL-style pattern (% = any, _ = single)"
+            },
+            {
+                name: "IS NULL",
+                filter: 'description IS NULL',
+                description: "Field missing or null"
+            },
+            {
+                name: "IS NOT NULL",
+                filter: 'category IS NOT NULL',
+                description: "Field exists with value"
+            },
+            {
+                name: "Complex Nested",
+                filter: '(category = "electronics" AND price < 500) OR (category = "books" AND rating > 4.5)',
+                description: "Nested boolean expressions"
+            },
+            {
+                name: "Multi-field Query",
+                filter: 'category = "gpu" AND brand IN ["nvidia", "amd"] AND price BETWEEN 200 AND 1000 AND in_stock = true',
+                description: "Real-world product search"
+            }
+        ];
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // COMMON ERROR FIXES (W24.4.4)
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        const ERROR_FIXES = {
+            // Unquoted string values
+            '= ([a-zA-Z][a-zA-Z0-9_]*)(?!["\'])': (match, value) => ({
+                suggestion: `Did you forget quotes? Try: = "${value}"`,
+                fix: `= "${value}"`
+            }),
+            // Missing closing quote
+            '"[^"]*$': () => ({
+                suggestion: 'Missing closing quote "',
+                fix: null
+            }),
+            // Missing closing paren
+            '\\([^)]*$': () => ({
+                suggestion: 'Missing closing parenthesis )',
+                fix: null
+            }),
+            // Common typos
+            'BEETWEEN': () => ({ suggestion: 'Did you mean BETWEEN?', fix: 'BETWEEN' }),
+            'CONTIANS': () => ({ suggestion: 'Did you mean CONTAINS?', fix: 'CONTAINS' }),
+            'STATRSWITH': () => ({ suggestion: 'Did you mean STARTS_WITH?', fix: 'STARTS_WITH' }),
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // DOM REFERENCES
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        const filterInput = document.getElementById('filter-input');
+        const statusIcon = document.getElementById('status-icon');
+        const statusMessage = document.getElementById('status-message');
+        const btnParse = document.getElementById('btn-parse');
+        const btnClear = document.getElementById('btn-clear');
+        const errorDisplay = document.getElementById('error-display');
+        const examplesGrid = document.getElementById('examples-grid');
+        const astOutput = document.getElementById('ast-output');
+        const jsonOutput = document.getElementById('json-output');
+        const filterInfo = document.getElementById('filter-info');
+        const loadingPlaceholder = document.getElementById('loading-placeholder');
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+
+        // Tab elements
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // STATE
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        let wasmModule = null;
+        let parseTimeout = null;
+        const DEBOUNCE_MS = 150;
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // THEME TOGGLE
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('edgevec-theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = savedTheme || (prefersDark ? 'dark' : 'dark'); // Default to dark
+            setTheme(theme);
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('edgevec-theme', theme);
+            themeIcon.textContent = theme === 'dark' ? '\u263E' : '\u2600'; // Moon or Sun
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // WASM INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        async function initWasm() {
+            try {
+                // Try to load from pkg directory (local development)
+                const wasmPath = '../pkg/edgevec.js';
+                wasmModule = await import(wasmPath);
+                await wasmModule.default();
+
+                loadingPlaceholder.innerHTML = '<span style="color: var(--green);">WASM module loaded. Enter a filter expression above.</span>';
+                filterInput.focus();
+
+                return true;
+            } catch (err) {
+                console.error('Failed to load WASM:', err);
+                loadingPlaceholder.innerHTML = `
+                    <div style="color: var(--red); text-align: center;">
+                        <p style="margin-bottom: 0.5rem;">Failed to load WASM module</p>
+                        <p style="font-size: 0.75rem; color: var(--gray-200);">
+                            Make sure to run: <code>wasm-pack build --target web</code>
+                        </p>
+                        <p style="font-size: 0.75rem; color: var(--gray-300); margin-top: 0.5rem;">
+                            Error: ${err.message}
+                        </p>
+                    </div>
+                `;
+                return false;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // PARSING ENGINE (W24.4.2)
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function parseFilter(filterStr) {
+            if (!wasmModule) {
+                showStatus('error', 'WASM module not loaded');
+                return;
+            }
+
+            if (!filterStr.trim()) {
+                showStatus('info', 'Enter a filter expression');
+                clearOutput();
+                errorDisplay.style.display = 'none';
+                filterInput.classList.remove('valid', 'error');
+                return;
+            }
+
+            try {
+                // Parse the filter
+                const astJson = wasmModule.parse_filter_js(filterStr);
+                const ast = JSON.parse(astJson);
+
+                // Get additional info
+                let info = null;
+                try {
+                    const infoJson = wasmModule.get_filter_info_js(filterStr);
+                    info = JSON.parse(infoJson);
+                } catch (e) {
+                    // Info extraction might fail for some edge cases
+                }
+
+                // Show success
+                showSuccess(ast, info, astJson);
+
+            } catch (err) {
+                // Parse error
+                showError(filterStr, err);
+            }
+        }
+
+        function showStatus(type, message) {
+            statusMessage.textContent = message;
+            statusIcon.className = 'status-icon';
+
+            if (type === 'valid') {
+                statusIcon.textContent = '\u2713'; // Checkmark
+                statusIcon.classList.add('status-valid');
+            } else if (type === 'error') {
+                statusIcon.textContent = '\u2717'; // X
+                statusIcon.classList.add('status-error');
+            } else {
+                statusIcon.textContent = '\u25CF'; // Circle
+                statusIcon.classList.add('status-info');
+            }
+        }
+
+        function showSuccess(ast, info, rawJson) {
+            showStatus('valid', 'Valid filter expression');
+            filterInput.classList.remove('error');
+            filterInput.classList.add('valid');
+            errorDisplay.style.display = 'none';
+
+            // Show AST with syntax highlighting
+            astOutput.innerHTML = syntaxHighlightJson(JSON.stringify(ast, null, 2));
+
+            // Show raw JSON
+            jsonOutput.textContent = rawJson;
+
+            // Show filter info
+            if (info) {
+                filterInfo.innerHTML = `
+                    <div class="info-card">
+                        <div class="info-label">Complexity</div>
+                        <div class="info-value">${info.complexity || 'N/A'}</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Node Count</div>
+                        <div class="info-value">${info.node_count || 'N/A'}</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Fields Used</div>
+                        <div class="info-list">${(info.fields || []).join(', ') || 'None'}</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Operators</div>
+                        <div class="info-list">${(info.operators || []).join(', ') || 'None'}</div>
+                    </div>
+                `;
+            } else {
+                filterInfo.innerHTML = '<div class="info-card"><div class="info-label">Info not available</div></div>';
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // ERROR FEEDBACK SYSTEM (W24.4.4)
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function showError(filterStr, err) {
+            showStatus('error', 'Invalid filter expression');
+            filterInput.classList.remove('valid');
+            filterInput.classList.add('error');
+
+            // Parse error details
+            let errorInfo = parseErrorMessage(err);
+
+            // Try to find a fix suggestion
+            let suggestion = findSuggestion(filterStr, errorInfo);
+
+            // Build error display HTML
+            let html = `
+                <div class="error-title">
+                    <span aria-hidden="true">\u26A0</span>
+                    <span>${errorInfo.title || 'Syntax Error'}</span>
+                </div>
+            `;
+
+            // Show error position if available
+            if (errorInfo.position !== undefined && errorInfo.position >= 0) {
+                const { before, error, after } = highlightPosition(filterStr, errorInfo.position);
+                html += `
+                    <div class="error-position">
+                        <div class="error-line">${escapeHtml(before)}<span class="error-marker">${escapeHtml(error || '\u2588')}</span>${escapeHtml(after)}</div>
+                        <div class="error-line">${' '.repeat(before.length)}<span class="error-marker">^</span></div>
+                    </div>
+                `;
+            }
+
+            // Show error message
+            html += `<p style="margin-top: 0.75rem; color: var(--gray-100);">${escapeHtml(errorInfo.message)}</p>`;
+
+            // Show suggestion if available
+            if (suggestion) {
+                html += `
+                    <div class="error-suggestion">
+                        <div class="error-suggestion-title">Did you mean?</div>
+                        <div class="error-suggestion-text"><code>${escapeHtml(suggestion.text)}</code></div>
+                    </div>
+                `;
+
+                if (suggestion.fix) {
+                    html += `
+                        <div class="error-actions">
+                            <button class="btn btn-small" onclick="applyFix('${escapeHtml(suggestion.fix)}')">Apply Fix</button>
+                            <a href="../docs/api/FILTER_SYNTAX.md" target="_blank" class="btn btn-small">View Docs</a>
+                        </div>
+                    `;
+                }
+            }
+
+            errorDisplay.innerHTML = html;
+            errorDisplay.style.display = 'block';
+
+            // Clear output
+            astOutput.innerHTML = '<span style="color: var(--gray-300);">Fix the error above to see parse result</span>';
+            jsonOutput.textContent = '';
+            filterInfo.innerHTML = '';
+        }
+
+        function parseErrorMessage(err) {
+            const errStr = err.toString ? err.toString() : String(err);
+
+            // Try to extract position from error message
+            // Common formats: "at position 10", "position: 10", etc.
+            const posMatch = errStr.match(/position[:\s]+(\d+)/i);
+            const position = posMatch ? parseInt(posMatch[1], 10) : -1;
+
+            // Extract code if present (E001, E002, etc.)
+            const codeMatch = errStr.match(/\b(E\d{3})\b/);
+            const code = codeMatch ? codeMatch[1] : null;
+
+            return {
+                message: errStr,
+                position: position,
+                code: code,
+                title: code ? `Error ${code}` : 'Syntax Error'
+            };
+        }
+
+        function highlightPosition(str, position) {
+            if (position < 0 || position > str.length) {
+                return { before: str, error: '', after: '' };
+            }
+
+            const before = str.substring(0, position);
+            const error = str[position] || '';
+            const after = str.substring(position + 1);
+
+            return { before, error, after };
+        }
+
+        function findSuggestion(filterStr, errorInfo) {
+            // Check for common patterns and suggest fixes
+
+            // 1. Unquoted string after =
+            const unquotedMatch = filterStr.match(/=\s*([a-zA-Z][a-zA-Z0-9_]*)\s*(?:$|AND|OR|\))/i);
+            if (unquotedMatch) {
+                const value = unquotedMatch[1];
+                // Don't suggest quotes for true/false/null
+                if (!['true', 'false', 'null'].includes(value.toLowerCase())) {
+                    return {
+                        text: `"${value}" (add quotes around string values)`,
+                        fix: filterStr.replace(new RegExp(`=\\s*${value}`, 'i'), `= "${value}"`)
+                    };
+                }
+            }
+
+            // 2. Missing closing quote
+            const quotes = (filterStr.match(/"/g) || []).length;
+            if (quotes % 2 !== 0) {
+                return {
+                    text: 'Missing closing quote "',
+                    fix: null
+                };
+            }
+
+            // 3. Missing closing paren
+            const opens = (filterStr.match(/\(/g) || []).length;
+            const closes = (filterStr.match(/\)/g) || []).length;
+            if (opens > closes) {
+                return {
+                    text: `Missing ${opens - closes} closing parenthesis`,
+                    fix: filterStr + ')'.repeat(opens - closes)
+                };
+            }
+
+            // 4. Common typos
+            const typos = {
+                'BEETWEEN': 'BETWEEN',
+                'CONTIANS': 'CONTAINS',
+                'STARTWITH': 'STARTS_WITH',
+                'ENDWITH': 'ENDS_WITH',
+                'STARTSWITH': 'STARTS_WITH',
+                'ENDSWITH': 'ENDS_WITH',
+                'ISNULL': 'IS NULL',
+                'ISNOTNULL': 'IS NOT NULL',
+                'NOTIN': 'NOT IN'
+            };
+
+            for (const [typo, correct] of Object.entries(typos)) {
+                if (filterStr.toUpperCase().includes(typo)) {
+                    return {
+                        text: `Did you mean ${correct}?`,
+                        fix: filterStr.replace(new RegExp(typo, 'gi'), correct)
+                    };
+                }
+            }
+
+            return null;
+        }
+
+        // Global function for fix button
+        window.applyFix = function(fix) {
+            filterInput.value = fix;
+            parseFilter(fix);
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // UTILITY FUNCTIONS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function syntaxHighlightJson(json) {
+            return json
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, (match) => {
+                    let cls = 'json-string';
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                        match = match.slice(0, -1); // Remove colon
+                        return `<span class="${cls}">${match}</span>:`;
+                    }
+                    return `<span class="${cls}">${match}</span>`;
+                })
+                .replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>')
+                .replace(/\bnull\b/g, '<span class="json-null">null</span>')
+                .replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function clearOutput() {
+            astOutput.innerHTML = '<span style="color: var(--gray-300);">Enter a filter expression above</span>';
+            jsonOutput.textContent = '';
+            filterInfo.innerHTML = '';
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // EXAMPLES (W24.4.3)
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function renderExamples() {
+            examplesGrid.innerHTML = EXAMPLES.map((ex, index) => `
+                <button class="example-btn" data-index="${index}" role="listitem" title="${ex.description}">
+                    <span class="example-name">${ex.name}</span>
+                    <span class="example-desc">${ex.description}</span>
+                </button>
+            `).join('');
+        }
+
+        function loadExample(index) {
+            const example = EXAMPLES[index];
+            if (example) {
+                filterInput.value = example.filter;
+                parseFilter(example.filter);
+                filterInput.focus();
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // TABS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        function switchTab(tabId) {
+            // Update buttons
+            tabBtns.forEach(btn => {
+                const isActive = btn.id === tabId;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', isActive);
+            });
+
+            // Update content
+            tabContents.forEach(content => {
+                const isActive = content.id === `content-${tabId.replace('tab-', '')}`;
+                content.classList.toggle('active', isActive);
+                content.hidden = !isActive;
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // EVENT LISTENERS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        // Theme toggle
+        themeToggle.addEventListener('click', toggleTheme);
+
+        // Filter input - debounced parsing (W24.4.2)
+        filterInput.addEventListener('input', (e) => {
+            clearTimeout(parseTimeout);
+            parseTimeout = setTimeout(() => {
+                parseFilter(e.target.value);
+            }, DEBOUNCE_MS);
+        });
+
+        // Parse button
+        btnParse.addEventListener('click', () => {
+            parseFilter(filterInput.value);
+        });
+
+        // Clear button
+        btnClear.addEventListener('click', () => {
+            filterInput.value = '';
+            filterInput.classList.remove('valid', 'error');
+            errorDisplay.style.display = 'none';
+            showStatus('info', 'Enter a filter expression');
+            clearOutput();
+            filterInput.focus();
+        });
+
+        // Examples click
+        examplesGrid.addEventListener('click', (e) => {
+            const btn = e.target.closest('.example-btn');
+            if (btn) {
+                const index = parseInt(btn.dataset.index, 10);
+                loadExample(index);
+            }
+        });
+
+        // Tab switching
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.id));
+        });
+
+        // Keyboard navigation for tabs
+        document.querySelector('.output-tabs').addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                const tabs = Array.from(tabBtns);
+                const currentIndex = tabs.findIndex(t => t.classList.contains('active'));
+                const nextIndex = e.key === 'ArrowRight'
+                    ? (currentIndex + 1) % tabs.length
+                    : (currentIndex - 1 + tabs.length) % tabs.length;
+                tabs[nextIndex].click();
+                tabs[nextIndex].focus();
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        async function init() {
+            initTheme();
+            renderExamples();
+            await initWasm();
+        }
+
+        init();
+    </script>
+</body>
+</html>
