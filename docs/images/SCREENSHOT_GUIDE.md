@@ -1,7 +1,38 @@
 # Screenshot Capture Guide
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Purpose:** Documentation for capturing demo screenshots
+
+---
+
+## Automated Capture (Recommended)
+
+The fastest way to capture all screenshots is using the automated script:
+
+```bash
+# 1. Start the local server (from project root)
+python -m http.server 8080
+
+# 2. In another terminal, install dependencies and run
+cd scripts
+npm install
+npm run screenshots
+
+# Or with custom options
+node capture-screenshots.js --port 8080 --output ../docs/images
+```
+
+**What the script captures:**
+- `playground-dark.png` - Filter Playground with dark theme
+- `playground-light.png` - Filter Playground with light theme
+- `dashboard.png` - Benchmark Dashboard with charts
+- `soft-delete.png` - Soft Delete Demo
+- `demo-catalog.png` - Main Demo Catalog
+
+**Requirements:**
+- Node.js 18+
+- Puppeteer (installed via npm)
+- Local server running on port 8080
 
 ---
 

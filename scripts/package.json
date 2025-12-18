@@ -1,0 +1,13 @@
+{
+  "name": "edgevec-scripts",
+  "version": "1.0.0",
+  "description": "Development scripts for EdgeVec",
+  "private": true,
+  "scripts": {
+    "screenshots": "node capture-screenshots.js",
+    "screenshots:help": "echo 'Usage: npm run screenshots -- --port 8080 --output docs/images'"
+  },
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  }
+}
