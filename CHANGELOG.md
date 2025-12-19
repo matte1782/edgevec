@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.3] - 2025-12-19 — crates.io Publishing Fix
+
+**Type:** Release engineering fix
+
+### Fixed
+
+- **crates.io 413 Payload Too Large** — Package was 28.0 MiB (11.0 MiB compressed), exceeding crates.io's 10 MiB limit
+  - Added `exclude` patterns to Cargo.toml to strip internal development files
+  - Excluded: `docs/`, `tests/`, `.claude/`, `.cursor/`, `.github/`, `benches/competitive/`, `scripts/`
+  - **New size: 1.7 MiB (358 KiB compressed)** — 96% reduction
+
+### Changed
+- Version sync: Cargo.toml and pkg/package.json both at 0.5.3
+- Previous versions: crates.io was stuck at v0.4.0, npm was at v0.5.2
+
+### Note
+This release enables crates.io publishing that was blocked since v0.5.0.
+
+---
+
+## [0.5.2] - 2025-12-19 — npm TypeScript Compilation Fix
+
+**Type:** Hotfix
+
+### Fixed
+
+- **npm package missing compiled JavaScript** — v0.5.0/v0.5.1 only included TypeScript source files (`.ts`), not compiled JavaScript (`.js`)
+  - Users with bundlers that don't handle TypeScript got import errors
+  - Added compiled `.js` and `.d.ts` files to pkg/
+
+### Added
+- Week 25 Day 1 metrics documentation
+- Enterprise-grade hostile audit review
+
+---
+
 ## [0.5.1] - 2025-12-19 — README Update
 
 **Type:** Documentation patch
@@ -449,6 +485,8 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
+| 0.5.3 | 2025-12-19 | **FIX:** crates.io publishing (package size reduction) |
+| 0.5.2 | 2025-12-19 | **FIX:** npm TypeScript compilation |
 | 0.5.1 | 2025-12-19 | README update for npm display |
 | 0.5.0 | 2025-12-19 | **Filter API:** 15 SQL-like operators, Filter Playground |
 | 0.4.1 | 2025-12-17 | **HOTFIX:** NPM package snippets fix |
@@ -470,7 +508,9 @@ This version was internal only, not published to crates.io or npm.
 
 ---
 
-[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/matte1782/edgevec/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/matte1782/edgevec/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/matte1782/edgevec/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/matte1782/edgevec/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/matte1782/edgevec/compare/v0.4.0...v0.4.1
