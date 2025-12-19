@@ -75,6 +75,7 @@
     "@types/node": "^20.19.26",
     "typescript": "^5.9.3"
   },
-  "peerDependencies": {},
-  "dependencies": {}
+  "dependencies": {
+    "edgevec": "^0.5.1"
+  }
 }
