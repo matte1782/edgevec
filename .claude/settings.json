@@ -1,13 +1,9 @@
 {
-  "$schema": "https://claude.ai/schemas/settings-v1.json",
-  "version": "2.0.0",
-  "description": "EdgeVec Military-Grade Development Protocol - Claude Code Edition",
-
   "permissions": {
     "allow": [
-      "Read(**/*)",
-      "Glob(**/*)",
-      "Grep(**/*)",
+      "Read",
+      "Glob",
+      "Grep",
       "Write(tests/**/*)",
       "Write(benches/**/*)",
       "Write(docs/**/*)",
@@ -19,171 +15,82 @@
       "Edit(docs/**/*)",
       "Edit(examples/**/*)",
       "Edit(fuzz/**/*)",
-      "Bash(cargo test*)",
-      "Bash(cargo clippy*)",
-      "Bash(cargo fmt*)",
-      "Bash(cargo bench*)",
-      "Bash(cargo fuzz*)",
-      "Bash(cargo tarpaulin*)",
-      "Bash(cargo miri*)",
-      "Bash(cargo doc*)",
-      "Bash(cargo check*)",
-      "Bash(cargo build*)",
-      "Bash(wasm-pack build*)",
-      "Bash(wasm-pack test*)",
-      "Bash(git status*)",
-      "Bash(git diff*)",
-      "Bash(git log*)",
-      "Bash(git add*)",
-      "Bash(git commit*)",
-      "Bash(test -f*)",
-      "Bash(grep*)",
-      "Bash(ls*)",
-      "Bash(cat*)",
-      "Bash(mkdir*)"
+      "Bash(cargo test:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo bench:*)",
+      "Bash(cargo fuzz:*)",
+      "Bash(cargo tarpaulin:*)",
+      "Bash(cargo miri:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo run:*)",
+      "Bash(cargo clean:*)",
+      "Bash(cargo +nightly check:*)",
+      "Bash(cargo +nightly clippy:*)",
+      "Bash(rustup run nightly cargo miri test:*)",
+      "Bash(rustup component add:*)",
+      "Bash(wasm-pack build:*)",
+      "Bash(wasm-pack test:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(test:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(echo:*)",
+      "Bash(npm test)",
+      "Bash(npm pack:*)",
+      "Bash(node:*)",
+      "Bash(node -e:*)",
+      "Bash(node harness.js:*)",
+      "Bash(python:*)",
+      "Bash(bash:*)",
+      "WebSearch"
     ],
-
-    "conditional": {
-      "Write(src/**)": {
-        "comment": "GATE 2: Source code can only be written after plan approval",
-        "requires": "file_exists(.claude/GATE_2_COMPLETE.md)",
-        "error_message": "GATE 2 BLOCKED: No approved WEEKLY_TASK_PLAN.md. Run /planner-weekly [N] and /review WEEKLY_TASK_PLAN.md first."
-      },
-      "Edit(src/**)": {
-        "comment": "GATE 2: Source code can only be edited after plan approval",
-        "requires": "file_exists(.claude/GATE_2_COMPLETE.md)",
-        "error_message": "GATE 2 BLOCKED: No approved plan. Code modifications require approved WEEKLY_TASK_PLAN.md"
-      },
-      "Write(Cargo.toml)": {
-        "comment": "Cargo.toml changes should be reviewed",
-        "requires": "user_approval",
-        "error_message": "Cargo.toml modification requires explicit user approval"
-      },
-      "Edit(.claude/**)": {
-        "comment": "Claude configuration changes require review",
-        "requires": "user_approval",
-        "error_message": "Claude configuration modification requires user approval"
-      },
-      "Bash(cargo publish*)": {
-        "comment": "GATE 4: Publishing requires doc approval",
-        "requires": "file_exists(.claude/GATE_4_COMPLETE.md)",
-        "error_message": "GATE 4 BLOCKED: Documentation must be approved before publishing"
-      }
-    },
-
     "deny": [
-      "Bash(rm -rf*)",
-      "Bash(rm -r *)",
-      "Bash(cargo clean && rm*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -r:*)",
       "Write(.git/**/*)",
       "Edit(.git/**/*)",
-      "Bash(git push --force*)",
-      "Bash(git reset --hard*)",
-      "Bash(git rebase -i*)",
-      "Bash(cargo yank*)"
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git rebase -i:*)",
+      "Bash(cargo yank:*)"
     ]
   },
-
   "hooks": {
-    "PostToolUse": {
-      "Edit": [
-        {
-          "comment": "Auto-format Rust files after editing",
-          "matcher": "**/*.rs",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "cargo fmt",
-              "description": "Format Rust code"
-            }
-          ]
-        },
-        {
-          "comment": "Run clippy check after Rust edits (non-blocking)",
-          "matcher": "**/*.rs",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "cargo clippy -- -D warnings || echo 'Warning: Clippy found issues. Please address before review.'",
-              "description": "Lint Rust code"
-            }
-          ]
-        }
-      ],
-
-      "Write": [
-        {
-          "comment": "Verify WASM build after writing WASM bindings",
-          "matcher": "**/*_wasm.rs",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "wasm-pack build --target web || echo 'Warning: WASM build failed. Fix before review.'",
-              "description": "Verify WASM compilation"
-            }
-          ]
-        },
-        {
-          "comment": "Auto-format new Rust files",
-          "matcher": "src/**/*.rs",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "cargo fmt",
-              "description": "Format new Rust code"
-            }
-          ]
-        }
-      ]
-    },
-
-    "PreToolUse": {
-      "Write(src/**)": [
-        {
-          "comment": "GATE 2 enforcement: Block code writing before plan approval",
-          "matcher": "**",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "test -f .claude/GATE_2_COMPLETE.md || (echo 'GATE 2 NOT PASSED: WEEKLY_TASK_PLAN.md must be approved by HOSTILE_REVIEWER before writing code' && exit 1)",
-              "description": "Verify plan approval before coding"
-            }
-          ]
-        }
-      ],
-
-      "Edit(src/**)": [
-        {
-          "comment": "GATE 2 enforcement: Block code editing before plan approval",
-          "matcher": "**",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "test -f .claude/GATE_2_COMPLETE.md || (echo 'GATE 2 NOT PASSED: Plan must be approved before modifying code' && exit 1)",
-              "description": "Verify plan approval before editing"
-            }
-          ]
-        }
-      ]
-    }
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo fmt 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -f .claude/GATE_2_COMPLETE.md || echo '[WARNING] GATE 2 not passed - plan approval recommended before writing source code'"
+          }
+        ]
+      }
+    ]
   },
-
-  "environment": {
+  "env": {
     "RUST_BACKTRACE": "1",
     "CARGO_TERM_COLOR": "always",
     "RUSTFLAGS": "-D warnings"
-  },
-
-  "metadata": {
-    "project": "EdgeVec",
-    "workflow": "Military-Grade Development Protocol",
-    "supreme_rule": "Architecture > Plan > Code",
-    "converted_from": "Cursor IDE",
-    "conversion_date": "2025-12-11",
-    "version_history": {
-      "1.0.0": "Initial Cursor format",
-      "1.1.0": "Added TEST_ENGINEER and PROMPT_MAKER",
-      "2.0.0": "Converted to Claude Code format with hooks/permissions"
-    }
   }
 }

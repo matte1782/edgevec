@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.1] - 2025-12-19 — README Update
+
+**Type:** Documentation patch
+
+### Changed
+- Updated `pkg/README.md` with v0.5.0 Filter API content for npm display
+- Tagline: "The first WASM-native vector database"
+- Added Filter API Quick Start example with `Filter.parse()`
+- Updated version references from v0.4.0 to v0.5.0
+
+### Note
+No code changes. This release ensures npm displays the correct v0.5.0 documentation.
+
+---
+
 ## [0.5.0] - 2025-12-19 — Filter API Release
 
 **Focus:** Metadata filtering — The feature that transforms EdgeVec from a search library into a vector database.
@@ -434,6 +449,8 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
+| 0.5.1 | 2025-12-19 | README update for npm display |
+| 0.5.0 | 2025-12-19 | **Filter API:** 15 SQL-like operators, Filter Playground |
 | 0.4.1 | 2025-12-17 | **HOTFIX:** NPM package snippets fix |
 | 0.4.0 | 2025-12-16 | Documentation sprint, P99 tracking, chaos testing |
 | 0.3.0 | 2025-12-15 | Soft delete API, compaction, dual-license |
@@ -453,7 +470,9 @@ This version was internal only, not published to crates.io or npm.
 
 ---
 
-[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/matte1782/edgevec/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/matte1782/edgevec/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/matte1782/edgevec/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/matte1782/edgevec/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/matte1782/edgevec/compare/v0.2.1...v0.3.0
