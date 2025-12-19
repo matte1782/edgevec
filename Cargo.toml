@@ -22,6 +22,54 @@ keywords = ["vector", "database", "wasm", "hnsw", "similarity-search"]
 categories = ["database", "wasm", "algorithms"]
 autobenches = false  # Disable auto-detection of bench targets (recall_bench is a [[bin]])
 
+# =============================================================================
+# PACKAGE EXCLUSIONS — Reduce crate size for crates.io (max 10 MiB)
+# =============================================================================
+# Internal development files that users don't need:
+exclude = [
+    # IDE configuration directories
+    ".claude/",
+    ".cursor/",
+    ".github/",
+
+    # ALL internal documentation - users get README + rustdoc
+    "docs/",
+
+    # Test files (users run their own tests)
+    "tests/",
+
+    # Benchmark data and tooling (users don't need our benchmarks)
+    "benches/baselines.json",
+    "benches/baselines.json.bak",
+    "benches/competitive/",      # Node.js competitive benchmarks with node_modules
+    "benches/*.py",              # Python benchmark scripts
+
+    # NPM package output (separate distribution)
+    "pkg/",
+
+    # Workspace members (published separately or internal)
+    "xtask/",
+
+    # Gate files (internal process tracking)
+    "GATE_*.md",
+
+    # Misc internal files
+    ".cursorrules",
+    "CONTRIBUTING.md",
+    "CLAUDE.md",                 # Internal dev rules
+
+    # Build/dev scripts (not needed by library users)
+    "scripts/",
+
+    # Test artifacts and data
+    "proptest-regressions/",
+    "*.wal",                     # WAL test files
+    "*.tgz",                     # Old tarballs
+
+    # WASM test files (published via npm, not crates.io)
+    "wasm/__tests__/",
+]
+
 [lib]
 name = "edgevec"
 crate-type = ["lib", "cdylib"]
