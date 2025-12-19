@@ -12,7 +12,7 @@ exclude = ["fuzz"]  # Fuzz crate uses cargo-fuzz which manages its own workspace
 
 [package]
 name = "edgevec"
-version = "0.5.0"
+version = "0.5.3"
 edition = "2021"
 rust-version = "1.70"
 description = "High-performance embedded vector database for Browser, Node, and Edge"

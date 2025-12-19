@@ -2,7 +2,7 @@
   "name": "edgevec",
   "type": "module",
   "description": "WASM-native vector database with SQL-like filtering, persistence, and soft delete",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
