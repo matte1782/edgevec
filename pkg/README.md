@@ -1,41 +1,37 @@
 # 🚀 `EdgeVec`
 
 [![CI](https://github.com/matte1782/edgevec/actions/workflows/ci.yml/badge.svg)](https://github.com/matte1782/edgevec/actions/workflows/ci.yml)
-[![Performance](https://github.com/matte1782/edgevec/actions/workflows/benchmark.yml/badge.svg)](https://github.com/matte1782/edgevec/actions/workflows/benchmark.yml)
+[![npm](https://img.shields.io/npm/v/edgevec.svg)](https://www.npmjs.com/package/edgevec)
 [![Crates.io](https://img.shields.io/crates/v/edgevec.svg)](https://crates.io/crates/edgevec)
 [![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/matte1782/edgevec/blob/main/LICENSE-MIT)
 
-**High-performance vector search for Browser, Node, and Edge**
+**The first WASM-native vector database. Filter, delete, persist — all in the browser.**
 
-> ✅ **STATUS: Alpha Release Ready** — All performance targets exceeded.
+> ✅ **STATUS: v0.5.0 Released** — Filter API with 15 SQL-like operators.
 
 ---
 
-## What's New in v0.4.0
+## What's New in v0.5.0
 
-### Documentation & Quality Sprint
-- **`docs/TUTORIAL.md`** — Complete getting started guide
-- **`docs/PERFORMANCE_TUNING.md`** — HNSW parameter optimization
-- **`docs/TROUBLESHOOTING.md`** — Top 10 errors and solutions
-- **`docs/INTEGRATION_GUIDE.md`** — Third-party embedding integrations
-- **`docs/MIGRATION.md`** — Migration from hnswlib, FAISS, Pinecone
+### Filter API — SQL-like Metadata Filtering
+- **15 operators**: `=`, `!=`, `>`, `<`, `>=`, `<=`, `IN`, `NOT IN`, `CONTAINS`, `STARTS_WITH`, `ENDS_WITH`, `IS NULL`, `IS NOT NULL`, `AND`, `OR`, `NOT`
+- **Parser + Evaluator** in pure TypeScript (no WASM overhead for filtering)
+- **Type-safe FilterBuilder** for programmatic query construction
+- **24h fuzz tested** — 14.4 billion executions, 0 crashes
 
-### Benchmark Dashboard
-- **Interactive visualization** at `/wasm/examples/benchmark-dashboard.html`
-- EdgeVec vs hnswlib-node vs voy comparison
-- Real-time performance charts with Chart.js
+### Interactive Demos
+- **Filter Playground** — Live syntax parsing with AST visualization
+- **WCAG 2.1 AA accessible** — All demos keyboard navigable
 
-### Quality Infrastructure
-- **Chaos Testing** — 15 edge case tests (empty index, max dimensions, etc.)
-- **Load Testing** — 100k vector stress tests, sustained search load
-- **P99 Latency Tracking** — P50/P99/P999 percentile benchmarks
-- **CI Regression Detection** — 10% threshold enforcement
+### Documentation
+- **Filter Syntax Reference** — Complete operator documentation
+- **Database Operations Guide** — CRUD patterns with filtering
+- **Comparison Guide** — EdgeVec vs Pinecone/Qdrant/hnswlib
 
-### Previous (v0.3.0)
-- Soft delete API with O(1) tombstone-based deletion
-- Compaction API for reclaiming space
-- Full WASM bindings for soft delete operations
-- Persistence format v0.3 with automatic migration
+### Previous Versions
+- **v0.4.0** — Documentation sprint, benchmark dashboard, chaos testing
+- **v0.3.0** — Soft delete API, compaction, persistence format v3
+- **v0.2.0** — Scalar quantization (SQ8), SIMD optimization
 
 ---
 
@@ -75,7 +71,7 @@ Without this configuration, performance will be 60-78% slower due to missing SIM
 ### Browser/Node.js Usage
 
 ```javascript
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig, Filter } from 'edgevec';
 
 async function main() {
     // 1. Initialize WASM (required once)
@@ -84,21 +80,24 @@ async function main() {
     // 2. Create Config and Index
     const config = new EdgeVecConfig(128);  // 128 dimensions
     config.metric = 'cosine';  // Optional: 'l2', 'cosine', or 'dot'
-    const index = new EdgeVec(config);
+    const db = new EdgeVec(config);
 
-    // 3. Insert Vectors
+    // 3. Insert Vectors with metadata
     const vector = new Float32Array(128).fill(0.1);
-    const id = index.insert(vector);
-    console.log(`Inserted vector with ID: ${id}`);
+    const id = db.insert(vector);
+    const metadata = { [id]: { category: "books", price: 29.99 } };
 
     // 4. Search
     const query = new Float32Array(128).fill(0.1);
-    const results = index.search(query, 10);
-    console.log("Results:", results);
-    // Results: [{ id: 0, score: 0.0 }, ...]
+    const results = db.search(query, 10);
 
-    // 5. Save to IndexedDB (browser) or file system
-    await index.save("my-vector-db");
+    // 5. Filter with SQL-like syntax (v0.5+)
+    const filter = Filter.parse('category = "books" AND price < 50');
+    const filtered = results.filter(r => filter.evaluate(metadata[r.id]));
+    console.log("Filtered:", filtered);
+
+    // 6. Save to IndexedDB (browser) or file system
+    await db.save("my-vector-db");
 }
 
 main().catch(console.error);
@@ -343,7 +342,8 @@ python -m http.server 8080
 - ✅ **Crash Recovery (WAL)** — Log-based replay
 - ✅ **Atomic Snapshots** — Safe background saving
 - ✅ **Browser Integration** — WASM Bindings + IndexedDB
-- ✅ **npm Package** — `edgevec@0.4.0` published
+- ✅ **npm Package** — `edgevec@0.5.0` published
+- ✅ **Filter API** — 15 SQL-like operators with fuzz testing
 
 **Development Progress:**
 - Phase 0: Environment Setup — ✅ COMPLETE
@@ -353,17 +353,17 @@ python -m http.server 8080
 - Phase 4: WASM Integration — ✅ COMPLETE
 - Phase 5: Alpha Release — ✅ **READY**
 
-### Future Roadmap (v0.5.0+)
+### Future Roadmap (v0.6.0+)
 
 1. **ARM/NEON Optimization** — Cross-platform SIMD verification
 2. **Mobile Support** — iOS Safari and Android Chrome formalized
-3. **CLI Tools** — Optional developer command-line interface
-4. **Enhanced Metadata Storage** — Native metadata support
+3. **Native Metadata Storage** — Metadata stored alongside vectors
+4. **Pre-filtering** — Filter before search for improved efficiency
 
 ### Path to v1.0
 
 EdgeVec will reach v1.0 after:
-- Production usage feedback from v0.4.0/v0.5.0
+- Production usage feedback from v0.5.0
 - Security audit
 - API stability guarantee commitment
 
@@ -395,7 +395,7 @@ Measured using `index.memory_usage() + storage.memory_usage()` after building 10
 
 | Package | Size (Gzipped) | Target | Status |
 |:--------|:---------------|:-------|:-------|
-| `edgevec@0.4.0` | **227 KB** | <500 KB | ✅ **55% under** |
+| `edgevec@0.5.0` | **227 KB** | <500 KB | ✅ **55% under** |
 
 ### Competitive Comparison (10k vectors, 128 dimensions)
 
