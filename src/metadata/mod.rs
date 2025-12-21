@@ -80,12 +80,14 @@
 //! - `store` - `MetadataStore` for CRUD operations (Day 2)
 
 mod error;
+mod serialize;
 mod store;
 mod types;
 pub mod validation;
 
 // Re-export public types at module level
 pub use error::MetadataError;
+pub use serialize::SerializationError;
 pub use store::MetadataStore;
 pub use types::MetadataValue;
 

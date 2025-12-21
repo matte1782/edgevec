@@ -14,6 +14,29 @@ pub const VERSION_MINOR: u8 = 3;
 /// Minimum supported minor version for migration
 pub const VERSION_MINOR_MIN: u8 = 1;
 
+/// Magic number for metadata section: "META" = [0x4D, 0x45, 0x54, 0x41]
+pub const METADATA_MAGIC: [u8; 4] = *b"META";
+
+/// Current metadata section version
+pub const METADATA_VERSION: u16 = 1;
+
+/// Serialization format: Postcard (binary, compact)
+pub const FORMAT_POSTCARD: u8 = 1;
+
+/// Serialization format: JSON (text, debugging)
+pub const FORMAT_JSON: u8 = 2;
+
+/// File format flags
+#[allow(non_snake_case)]
+pub mod Flags {
+    /// Data is compressed
+    pub const COMPRESSED: u16 = 1 << 0;
+    /// Vectors are quantized
+    pub const QUANTIZED: u16 = 1 << 1;
+    /// MetadataStore is present (v0.4+)
+    pub const HAS_METADATA: u16 = 1 << 2;
+}
+
 /// File header for .evec index files.
 ///
 /// # Layout
@@ -81,6 +104,209 @@ pub struct FileHeader {
 // Static assertions for size and alignment
 const _: () = assert!(size_of::<FileHeader>() == 64);
 const _: () = assert!(align_of::<FileHeader>() == 8);
+
+/// Metadata section header (16 bytes).
+///
+/// Placed after tombstone bitvec when `Flags::HAS_METADATA` flag is set.
+///
+/// # Layout
+///
+/// Total size: 16 bytes
+/// Alignment: 4 bytes
+///
+/// | Offset | Size | Field    | Description                      |
+/// |--------|------|----------|----------------------------------|
+/// | 0      | 4    | magic    | "META" = [0x4D, 0x45, 0x54, 0x41]|
+/// | 4      | 2    | version  | Section format version (1)       |
+/// | 6      | 1    | format   | Serialization format (1=Postcard)|
+/// | 7      | 1    | reserved | Reserved for future use (0)      |
+/// | 8      | 4    | size     | Size of serialized metadata      |
+/// | 12     | 4    | crc      | CRC32 of serialized metadata     |
+///
+/// # Thread Safety
+///
+/// This type is `Send + Sync` as it is a POD struct.
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[repr(C)]
+pub struct MetadataSectionHeader {
+    /// Magic number: "META" = [0x4D, 0x45, 0x54, 0x41]
+    pub magic: [u8; 4],
+
+    /// Section format version (currently 1)
+    pub version: u16,
+
+    /// Serialization format: 1=Postcard, 2=JSON
+    pub format: u8,
+
+    /// Reserved for future use (must be 0)
+    pub reserved: u8,
+
+    /// Size of serialized metadata in bytes
+    pub size: u32,
+
+    /// CRC32 of serialized metadata bytes
+    pub crc: u32,
+}
+
+// Static assertions for MetadataSectionHeader size and alignment
+const _: () = assert!(size_of::<MetadataSectionHeader>() == 16);
+const _: () = assert!(align_of::<MetadataSectionHeader>() == 4);
+
+impl MetadataSectionHeader {
+    /// The expected magic bytes "META".
+    pub const MAGIC: [u8; 4] = METADATA_MAGIC;
+
+    /// The current section version.
+    pub const VERSION: u16 = METADATA_VERSION;
+
+    /// Postcard serialization format identifier.
+    pub const FORMAT_POSTCARD: u8 = FORMAT_POSTCARD;
+
+    /// JSON serialization format identifier.
+    pub const FORMAT_JSON: u8 = FORMAT_JSON;
+
+    /// Creates a new `MetadataSectionHeader` for Postcard-serialized metadata.
+    #[must_use]
+    pub fn new_postcard(size: u32, crc: u32) -> Self {
+        Self {
+            magic: Self::MAGIC,
+            version: Self::VERSION,
+            format: Self::FORMAT_POSTCARD,
+            reserved: 0,
+            size,
+            crc,
+        }
+    }
+
+    /// Creates a new `MetadataSectionHeader` for JSON-serialized metadata.
+    #[must_use]
+    pub fn new_json(size: u32, crc: u32) -> Self {
+        Self {
+            magic: Self::MAGIC,
+            version: Self::VERSION,
+            format: Self::FORMAT_JSON,
+            reserved: 0,
+            size,
+            crc,
+        }
+    }
+
+    /// Returns the byte representation of the header.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8; 16] {
+        bytemuck::cast_ref(self)
+    }
+
+    /// Parses a `MetadataSectionHeader` from bytes.
+    ///
+    /// # Requirements
+    ///
+    /// - `bytes` must be at least 16 bytes
+    /// - `bytes` must be 4-byte aligned
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if:
+    /// - Buffer is less than 16 bytes
+    /// - Buffer is not 4-byte aligned
+    /// - Magic number is invalid
+    /// - Version is unsupported
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, MetadataHeaderError> {
+        if bytes.len() < 16 {
+            return Err(MetadataHeaderError::BufferTooShort(bytes.len()));
+        }
+
+        let header = *bytemuck::try_from_bytes::<MetadataSectionHeader>(&bytes[..16])
+            .map_err(|_| MetadataHeaderError::UnalignedBuffer)?;
+
+        header.validate_magic()?;
+        header.validate_version()?;
+        header.validate_format()?;
+
+        Ok(header)
+    }
+
+    /// Validates the magic bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns `MetadataHeaderError::InvalidMagic` if magic bytes don't match "META".
+    pub fn validate_magic(&self) -> Result<(), MetadataHeaderError> {
+        if self.magic != Self::MAGIC {
+            return Err(MetadataHeaderError::InvalidMagic(self.magic));
+        }
+        Ok(())
+    }
+
+    /// Validates the version is supported.
+    ///
+    /// # Errors
+    ///
+    /// Returns `MetadataHeaderError::UnsupportedVersion` if version is newer than current.
+    pub fn validate_version(&self) -> Result<(), MetadataHeaderError> {
+        if self.version > Self::VERSION {
+            return Err(MetadataHeaderError::UnsupportedVersion(self.version));
+        }
+        Ok(())
+    }
+
+    /// Validates the serialization format is supported.
+    ///
+    /// # Errors
+    ///
+    /// Returns `MetadataHeaderError::UnsupportedFormat` if format is not 1 (Postcard) or 2 (JSON).
+    pub fn validate_format(&self) -> Result<(), MetadataHeaderError> {
+        if self.format != Self::FORMAT_POSTCARD && self.format != Self::FORMAT_JSON {
+            return Err(MetadataHeaderError::UnsupportedFormat(self.format));
+        }
+        Ok(())
+    }
+
+    /// Returns true if this header uses Postcard serialization.
+    #[must_use]
+    pub fn is_postcard(&self) -> bool {
+        self.format == Self::FORMAT_POSTCARD
+    }
+
+    /// Returns true if this header uses JSON serialization.
+    #[must_use]
+    pub fn is_json(&self) -> bool {
+        self.format == Self::FORMAT_JSON
+    }
+}
+
+/// Errors that can occur during metadata header parsing.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum MetadataHeaderError {
+    /// Invalid magic number.
+    #[error("invalid metadata magic: expected 'META', got {0:?}")]
+    InvalidMagic([u8; 4]),
+
+    /// Unsupported version.
+    #[error("unsupported metadata version: {0}")]
+    UnsupportedVersion(u16),
+
+    /// Unsupported serialization format.
+    #[error("unsupported serialization format: {0}")]
+    UnsupportedFormat(u8),
+
+    /// Buffer too short.
+    #[error("buffer too short: expected 16 bytes, got {0}")]
+    BufferTooShort(usize),
+
+    /// Buffer is not 4-byte aligned.
+    #[error("buffer is not 4-byte aligned")]
+    UnalignedBuffer,
+
+    /// CRC mismatch.
+    #[error("CRC mismatch: expected {expected:#x}, got {actual:#x}")]
+    CrcMismatch {
+        /// Expected CRC (from header)
+        expected: u32,
+        /// Actual calculated CRC
+        actual: u32,
+    },
+}
 
 /// Errors that can occur during header parsing.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -298,5 +524,115 @@ mod tests {
         let slice = &buf[1..65];
         let result = FileHeader::from_bytes(slice);
         assert!(matches!(result, Err(HeaderError::UnalignedBuffer)));
+    }
+
+    // =========================================================================
+    // MetadataSectionHeader tests
+    // =========================================================================
+
+    #[test]
+    fn test_metadata_header_layout() {
+        assert_eq!(size_of::<MetadataSectionHeader>(), 16);
+        assert_eq!(align_of::<MetadataSectionHeader>(), 4);
+    }
+
+    #[test]
+    fn test_metadata_header_new_postcard() {
+        let header = MetadataSectionHeader::new_postcard(1024, 0xDEADBEEF);
+
+        assert_eq!(header.magic, *b"META");
+        assert_eq!(header.version, 1);
+        assert_eq!(header.format, FORMAT_POSTCARD);
+        assert_eq!(header.reserved, 0);
+        assert_eq!(header.size, 1024);
+        assert_eq!(header.crc, 0xDEADBEEF);
+        assert!(header.is_postcard());
+        assert!(!header.is_json());
+    }
+
+    #[test]
+    fn test_metadata_header_new_json() {
+        let header = MetadataSectionHeader::new_json(2048, 0xCAFEBABE);
+
+        assert_eq!(header.magic, *b"META");
+        assert_eq!(header.version, 1);
+        assert_eq!(header.format, FORMAT_JSON);
+        assert_eq!(header.reserved, 0);
+        assert_eq!(header.size, 2048);
+        assert_eq!(header.crc, 0xCAFEBABE);
+        assert!(!header.is_postcard());
+        assert!(header.is_json());
+    }
+
+    #[test]
+    fn test_metadata_header_roundtrip() {
+        let header = MetadataSectionHeader::new_postcard(512, 0x12345678);
+        let bytes = header.as_bytes();
+
+        assert_eq!(bytes.len(), 16);
+
+        let decoded = MetadataSectionHeader::from_bytes(bytes).unwrap();
+        assert_eq!(decoded.magic, header.magic);
+        assert_eq!(decoded.version, header.version);
+        assert_eq!(decoded.format, header.format);
+        assert_eq!(decoded.size, header.size);
+        assert_eq!(decoded.crc, header.crc);
+    }
+
+    #[test]
+    fn test_metadata_header_invalid_magic() {
+        let mut header = MetadataSectionHeader::new_postcard(0, 0);
+        header.magic = [0x00, 0x00, 0x00, 0x00];
+
+        let bytes = header.as_bytes();
+        let result = MetadataSectionHeader::from_bytes(bytes);
+        assert!(matches!(result, Err(MetadataHeaderError::InvalidMagic(_))));
+    }
+
+    #[test]
+    fn test_metadata_header_unsupported_version() {
+        let mut header = MetadataSectionHeader::new_postcard(0, 0);
+        header.version = 99; // Future version
+
+        let bytes = header.as_bytes();
+        let result = MetadataSectionHeader::from_bytes(bytes);
+        assert!(matches!(
+            result,
+            Err(MetadataHeaderError::UnsupportedVersion(99))
+        ));
+    }
+
+    #[test]
+    fn test_metadata_header_unsupported_format() {
+        let mut header = MetadataSectionHeader::new_postcard(0, 0);
+        header.format = 99; // Unknown format
+
+        let bytes = header.as_bytes();
+        let result = MetadataSectionHeader::from_bytes(bytes);
+        assert!(matches!(
+            result,
+            Err(MetadataHeaderError::UnsupportedFormat(99))
+        ));
+    }
+
+    #[test]
+    fn test_metadata_header_buffer_too_short() {
+        let bytes = [0u8; 8]; // Only 8 bytes, need 16
+        let result = MetadataSectionHeader::from_bytes(&bytes);
+        assert!(matches!(
+            result,
+            Err(MetadataHeaderError::BufferTooShort(8))
+        ));
+    }
+
+    #[test]
+    fn test_flags_constants() {
+        assert_eq!(Flags::COMPRESSED, 0b0001);
+        assert_eq!(Flags::QUANTIZED, 0b0010);
+        assert_eq!(Flags::HAS_METADATA, 0b0100);
+
+        // Flags should be combinable
+        let combined = Flags::COMPRESSED | Flags::HAS_METADATA;
+        assert_eq!(combined, 0b0101);
     }
 }

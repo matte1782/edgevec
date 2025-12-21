@@ -20,7 +20,11 @@ pub mod wal;
 pub mod writer;
 
 pub use chunking::ChunkedWriter;
-pub use header::{FileHeader, HeaderError, MAGIC, VERSION_MAJOR, VERSION_MINOR, VERSION_MINOR_MIN};
+pub use header::{
+    FileHeader, Flags, HeaderError, MetadataHeaderError, MetadataSectionHeader, FORMAT_JSON,
+    FORMAT_POSTCARD, MAGIC, METADATA_MAGIC, METADATA_VERSION, VERSION_MAJOR, VERSION_MINOR,
+    VERSION_MINOR_MIN,
+};
 pub use reader::{read_file_header, read_index_header};
 pub use snapshot::{read_snapshot, write_snapshot};
 pub use storage::{MemoryBackend, StorageBackend};
