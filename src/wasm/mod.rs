@@ -1160,6 +1160,227 @@ impl EdgeVec {
     }
 
     // =========================================================================
+    // COMBINED INSERT + METADATA API (v0.6.0 — Week 28 RFC-002)
+    // =========================================================================
+
+    /// Insert a vector with associated metadata in a single operation.
+    ///
+    /// This is a convenience method that combines `insert()` and `setMetadata()`
+    /// into a single atomic operation. The vector is inserted first, then all
+    /// metadata key-value pairs are attached to it.
+    ///
+    /// # Arguments
+    ///
+    /// * `vector` - A Float32Array containing the vector data
+    /// * `metadata` - A JavaScript object with string keys and metadata values
+    ///   - Supported value types: `string`, `number`, `boolean`, `string[]`
+    ///   - Numbers are automatically detected as integer or float
+    ///
+    /// # Returns
+    ///
+    /// The assigned Vector ID (u32).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Vector dimensions mismatch the index configuration
+    /// - Vector contains NaN or Infinity values
+    /// - Metadata key is invalid (empty, too long, or contains invalid characters)
+    /// - Metadata value is invalid (NaN float, string too long, etc.)
+    /// - Too many metadata keys (>64 per vector)
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const id = index.insertWithMetadata(
+    ///     new Float32Array([0.1, 0.2, 0.3, ...]),
+    ///     {
+    ///         category: "news",
+    ///         score: 0.95,
+    ///         active: true,
+    ///         tags: ["featured", "trending"]
+    ///     }
+    /// );
+    /// console.log(`Inserted vector with ID: ${id}`);
+    /// ```
+    #[wasm_bindgen(js_name = "insertWithMetadata")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn insert_with_metadata(
+        &mut self,
+        vector: Float32Array,
+        metadata_js: JsValue,
+    ) -> Result<u32, JsValue> {
+        // Validate vector dimension
+        let len = vector.length();
+        if len != self.inner.config.dimensions {
+            return Err(EdgeVecError::Graph(GraphError::DimensionMismatch {
+                expected: self.inner.config.dimensions as usize,
+                actual: len as usize,
+            })
+            .into());
+        }
+
+        let vec = vector.to_vec();
+
+        #[cfg(debug_assertions)]
+        if vec.iter().any(|v| !v.is_finite()) {
+            return Err(
+                EdgeVecError::Validation("Vector contains non-finite values".to_string()).into(),
+            );
+        }
+
+        // Parse JavaScript object into HashMap<String, MetadataValue>
+        let metadata = parse_js_metadata_object(&metadata_js)?;
+
+        // Use the core insert_with_metadata method
+        let id = self
+            .inner
+            .insert_with_metadata(&mut self.storage, &vec, metadata)
+            .map_err(EdgeVecError::from)?;
+
+        // Safety: VectorId is u64, we cast to u32 as requested by API.
+        if id.0 > u64::from(u32::MAX) {
+            return Err(EdgeVecError::Validation("Vector ID overflowed u32".to_string()).into());
+        }
+        Ok(id.0 as u32)
+    }
+
+    /// Search with metadata filter expression (simplified API).
+    ///
+    /// This is a simplified version of `searchFiltered()` that takes the filter
+    /// expression directly as a string instead of JSON options.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A Float32Array containing the query vector
+    /// * `filter` - Filter expression string (e.g., 'category == "news" AND score > 0.5')
+    /// * `k` - Number of results to return
+    ///
+    /// # Returns
+    ///
+    /// An array of search result objects: `[{ id: number, distance: number }, ...]`
+    ///
+    /// # Filter Syntax
+    ///
+    /// - Comparison: `field == value`, `field != value`, `field > value`, etc.
+    /// - Logical: `expr AND expr`, `expr OR expr`, `NOT expr`
+    /// - Grouping: `(expr)`
+    /// - Array contains: `field CONTAINS value`
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Query dimensions mismatch
+    /// - Filter expression is invalid
+    /// - k is 0
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const results = index.searchWithFilter(
+    ///     new Float32Array([0.1, 0.2, ...]),
+    ///     'category == "news" AND score > 0.5',
+    ///     10
+    /// );
+    /// for (const r of results) {
+    ///     console.log(`ID: ${r.id}, Distance: ${r.distance}`);
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "searchWithFilter")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn search_with_filter(
+        &mut self,
+        query: Float32Array,
+        filter: &str,
+        k: usize,
+    ) -> Result<JsValue, JsValue> {
+        use crate::filter::{parse, FilterStrategy, FilteredSearcher};
+
+        // Validate k
+        if k == 0 {
+            return Err(JsValue::from_str("k must be greater than 0"));
+        }
+
+        // Validate query dimensions
+        let len = query.length();
+        if len != self.inner.config.dimensions {
+            return Err(EdgeVecError::Graph(GraphError::DimensionMismatch {
+                expected: self.inner.config.dimensions as usize,
+                actual: len as usize,
+            })
+            .into());
+        }
+
+        let query_vec = query.to_vec();
+        if query_vec.iter().any(|v| !v.is_finite()) {
+            return Err(EdgeVecError::Validation(
+                "Query vector contains non-finite values".to_string(),
+            )
+            .into());
+        }
+
+        // Parse filter expression
+        let filter_expr = parse(filter).map_err(|e| filter::filter_error_to_jsvalue(&e))?;
+
+        // Create metadata store adapter
+        let metadata_adapter = EdgeVecMetadataAdapter::new(&self.metadata, self.inner.len());
+
+        // Execute filtered search with auto strategy
+        let mut searcher = FilteredSearcher::new(&self.inner, &self.storage, &metadata_adapter);
+        let result = searcher
+            .search_filtered(&query_vec, k, Some(&filter_expr), FilterStrategy::Auto)
+            .map_err(|e| JsValue::from_str(&format!("Search failed: {e}")))?;
+
+        // Convert results to JavaScript array
+        let arr = Array::new_with_length(result.results.len() as u32);
+        for (i, r) in result.results.iter().enumerate() {
+            let obj = Object::new();
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("id"),
+                &JsValue::from(r.vector_id.0 as u32),
+            )?;
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("distance"),
+                &JsValue::from(r.distance),
+            )?;
+            arr.set(i as u32, obj.into());
+        }
+
+        Ok(arr.into())
+    }
+
+    /// Get all metadata for a vector by ID (alias for getAllMetadata).
+    ///
+    /// This is an alias for `getAllMetadata()` provided for API consistency
+    /// with the new RFC-002 metadata API.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The vector ID to look up
+    ///
+    /// # Returns
+    ///
+    /// A JavaScript object with all metadata key-value pairs, or `undefined`
+    /// if the vector has no metadata or doesn't exist.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const id = index.insertWithMetadata(vector, { category: 'news' });
+    /// const meta = index.getVectorMetadata(id);
+    /// console.log(meta.category); // 'news'
+    /// ```
+    #[wasm_bindgen(js_name = "getVectorMetadata")]
+    #[must_use]
+    pub fn get_vector_metadata(&self, id: u32) -> JsValue {
+        metadata::metadata_to_js_object(&self.metadata, id)
+    }
+
+    // =========================================================================
     // FILTERED SEARCH API (v0.5.0 — Week 23)
     // =========================================================================
 
@@ -1528,4 +1749,121 @@ fn strategy_to_string(strategy: &FilterStrategy) -> String {
         FilterStrategy::Hybrid { .. } => "hybrid".to_string(),
         FilterStrategy::Auto => "auto".to_string(),
     }
+}
+
+// =============================================================================
+// HELPER FUNCTIONS FOR METADATA PARSING (Week 28 RFC-002)
+// =============================================================================
+
+/// Maximum safe integer in JavaScript (2^53 - 1).
+const JS_MAX_SAFE_INT: f64 = 9_007_199_254_740_991.0;
+
+/// Minimum safe integer in JavaScript (-(2^53 - 1)).
+const JS_MIN_SAFE_INT: f64 = -9_007_199_254_740_991.0;
+
+/// Parse a JavaScript object into a HashMap<String, MetadataValue>.
+///
+/// Automatically detects value types:
+/// - String → MetadataValue::String
+/// - Number (integer) → MetadataValue::Integer
+/// - Number (float) → MetadataValue::Float
+/// - Boolean → MetadataValue::Boolean
+/// - Array of strings → MetadataValue::StringArray
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The input is not a valid JavaScript object
+/// - A value has an unsupported type
+/// - An array contains non-string elements
+#[allow(clippy::cast_possible_truncation)]
+fn parse_js_metadata_object(js_obj: &JsValue) -> Result<HashMap<String, MetadataValue>, JsValue> {
+    use js_sys::Object as JsObject;
+
+    // Check if it's an object
+    if !js_obj.is_object() {
+        return Err(JsValue::from_str("Metadata must be a JavaScript object"));
+    }
+
+    let obj = JsObject::try_from(js_obj)
+        .ok_or_else(|| JsValue::from_str("Failed to convert metadata to JavaScript object"))?;
+
+    let mut metadata = HashMap::new();
+
+    // Get all enumerable property keys
+    let keys = JsObject::keys(obj);
+
+    for i in 0..keys.length() {
+        let key_js = keys.get(i);
+        let key = key_js
+            .as_string()
+            .ok_or_else(|| JsValue::from_str("Metadata key must be a string"))?;
+
+        let value_js = Reflect::get(obj, &key_js)?;
+        let value = parse_js_metadata_value(&key, &value_js)?;
+
+        metadata.insert(key, value);
+    }
+
+    Ok(metadata)
+}
+
+/// Parse a single JavaScript value into MetadataValue.
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_precision_loss)]
+fn parse_js_metadata_value(key: &str, value: &JsValue) -> Result<MetadataValue, JsValue> {
+    // Check for null/undefined
+    if value.is_null() || value.is_undefined() {
+        return Err(JsValue::from_str(&format!(
+            "Metadata value for key '{key}' cannot be null or undefined"
+        )));
+    }
+
+    // Check for string
+    if let Some(s) = value.as_string() {
+        return Ok(MetadataValue::String(s));
+    }
+
+    // Check for boolean
+    if let Some(b) = value.as_bool() {
+        return Ok(MetadataValue::Boolean(b));
+    }
+
+    // Check for number
+    if let Some(n) = value.as_f64() {
+        if !n.is_finite() {
+            return Err(JsValue::from_str(&format!(
+                "Metadata value for key '{key}' must be finite (not NaN or Infinity)"
+            )));
+        }
+
+        // Detect if it's an integer (no fractional part)
+        // Use JavaScript safe integer bounds for precision safety
+        if n.fract() == 0.0 && (JS_MIN_SAFE_INT..=JS_MAX_SAFE_INT).contains(&n) {
+            return Ok(MetadataValue::Integer(n as i64));
+        }
+        return Ok(MetadataValue::Float(n));
+    }
+
+    // Check for array (string array)
+    if js_sys::Array::is_array(value) {
+        let arr = js_sys::Array::from(value);
+        let mut strings = Vec::with_capacity(arr.length() as usize);
+
+        for i in 0..arr.length() {
+            let item = arr.get(i);
+            let s = item.as_string().ok_or_else(|| {
+                JsValue::from_str(&format!(
+                    "Metadata array for key '{key}' must contain only strings, found non-string at index {i}"
+                ))
+            })?;
+            strings.push(s);
+        }
+
+        return Ok(MetadataValue::StringArray(strings));
+    }
+
+    Err(JsValue::from_str(&format!(
+        "Unsupported metadata value type for key '{key}'. Supported types: string, number, boolean, string[]"
+    )))
 }
