@@ -224,6 +224,50 @@ export class EdgeVec {
    */
   deletedCount(): number;
   /**
+   * Hybrid search combining BQ speed with metadata filtering.
+   *
+   * This is the most flexible search method, combining:
+   * - Binary quantization for speed
+   * - Metadata filtering for precision
+   * - Optional F32 rescoring for accuracy
+   *
+   * # Arguments
+   *
+   * * `query` - A Float32Array containing the query vector
+   * * `options` - A JavaScript object with search options:
+   *   - `k` (required): Number of results to return
+   *   - `filter` (optional): Filter expression string
+   *   - `useBQ` (optional, default true): Use binary quantization
+   *   - `rescoreFactor` (optional, default 3): Overfetch multiplier
+   *
+   * # Returns
+   *
+   * An array of search result objects: `[{ id: number, distance: number }, ...]`
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Options is not a valid object
+   * - k is 0 or missing
+   * - Filter expression is invalid
+   * - Query dimensions mismatch
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const results = index.searchHybrid(
+   *     new Float32Array([0.1, 0.2, ...]),
+   *     {
+   *         k: 10,
+   *         filter: 'category == "news" AND score > 0.5',
+   *         useBQ: true,
+   *         rescoreFactor: 3
+   *     }
+   * );
+   * ```
+   */
+  searchHybrid(query: Float32Array, options: any): any;
+  /**
    * Deletes a metadata key for a vector.
    *
    * This operation is idempotent - deleting a non-existent key is not an error.
@@ -501,6 +545,99 @@ export class EdgeVec {
    */
   metadataKeyCount(vector_id: number): number;
   /**
+   * Search using BQ with F32 rescoring (fast + accurate).
+   *
+   * This method combines BQ speed with F32 accuracy:
+   * 1. Uses BQ to quickly find `k * rescoreFactor` candidates
+   * 2. Rescores candidates using exact F32 distance
+   * 3. Returns the final top-k results
+   *
+   * This provides near-F32 recall (~95%) with most of the BQ speedup.
+   *
+   * # Arguments
+   *
+   * * `query` - A Float32Array containing the query vector
+   * * `k` - Number of results to return
+   * * `rescore_factor` - Overfetch multiplier (3-10 recommended)
+   *
+   * # Returns
+   *
+   * An array of search result objects: `[{ id: number, distance: number }, ...]`
+   * where distance is a similarity score (higher is more similar).
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Binary quantization is not enabled on this index
+   * - Query dimensions mismatch
+   * - k or rescore_factor is 0
+   *
+   * # Rescore Factor Guide
+   *
+   * | Factor | Recall | Relative Speed |
+   * |--------|--------|----------------|
+   * | 1      | ~70%   | 5x             |
+   * | 3      | ~90%   | 3x             |
+   * | 5      | ~95%   | 2.5x           |
+   * | 10     | ~98%   | 2x             |
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * // Fast search with high recall (~95%)
+   * const results = index.searchBQRescored(
+   *     new Float32Array([0.1, 0.2, ...]),
+   *     10,  // k
+   *     5    // rescore factor
+   * );
+   * ```
+   */
+  searchBQRescored(query: Float32Array, k: number, rescore_factor: number): any;
+  /**
+   * Search with metadata filter expression (simplified API).
+   *
+   * This is a simplified version of `searchFiltered()` that takes the filter
+   * expression directly as a string instead of JSON options.
+   *
+   * # Arguments
+   *
+   * * `query` - A Float32Array containing the query vector
+   * * `filter` - Filter expression string (e.g., 'category == "news" AND score > 0.5')
+   * * `k` - Number of results to return
+   *
+   * # Returns
+   *
+   * An array of search result objects: `[{ id: number, distance: number }, ...]`
+   *
+   * # Filter Syntax
+   *
+   * - Comparison: `field == value`, `field != value`, `field > value`, etc.
+   * - Logical: `expr AND expr`, `expr OR expr`, `NOT expr`
+   * - Grouping: `(expr)`
+   * - Array contains: `field CONTAINS value`
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Query dimensions mismatch
+   * - Filter expression is invalid
+   * - k is 0
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const results = index.searchWithFilter(
+   *     new Float32Array([0.1, 0.2, ...]),
+   *     'category == "news" AND score > 0.5',
+   *     10
+   * );
+   * for (const r of results) {
+   *     console.log(`ID: ${r.id}, Distance: ${r.distance}`);
+   * }
+   * ```
+   */
+  searchWithFilter(query: Float32Array, filter: string, k: number): any;
+  /**
    * Deletes all metadata for a vector.
    *
    * This operation is idempotent - deleting metadata for a vector without
@@ -523,6 +660,30 @@ export class EdgeVec {
    */
   deleteAllMetadata(vector_id: number): boolean;
   /**
+   * Get all metadata for a vector by ID (alias for getAllMetadata).
+   *
+   * This is an alias for `getAllMetadata()` provided for API consistency
+   * with the new RFC-002 metadata API.
+   *
+   * # Arguments
+   *
+   * * `id` - The vector ID to look up
+   *
+   * # Returns
+   *
+   * A JavaScript object with all metadata key-value pairs, or `undefined`
+   * if the vector has no metadata or doesn't exist.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const id = index.insertWithMetadata(vector, { category: 'news' });
+   * const meta = index.getVectorMetadata(id);
+   * console.log(meta.category); // 'news'
+   * ```
+   */
+  getVectorMetadata(id: number): any;
+  /**
    * Get the current compaction threshold.
    *
    * # Returns
@@ -531,6 +692,49 @@ export class EdgeVec {
    * Default is 0.3 (30%).
    */
   compactionThreshold(): number;
+  /**
+   * Insert a vector with associated metadata in a single operation.
+   *
+   * This is a convenience method that combines `insert()` and `setMetadata()`
+   * into a single atomic operation. The vector is inserted first, then all
+   * metadata key-value pairs are attached to it.
+   *
+   * # Arguments
+   *
+   * * `vector` - A Float32Array containing the vector data
+   * * `metadata` - A JavaScript object with string keys and metadata values
+   *   - Supported value types: `string`, `number`, `boolean`, `string[]`
+   *   - Numbers are automatically detected as integer or float
+   *
+   * # Returns
+   *
+   * The assigned Vector ID (u32).
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Vector dimensions mismatch the index configuration
+   * - Vector contains NaN or Infinity values
+   * - Metadata key is invalid (empty, too long, or contains invalid characters)
+   * - Metadata value is invalid (NaN float, string too long, etc.)
+   * - Too many metadata keys (>64 per vector)
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const id = index.insertWithMetadata(
+   *     new Float32Array([0.1, 0.2, 0.3, ...]),
+   *     {
+   *         category: "news",
+   *         score: 0.95,
+   *         active: true,
+   *         tags: ["featured", "trending"]
+   *     }
+   * );
+   * console.log(`Inserted vector with ID: ${id}`);
+   * ```
+   */
+  insertWithMetadata(vector: Float32Array, metadata_js: any): number;
   /**
    * Returns the total number of metadata key-value pairs across all vectors.
    *
@@ -655,6 +859,24 @@ export class EdgeVec {
    */
   constructor(config: EdgeVecConfig);
   /**
+   * Check if binary quantization is enabled on this index.
+   *
+   * # Returns
+   *
+   * `true` if BQ is enabled and ready for use, `false` otherwise.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * if (index.hasBQ()) {
+   *     const results = index.searchBQ(query, 10);
+   * } else {
+   *     const results = index.search(query, 10);
+   * }
+   * ```
+   */
+  hasBQ(): boolean;
+  /**
    * Inserts a vector into the index.
    *
    * # Arguments
@@ -721,6 +943,43 @@ export class EdgeVec {
    * ```
    */
   compact(): WasmCompactionResult;
+  /**
+   * Search using binary quantization (fast, approximate).
+   *
+   * Binary quantization converts vectors to bit arrays (1 bit per dimension)
+   * and uses Hamming distance for comparison. This provides:
+   * - ~32x memory reduction
+   * - ~3-5x faster search
+   * - ~70-85% recall (use `searchBQRescored` for higher recall)
+   *
+   * # Arguments
+   *
+   * * `query` - A Float32Array containing the query vector
+   * * `k` - Number of results to return
+   *
+   * # Returns
+   *
+   * An array of search result objects: `[{ id: number, distance: number }, ...]`
+   * where distance is a similarity score (higher is more similar).
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Binary quantization is not enabled on this index
+   * - Query dimensions mismatch
+   * - k is 0
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * // Fast search, lower recall
+   * const results = index.searchBQ(new Float32Array([0.1, 0.2, ...]), 10);
+   * for (const r of results) {
+   *     console.log(`ID: ${r.id}, Similarity: ${r.distance}`);
+   * }
+   * ```
+   */
+  searchBQ(query: Float32Array, k: number): any;
 }
 
 export class EdgeVecConfig {
@@ -1102,11 +1361,13 @@ export interface InitOutput {
   readonly edgevec_deletedCount: (a: number) => number;
   readonly edgevec_getAllMetadata: (a: number, b: number) => number;
   readonly edgevec_getMetadata: (a: number, b: number, c: number, d: number) => number;
+  readonly edgevec_hasBQ: (a: number) => number;
   readonly edgevec_hasMetadata: (a: number, b: number, c: number, d: number) => number;
   readonly edgevec_insert: (a: number, b: number, c: number) => void;
   readonly edgevec_insertBatch: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_insertBatchFlat: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_insertBatchWithProgress: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_insertWithMetadata: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_isDeleted: (a: number, b: number, c: number) => void;
   readonly edgevec_liveCount: (a: number) => number;
   readonly edgevec_load: (a: number, b: number) => number;
@@ -1117,7 +1378,11 @@ export interface InitOutput {
   readonly edgevec_save: (a: number, b: number, c: number) => number;
   readonly edgevec_save_stream: (a: number, b: number) => number;
   readonly edgevec_search: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchBQ: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchBQRescored: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly edgevec_searchFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly edgevec_searchHybrid: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchWithFilter: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_setCompactionThreshold: (a: number, b: number) => void;
   readonly edgevec_setMetadata: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_softDelete: (a: number, b: number, c: number) => void;
@@ -1132,6 +1397,7 @@ export interface InitOutput {
   readonly edgevecconfig_set_m0: (a: number, b: number) => void;
   readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
   readonly get_filter_info_js: (a: number, b: number, c: number) => void;
+  readonly init_logging: () => void;
   readonly jsmetadatavalue_asBoolean: (a: number) => number;
   readonly jsmetadatavalue_asFloat: (a: number, b: number) => void;
   readonly jsmetadatavalue_asInteger: (a: number, b: number) => void;
@@ -1158,12 +1424,12 @@ export interface InitOutput {
   readonly wasmbatchdeleteresult_anyDeleted: (a: number) => number;
   readonly wasmbatchdeleteresult_deleted: (a: number) => number;
   readonly wasmbatchdeleteresult_invalidIds: (a: number) => number;
-  readonly init_logging: () => void;
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
-  readonly __wasm_bindgen_func_elem_605: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_598: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_863: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
+  readonly __wasm_bindgen_func_elem_1608: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_1592: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_2123: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export3: (a: number) => void;

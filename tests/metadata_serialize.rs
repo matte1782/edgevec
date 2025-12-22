@@ -70,7 +70,7 @@ mod postcard_roundtrip {
             .insert(0, "int_val", MetadataValue::Integer(-9876543210))
             .unwrap();
         store
-            .insert(0, "float_val", MetadataValue::Float(3.14159265359))
+            .insert(0, "float_val", MetadataValue::Float(std::f64::consts::PI))
             .unwrap();
         store
             .insert(0, "bool_true", MetadataValue::Boolean(true))

@@ -252,7 +252,10 @@ mod edge_cases {
             MetadataValue::String("hello world".into()),
         );
         metadata.insert("int_val".to_string(), MetadataValue::Integer(-9876543210));
-        metadata.insert("float_val".to_string(), MetadataValue::Float(3.14159265359));
+        metadata.insert(
+            "float_val".to_string(),
+            MetadataValue::Float(std::f64::consts::PI),
+        );
         metadata.insert("bool_val".to_string(), MetadataValue::Boolean(true));
         metadata.insert(
             "array_val".to_string(),
@@ -281,7 +284,7 @@ mod edge_cases {
         );
         assert_eq!(
             meta.get("float_val"),
-            Some(&MetadataValue::Float(3.14159265359))
+            Some(&MetadataValue::Float(std::f64::consts::PI))
         );
         assert_eq!(meta.get("bool_val"), Some(&MetadataValue::Boolean(true)));
         assert_eq!(

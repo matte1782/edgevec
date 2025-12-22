@@ -1,4 +1,4 @@
-import { IndexedDbBackend } from './snippets/edgevec-c4203241896ff5ca/src/js/storage.js';
+import { IndexedDbBackend } from './snippets/edgevec-2248952a92ddd6ed/src/js/storage.js';
 
 let wasm;
 
@@ -224,12 +224,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_605(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_605(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_1608(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_1608(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_863(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_863(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_2123(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_2123(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -681,6 +681,67 @@ export class EdgeVec {
         return ret >>> 0;
     }
     /**
+     * Hybrid search combining BQ speed with metadata filtering.
+     *
+     * This is the most flexible search method, combining:
+     * - Binary quantization for speed
+     * - Metadata filtering for precision
+     * - Optional F32 rescoring for accuracy
+     *
+     * # Arguments
+     *
+     * * `query` - A Float32Array containing the query vector
+     * * `options` - A JavaScript object with search options:
+     *   - `k` (required): Number of results to return
+     *   - `filter` (optional): Filter expression string
+     *   - `useBQ` (optional, default true): Use binary quantization
+     *   - `rescoreFactor` (optional, default 3): Overfetch multiplier
+     *
+     * # Returns
+     *
+     * An array of search result objects: `[{ id: number, distance: number }, ...]`
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Options is not a valid object
+     * - k is 0 or missing
+     * - Filter expression is invalid
+     * - Query dimensions mismatch
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const results = index.searchHybrid(
+     *     new Float32Array([0.1, 0.2, ...]),
+     *     {
+     *         k: 10,
+     *         filter: 'category == "news" AND score > 0.5',
+     *         useBQ: true,
+     *         rescoreFactor: 3
+     *     }
+     * );
+     * ```
+     * @param {Float32Array} query
+     * @param {any} options
+     * @returns {any}
+     */
+    searchHybrid(query, options) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_searchHybrid(retptr, this.__wbg_ptr, addHeapObject(query), addHeapObject(options));
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Deletes a metadata key for a vector.
      *
      * This operation is idempotent - deleting a non-existent key is not an error.
@@ -1095,6 +1156,137 @@ export class EdgeVec {
         return ret >>> 0;
     }
     /**
+     * Search using BQ with F32 rescoring (fast + accurate).
+     *
+     * This method combines BQ speed with F32 accuracy:
+     * 1. Uses BQ to quickly find `k * rescoreFactor` candidates
+     * 2. Rescores candidates using exact F32 distance
+     * 3. Returns the final top-k results
+     *
+     * This provides near-F32 recall (~95%) with most of the BQ speedup.
+     *
+     * # Arguments
+     *
+     * * `query` - A Float32Array containing the query vector
+     * * `k` - Number of results to return
+     * * `rescore_factor` - Overfetch multiplier (3-10 recommended)
+     *
+     * # Returns
+     *
+     * An array of search result objects: `[{ id: number, distance: number }, ...]`
+     * where distance is a similarity score (higher is more similar).
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Binary quantization is not enabled on this index
+     * - Query dimensions mismatch
+     * - k or rescore_factor is 0
+     *
+     * # Rescore Factor Guide
+     *
+     * | Factor | Recall | Relative Speed |
+     * |--------|--------|----------------|
+     * | 1      | ~70%   | 5x             |
+     * | 3      | ~90%   | 3x             |
+     * | 5      | ~95%   | 2.5x           |
+     * | 10     | ~98%   | 2x             |
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * // Fast search with high recall (~95%)
+     * const results = index.searchBQRescored(
+     *     new Float32Array([0.1, 0.2, ...]),
+     *     10,  // k
+     *     5    // rescore factor
+     * );
+     * ```
+     * @param {Float32Array} query
+     * @param {number} k
+     * @param {number} rescore_factor
+     * @returns {any}
+     */
+    searchBQRescored(query, k, rescore_factor) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_searchBQRescored(retptr, this.__wbg_ptr, addHeapObject(query), k, rescore_factor);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Search with metadata filter expression (simplified API).
+     *
+     * This is a simplified version of `searchFiltered()` that takes the filter
+     * expression directly as a string instead of JSON options.
+     *
+     * # Arguments
+     *
+     * * `query` - A Float32Array containing the query vector
+     * * `filter` - Filter expression string (e.g., 'category == "news" AND score > 0.5')
+     * * `k` - Number of results to return
+     *
+     * # Returns
+     *
+     * An array of search result objects: `[{ id: number, distance: number }, ...]`
+     *
+     * # Filter Syntax
+     *
+     * - Comparison: `field == value`, `field != value`, `field > value`, etc.
+     * - Logical: `expr AND expr`, `expr OR expr`, `NOT expr`
+     * - Grouping: `(expr)`
+     * - Array contains: `field CONTAINS value`
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Query dimensions mismatch
+     * - Filter expression is invalid
+     * - k is 0
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const results = index.searchWithFilter(
+     *     new Float32Array([0.1, 0.2, ...]),
+     *     'category == "news" AND score > 0.5',
+     *     10
+     * );
+     * for (const r of results) {
+     *     console.log(`ID: ${r.id}, Distance: ${r.distance}`);
+     * }
+     * ```
+     * @param {Float32Array} query
+     * @param {string} filter
+     * @param {number} k
+     * @returns {any}
+     */
+    searchWithFilter(query, filter, k) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(filter, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.edgevec_searchWithFilter(retptr, this.__wbg_ptr, addHeapObject(query), ptr0, len0, k);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Deletes all metadata for a vector.
      *
      * This operation is idempotent - deleting metadata for a vector without
@@ -1122,6 +1314,35 @@ export class EdgeVec {
         return ret !== 0;
     }
     /**
+     * Get all metadata for a vector by ID (alias for getAllMetadata).
+     *
+     * This is an alias for `getAllMetadata()` provided for API consistency
+     * with the new RFC-002 metadata API.
+     *
+     * # Arguments
+     *
+     * * `id` - The vector ID to look up
+     *
+     * # Returns
+     *
+     * A JavaScript object with all metadata key-value pairs, or `undefined`
+     * if the vector has no metadata or doesn't exist.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const id = index.insertWithMetadata(vector, { category: 'news' });
+     * const meta = index.getVectorMetadata(id);
+     * console.log(meta.category); // 'news'
+     * ```
+     * @param {number} id
+     * @returns {any}
+     */
+    getVectorMetadata(id) {
+        const ret = wasm.edgevec_getAllMetadata(this.__wbg_ptr, id);
+        return takeObject(ret);
+    }
+    /**
      * Get the current compaction threshold.
      *
      * # Returns
@@ -1133,6 +1354,66 @@ export class EdgeVec {
     compactionThreshold() {
         const ret = wasm.edgevec_compactionThreshold(this.__wbg_ptr);
         return ret;
+    }
+    /**
+     * Insert a vector with associated metadata in a single operation.
+     *
+     * This is a convenience method that combines `insert()` and `setMetadata()`
+     * into a single atomic operation. The vector is inserted first, then all
+     * metadata key-value pairs are attached to it.
+     *
+     * # Arguments
+     *
+     * * `vector` - A Float32Array containing the vector data
+     * * `metadata` - A JavaScript object with string keys and metadata values
+     *   - Supported value types: `string`, `number`, `boolean`, `string[]`
+     *   - Numbers are automatically detected as integer or float
+     *
+     * # Returns
+     *
+     * The assigned Vector ID (u32).
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Vector dimensions mismatch the index configuration
+     * - Vector contains NaN or Infinity values
+     * - Metadata key is invalid (empty, too long, or contains invalid characters)
+     * - Metadata value is invalid (NaN float, string too long, etc.)
+     * - Too many metadata keys (>64 per vector)
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const id = index.insertWithMetadata(
+     *     new Float32Array([0.1, 0.2, 0.3, ...]),
+     *     {
+     *         category: "news",
+     *         score: 0.95,
+     *         active: true,
+     *         tags: ["featured", "trending"]
+     *     }
+     * );
+     * console.log(`Inserted vector with ID: ${id}`);
+     * ```
+     * @param {Float32Array} vector
+     * @param {any} metadata_js
+     * @returns {number}
+     */
+    insertWithMetadata(vector, metadata_js) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_insertWithMetadata(retptr, this.__wbg_ptr, addHeapObject(vector), addHeapObject(metadata_js));
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return r0 >>> 0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Returns the total number of metadata key-value pairs across all vectors.
@@ -1320,6 +1601,28 @@ export class EdgeVec {
         }
     }
     /**
+     * Check if binary quantization is enabled on this index.
+     *
+     * # Returns
+     *
+     * `true` if BQ is enabled and ready for use, `false` otherwise.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * if (index.hasBQ()) {
+     *     const results = index.searchBQ(query, 10);
+     * } else {
+     *     const results = index.search(query, 10);
+     * }
+     * ```
+     * @returns {boolean}
+     */
+    hasBQ() {
+        const ret = wasm.edgevec_hasBQ(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
      * Inserts a vector into the index.
      *
      * # Arguments
@@ -1430,6 +1733,60 @@ export class EdgeVec {
                 throw takeObject(r1);
             }
             return WasmCompactionResult.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Search using binary quantization (fast, approximate).
+     *
+     * Binary quantization converts vectors to bit arrays (1 bit per dimension)
+     * and uses Hamming distance for comparison. This provides:
+     * - ~32x memory reduction
+     * - ~3-5x faster search
+     * - ~70-85% recall (use `searchBQRescored` for higher recall)
+     *
+     * # Arguments
+     *
+     * * `query` - A Float32Array containing the query vector
+     * * `k` - Number of results to return
+     *
+     * # Returns
+     *
+     * An array of search result objects: `[{ id: number, distance: number }, ...]`
+     * where distance is a similarity score (higher is more similar).
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Binary quantization is not enabled on this index
+     * - Query dimensions mismatch
+     * - k is 0
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * // Fast search, lower recall
+     * const results = index.searchBQ(new Float32Array([0.1, 0.2, ...]), 10);
+     * for (const r of results) {
+     *     console.log(`ID: ${r.id}, Similarity: ${r.distance}`);
+     * }
+     * ```
+     * @param {Float32Array} query
+     * @param {number} k
+     * @returns {any}
+     */
+    searchBQ(query, k) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_searchBQ(retptr, this.__wbg_ptr, addHeapObject(query), k);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
@@ -1911,7 +2268,7 @@ export class WasmBatchDeleteResult {
      * @returns {number}
      */
     get uniqueCount() {
-        const ret = wasm.batchinsertresult_total(this.__wbg_ptr);
+        const ret = wasm.wasmbatchdeleteresult_uniqueCount(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -1927,7 +2284,7 @@ export class WasmBatchDeleteResult {
      * @returns {number}
      */
     get total() {
-        const ret = wasm.batchinsertresult_inserted(this.__wbg_ptr);
+        const ret = wasm.wasmbatchdeleteresult_total(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
@@ -2236,13 +2593,37 @@ function __wbg_get_imports() {
         const ret = Error(getStringFromWasm0(arg0, arg1));
         return addHeapObject(ret);
     };
+    imports.wbg.__wbg___wbindgen_boolean_get_dea25b33882b895b = function(arg0) {
+        const v = getObject(arg0);
+        const ret = typeof(v) === 'boolean' ? v : undefined;
+        return isLikeNone(ret) ? 0xFFFFFF : ret ? 1 : 0;
+    };
     imports.wbg.__wbg___wbindgen_is_function_8d400b8b1af978cd = function(arg0) {
         const ret = typeof(getObject(arg0)) === 'function';
+        return ret;
+    };
+    imports.wbg.__wbg___wbindgen_is_null_dfda7d66506c95b5 = function(arg0) {
+        const ret = getObject(arg0) === null;
+        return ret;
+    };
+    imports.wbg.__wbg___wbindgen_is_object_ce774f3490692386 = function(arg0) {
+        const val = getObject(arg0);
+        const ret = typeof(val) === 'object' && val !== null;
+        return ret;
+    };
+    imports.wbg.__wbg___wbindgen_is_string_704ef9c8fc131030 = function(arg0) {
+        const ret = typeof(getObject(arg0)) === 'string';
         return ret;
     };
     imports.wbg.__wbg___wbindgen_is_undefined_f6b95eab589e0269 = function(arg0) {
         const ret = getObject(arg0) === undefined;
         return ret;
+    };
+    imports.wbg.__wbg___wbindgen_number_get_9619185a74197f95 = function(arg0, arg1) {
+        const obj = getObject(arg1);
+        const ret = typeof(obj) === 'number' ? obj : undefined;
+        getDataViewMemory0().setFloat64(arg0 + 8 * 1, isLikeNone(ret) ? 0 : ret, true);
+        getDataViewMemory0().setInt32(arg0 + 4 * 0, !isLikeNone(ret), true);
     };
     imports.wbg.__wbg___wbindgen_string_get_a2a31e16edf96e42 = function(arg0, arg1) {
         const obj = getObject(arg1);
@@ -2270,6 +2651,10 @@ function __wbg_get_imports() {
         const ret = getObject(arg0).call(getObject(arg1), getObject(arg2), getObject(arg3));
         return addHeapObject(ret);
     }, arguments) };
+    imports.wbg.__wbg_crypto_574e78ad8b13b65f = function(arg0) {
+        const ret = getObject(arg0).crypto;
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_debug_9d0c87ddda3dc485 = function(arg0) {
         console.debug(getObject(arg0));
     };
@@ -2291,10 +2676,21 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_error_7bc7d576a6aaf855 = function(arg0) {
         console.error(getObject(arg0));
     };
+    imports.wbg.__wbg_from_29a8414a7a7cd19d = function(arg0) {
+        const ret = Array.from(getObject(arg0));
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbg_getRandomValues_b8f5dbd5f3995a9e = function() { return handleError(function (arg0, arg1) {
+        getObject(arg0).getRandomValues(getObject(arg1));
+    }, arguments) };
     imports.wbg.__wbg_get_6b7bd52aca3f9671 = function(arg0, arg1) {
         const ret = getObject(arg0)[arg1 >>> 0];
         return addHeapObject(ret);
     };
+    imports.wbg.__wbg_get_af9dab7e9603ea93 = function() { return handleError(function (arg0, arg1) {
+        const ret = Reflect.get(getObject(arg0), getObject(arg1));
+        return addHeapObject(ret);
+    }, arguments) };
     imports.wbg.__wbg_info_ce6bcc489c22f6f0 = function(arg0) {
         console.info(getObject(arg0));
     };
@@ -2307,6 +2703,14 @@ function __wbg_get_imports() {
         }
         const ret = result;
         return ret;
+    };
+    imports.wbg.__wbg_isArray_51fd9e6422c0a395 = function(arg0) {
+        const ret = Array.isArray(getObject(arg0));
+        return ret;
+    };
+    imports.wbg.__wbg_keys_f5c6002ff150fc6c = function(arg0) {
+        const ret = Object.keys(getObject(arg0));
+        return addHeapObject(ret);
     };
     imports.wbg.__wbg_length_22ac23eaec9d8053 = function(arg0) {
         const ret = getObject(arg0).length;
@@ -2331,6 +2735,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_log_1d990106d99dacb7 = function(arg0) {
         console.log(getObject(arg0));
     };
+    imports.wbg.__wbg_msCrypto_a61aeb35a24c1329 = function(arg0) {
+        const ret = getObject(arg0).msCrypto;
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_new_1ba21ce319a06297 = function() {
         const ret = new Object();
         return addHeapObject(ret);
@@ -2354,7 +2762,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_863(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_2123(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -2381,6 +2789,14 @@ function __wbg_get_imports() {
         const ret = new Array(arg0 >>> 0);
         return addHeapObject(ret);
     };
+    imports.wbg.__wbg_new_with_length_aa5eaf41d35235e5 = function(arg0) {
+        const ret = new Uint8Array(arg0 >>> 0);
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbg_node_905d3e251edff8a2 = function(arg0) {
+        const ret = getObject(arg0).node;
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_now_8cf15d6e317793e1 = function(arg0) {
         const ret = getObject(arg0).now();
         return ret;
@@ -2388,6 +2804,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_performance_c77a440eff2efd9b = function(arg0) {
         const ret = getObject(arg0).performance;
         return isLikeNone(ret) ? 0 : addHeapObject(ret);
+    };
+    imports.wbg.__wbg_process_dc0fbacc7c1c06f7 = function(arg0) {
+        const ret = getObject(arg0).process;
+        return addHeapObject(ret);
     };
     imports.wbg.__wbg_prototypesetcall_6a0ca140cebe5ef8 = function(arg0, arg1, arg2) {
         Uint32Array.prototype.set.call(getArrayU32FromWasm0(arg0, arg1), getObject(arg2));
@@ -2412,8 +2832,15 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_queueMicrotask_fca69f5bfad613a5 = function(arg0) {
         queueMicrotask(getObject(arg0));
     };
-    imports.wbg.__wbg_read_710db9befb94d7f5 = function() { return handleError(function (arg0, arg1) {
+    imports.wbg.__wbg_randomFillSync_ac0988aba3254290 = function() { return handleError(function (arg0, arg1) {
+        getObject(arg0).randomFillSync(takeObject(arg1));
+    }, arguments) };
+    imports.wbg.__wbg_read_a68635a97e5352a0 = function() { return handleError(function (arg0, arg1) {
         const ret = IndexedDbBackend.read(getStringFromWasm0(arg0, arg1));
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_require_60cc747a6bc5215a = function() { return handleError(function () {
+        const ret = module.require;
         return addHeapObject(ret);
     }, arguments) };
     imports.wbg.__wbg_resolve_fd5bfbaa4ce36e1e = function(arg0) {
@@ -2450,6 +2877,10 @@ function __wbg_get_imports() {
         const ret = typeof window === 'undefined' ? null : window;
         return isLikeNone(ret) ? 0 : addHeapObject(ret);
     };
+    imports.wbg.__wbg_subarray_845f2f5bce7d061a = function(arg0, arg1, arg2) {
+        const ret = getObject(arg0).subarray(arg1 >>> 0, arg2 >>> 0);
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_then_429f7caf1026411d = function(arg0, arg1, arg2) {
         const ret = getObject(arg0).then(getObject(arg1), getObject(arg2));
         return addHeapObject(ret);
@@ -2458,21 +2889,30 @@ function __wbg_get_imports() {
         const ret = getObject(arg0).then(getObject(arg1));
         return addHeapObject(ret);
     };
+    imports.wbg.__wbg_versions_c01dfd4722a88165 = function(arg0) {
+        const ret = getObject(arg0).versions;
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_warn_6e567d0d926ff881 = function(arg0) {
         console.warn(getObject(arg0));
     };
-    imports.wbg.__wbg_write_b60005356a2f68e0 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
+    imports.wbg.__wbg_write_a46dfda682f6e473 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
         const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getArrayU8FromWasm0(arg2, arg3));
         return addHeapObject(ret);
     }, arguments) };
-    imports.wbg.__wbindgen_cast_1e9af41a93765cab = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 88, function: Function { arguments: [Externref], shim_idx: 89, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_598, __wasm_bindgen_func_elem_605);
-        return addHeapObject(ret);
-    };
     imports.wbg.__wbindgen_cast_2241b6af4c4b2941 = function(arg0, arg1) {
         // Cast intrinsic for `Ref(String) -> Externref`.
         const ret = getStringFromWasm0(arg0, arg1);
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbindgen_cast_902a70736b89c8fd = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 119, function: Function { arguments: [Externref], shim_idx: 120, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_1592, __wasm_bindgen_func_elem_1608);
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbindgen_cast_cb9088102bce6b30 = function(arg0, arg1) {
+        // Cast intrinsic for `Ref(Slice(U8)) -> NamedExternref("Uint8Array")`.
+        const ret = getArrayU8FromWasm0(arg0, arg1);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {

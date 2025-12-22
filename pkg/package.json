@@ -2,37 +2,19 @@
   "name": "edgevec",
   "version": "0.5.4",
   "description": "High-performance embedded vector database for Browser, Node, and Edge",
-  "type": "module",
-  "main": "edgevec.js",
-  "types": "edgevec.d.ts",
-  "sideEffects": [
-    "./snippets/*"
-  ],
-  "files": [
-    "edgevec_bg.wasm",
-    "edgevec.js",
-    "edgevec.d.ts",
-    "edgevec_bg.wasm.d.ts",
-    "snippets"
-  ],
+  "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/matte1782/edgevec"
   },
-  "keywords": [
-    "vector",
-    "database",
-    "wasm",
-    "hnsw",
-    "similarity-search",
-    "embeddings",
-    "machine-learning",
-    "browser"
+  "files": [
+    "edgevec_bg.wasm",
+    "edgevec.js",
+    "edgevec.d.ts"
   ],
-  "author": "Matteo Panzeri",
-  "license": "MIT OR Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/matte1782/edgevec/issues"
-  },
-  "homepage": "https://github.com/matte1782/edgevec#readme"
+  "main": "edgevec.js",
+  "types": "edgevec.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
 }

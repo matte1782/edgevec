@@ -380,7 +380,7 @@ mod tests {
             .insert(0, "integer", MetadataValue::Integer(-42))
             .unwrap();
         store
-            .insert(0, "float", MetadataValue::Float(3.14159))
+            .insert(0, "float", MetadataValue::Float(core::f64::consts::PI))
             .unwrap();
         store
             .insert(0, "boolean", MetadataValue::Boolean(true))
@@ -492,7 +492,7 @@ mod tests {
 
         // CRC should be non-zero for any data
         // (Empty store still serializes to some bytes)
-        assert!(bytes.len() > 0);
+        assert!(!bytes.is_empty());
 
         // Same input should produce same CRC (deterministic)
         let crc2 = MetadataStore::calculate_crc(&bytes);

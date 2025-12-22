@@ -1226,7 +1226,7 @@ mod tests {
                 "Should suggest using '=' instead of ':'"
             );
             let s = suggestion.unwrap();
-            assert!(s.contains("="), "Suggestion should mention '='");
+            assert!(s.contains('='), "Suggestion should mention '='");
         }
     }
 
@@ -1264,7 +1264,7 @@ mod tests {
             );
             let s = suggestion.unwrap();
             assert!(
-                s.contains("[") || s.contains("square brackets"),
+                s.contains('[') || s.contains("square brackets"),
                 "Suggestion should mention square brackets"
             );
         }

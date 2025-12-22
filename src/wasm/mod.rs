@@ -1381,6 +1381,400 @@ impl EdgeVec {
     }
 
     // =========================================================================
+    // BINARY QUANTIZATION SEARCH API (v0.6.0 — Week 28 RFC-002)
+    // =========================================================================
+
+    /// Search using binary quantization (fast, approximate).
+    ///
+    /// Binary quantization converts vectors to bit arrays (1 bit per dimension)
+    /// and uses Hamming distance for comparison. This provides:
+    /// - ~32x memory reduction
+    /// - ~3-5x faster search
+    /// - ~70-85% recall (use `searchBQRescored` for higher recall)
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A Float32Array containing the query vector
+    /// * `k` - Number of results to return
+    ///
+    /// # Returns
+    ///
+    /// An array of search result objects: `[{ id: number, distance: number }, ...]`
+    /// where distance is a similarity score (higher is more similar).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Binary quantization is not enabled on this index
+    /// - Query dimensions mismatch
+    /// - k is 0
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// // Fast search, lower recall
+    /// const results = index.searchBQ(new Float32Array([0.1, 0.2, ...]), 10);
+    /// for (const r of results) {
+    ///     console.log(`ID: ${r.id}, Similarity: ${r.distance}`);
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "searchBQ")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn search_bq(&self, query: Float32Array, k: usize) -> Result<JsValue, JsValue> {
+        // Validate k
+        if k == 0 {
+            return Err(JsValue::from_str("k must be greater than 0"));
+        }
+
+        // Validate query dimensions
+        let len = query.length();
+        if len != self.inner.config.dimensions {
+            return Err(EdgeVecError::Graph(GraphError::DimensionMismatch {
+                expected: self.inner.config.dimensions as usize,
+                actual: len as usize,
+            })
+            .into());
+        }
+
+        let query_vec = query.to_vec();
+        if query_vec.iter().any(|v| !v.is_finite()) {
+            return Err(EdgeVecError::Validation(
+                "Query vector contains non-finite values".to_string(),
+            )
+            .into());
+        }
+
+        // Execute BQ search
+        let results = self
+            .inner
+            .search_bq(&query_vec, k, &self.storage)
+            .map_err(EdgeVecError::from)?;
+
+        // Convert results to JavaScript array
+        let arr = Array::new_with_length(results.len() as u32);
+        for (i, (vector_id, similarity)) in results.iter().enumerate() {
+            let obj = Object::new();
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("id"),
+                &JsValue::from(vector_id.0 as u32),
+            )?;
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("distance"),
+                &JsValue::from(*similarity),
+            )?;
+            arr.set(i as u32, obj.into());
+        }
+
+        Ok(arr.into())
+    }
+
+    /// Search using BQ with F32 rescoring (fast + accurate).
+    ///
+    /// This method combines BQ speed with F32 accuracy:
+    /// 1. Uses BQ to quickly find `k * rescoreFactor` candidates
+    /// 2. Rescores candidates using exact F32 distance
+    /// 3. Returns the final top-k results
+    ///
+    /// This provides near-F32 recall (~95%) with most of the BQ speedup.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A Float32Array containing the query vector
+    /// * `k` - Number of results to return
+    /// * `rescore_factor` - Overfetch multiplier (3-10 recommended)
+    ///
+    /// # Returns
+    ///
+    /// An array of search result objects: `[{ id: number, distance: number }, ...]`
+    /// where distance is a similarity score (higher is more similar).
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Binary quantization is not enabled on this index
+    /// - Query dimensions mismatch
+    /// - k or rescore_factor is 0
+    ///
+    /// # Rescore Factor Guide
+    ///
+    /// | Factor | Recall | Relative Speed |
+    /// |--------|--------|----------------|
+    /// | 1      | ~70%   | 5x             |
+    /// | 3      | ~90%   | 3x             |
+    /// | 5      | ~95%   | 2.5x           |
+    /// | 10     | ~98%   | 2x             |
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// // Fast search with high recall (~95%)
+    /// const results = index.searchBQRescored(
+    ///     new Float32Array([0.1, 0.2, ...]),
+    ///     10,  // k
+    ///     5    // rescore factor
+    /// );
+    /// ```
+    #[wasm_bindgen(js_name = "searchBQRescored")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn search_bq_rescored(
+        &self,
+        query: Float32Array,
+        k: usize,
+        rescore_factor: usize,
+    ) -> Result<JsValue, JsValue> {
+        // Validate k
+        if k == 0 {
+            return Err(JsValue::from_str("k must be greater than 0"));
+        }
+
+        // Validate rescore_factor
+        if rescore_factor == 0 {
+            return Err(JsValue::from_str("rescoreFactor must be greater than 0"));
+        }
+
+        // Validate query dimensions
+        let len = query.length();
+        if len != self.inner.config.dimensions {
+            return Err(EdgeVecError::Graph(GraphError::DimensionMismatch {
+                expected: self.inner.config.dimensions as usize,
+                actual: len as usize,
+            })
+            .into());
+        }
+
+        let query_vec = query.to_vec();
+        if query_vec.iter().any(|v| !v.is_finite()) {
+            return Err(EdgeVecError::Validation(
+                "Query vector contains non-finite values".to_string(),
+            )
+            .into());
+        }
+
+        // Execute BQ rescored search
+        let results = self
+            .inner
+            .search_bq_rescored(&query_vec, k, rescore_factor, &self.storage)
+            .map_err(EdgeVecError::from)?;
+
+        // Convert results to JavaScript array
+        let arr = Array::new_with_length(results.len() as u32);
+        for (i, (vector_id, similarity)) in results.iter().enumerate() {
+            let obj = Object::new();
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("id"),
+                &JsValue::from(vector_id.0 as u32),
+            )?;
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("distance"),
+                &JsValue::from(*similarity),
+            )?;
+            arr.set(i as u32, obj.into());
+        }
+
+        Ok(arr.into())
+    }
+
+    /// Hybrid search combining BQ speed with metadata filtering.
+    ///
+    /// This is the most flexible search method, combining:
+    /// - Binary quantization for speed
+    /// - Metadata filtering for precision
+    /// - Optional F32 rescoring for accuracy
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - A Float32Array containing the query vector
+    /// * `options` - A JavaScript object with search options:
+    ///   - `k` (required): Number of results to return
+    ///   - `filter` (optional): Filter expression string
+    ///   - `useBQ` (optional, default true): Use binary quantization
+    ///   - `rescoreFactor` (optional, default 3): Overfetch multiplier
+    ///
+    /// # Returns
+    ///
+    /// An array of search result objects: `[{ id: number, distance: number }, ...]`
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Options is not a valid object
+    /// - k is 0 or missing
+    /// - Filter expression is invalid
+    /// - Query dimensions mismatch
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const results = index.searchHybrid(
+    ///     new Float32Array([0.1, 0.2, ...]),
+    ///     {
+    ///         k: 10,
+    ///         filter: 'category == "news" AND score > 0.5',
+    ///         useBQ: true,
+    ///         rescoreFactor: 3
+    ///     }
+    /// );
+    /// ```
+    #[wasm_bindgen(js_name = "searchHybrid")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn search_hybrid(
+        &mut self,
+        query: Float32Array,
+        options: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        use crate::filter::{parse, FilterStrategy, FilteredSearcher};
+
+        // Parse options
+        let opts = parse_hybrid_search_options(&options)?;
+
+        // Validate k
+        if opts.k == 0 {
+            return Err(JsValue::from_str("k must be greater than 0"));
+        }
+
+        // Validate query dimensions
+        let len = query.length();
+        if len != self.inner.config.dimensions {
+            return Err(EdgeVecError::Graph(GraphError::DimensionMismatch {
+                expected: self.inner.config.dimensions as usize,
+                actual: len as usize,
+            })
+            .into());
+        }
+
+        let query_vec = query.to_vec();
+        if query_vec.iter().any(|v| !v.is_finite()) {
+            return Err(EdgeVecError::Validation(
+                "Query vector contains non-finite values".to_string(),
+            )
+            .into());
+        }
+
+        // Determine search strategy
+        let use_bq = opts.use_bq && self.inner.bq_storage.is_some();
+        let rescore_factor = opts.rescore_factor.max(1);
+
+        // Execute appropriate search based on options
+        let results: Vec<(crate::hnsw::VectorId, f32)> = if use_bq {
+            if let Some(ref filter_str) = opts.filter {
+                // BQ + filter + rescore: Use filtered search with BQ candidates
+                let filter_expr =
+                    parse(filter_str).map_err(|e| filter::filter_error_to_jsvalue(&e))?;
+
+                // Get BQ candidates with overfetch
+                let overfetch_k = opts.k.saturating_mul(rescore_factor);
+                let bq_candidates = self
+                    .inner
+                    .search_bq(&query_vec, overfetch_k, &self.storage)
+                    .map_err(EdgeVecError::from)?;
+
+                // Filter candidates using metadata
+                let empty_map = std::collections::HashMap::new();
+                let mut filtered: Vec<_> = bq_candidates
+                    .into_iter()
+                    .filter(|(vid, _)| {
+                        let metadata = self.metadata.get_all(vid.0 as u32).unwrap_or(&empty_map);
+                        crate::filter::evaluate(&filter_expr, metadata).unwrap_or(false)
+                    })
+                    .take(opts.k)
+                    .collect();
+
+                // Rescore filtered candidates with F32 if we have enough
+                if !filtered.is_empty() {
+                    use super::hnsw::rescore::rescore_top_k;
+                    let rescored = rescore_top_k(
+                        &filtered,
+                        &query_vec,
+                        &self.storage,
+                        opts.k.min(filtered.len()),
+                    );
+                    filtered = rescored
+                        .into_iter()
+                        .map(|(id, dist)| (id, 1.0 / (1.0 + dist)))
+                        .collect();
+                }
+
+                filtered
+            } else {
+                // BQ only (no filter)
+                self.inner
+                    .search_bq_rescored(&query_vec, opts.k, rescore_factor, &self.storage)
+                    .map_err(EdgeVecError::from)?
+            }
+        } else if let Some(ref filter_str) = opts.filter {
+            // F32 + filter (no BQ)
+            let filter_expr = parse(filter_str).map_err(|e| filter::filter_error_to_jsvalue(&e))?;
+            let metadata_adapter = EdgeVecMetadataAdapter::new(&self.metadata, self.inner.len());
+            let mut searcher = FilteredSearcher::new(&self.inner, &self.storage, &metadata_adapter);
+            let result = searcher
+                .search_filtered(&query_vec, opts.k, Some(&filter_expr), FilterStrategy::Auto)
+                .map_err(|e| JsValue::from_str(&format!("Search failed: {e}")))?;
+            result
+                .results
+                .into_iter()
+                .map(|r| (r.vector_id, r.distance))
+                .collect()
+        } else {
+            // Pure F32 search (no BQ, no filter)
+            let search_results = self
+                .inner
+                .search(&query_vec, opts.k, &self.storage)
+                .map_err(EdgeVecError::from)?;
+            search_results
+                .into_iter()
+                .map(|r| (r.vector_id, r.distance))
+                .collect()
+        };
+
+        // Convert results to JavaScript array
+        let arr = Array::new_with_length(results.len() as u32);
+        for (i, (vector_id, distance)) in results.iter().enumerate() {
+            let obj = Object::new();
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("id"),
+                &JsValue::from(vector_id.0 as u32),
+            )?;
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("distance"),
+                &JsValue::from(*distance),
+            )?;
+            arr.set(i as u32, obj.into());
+        }
+
+        Ok(arr.into())
+    }
+
+    /// Check if binary quantization is enabled on this index.
+    ///
+    /// # Returns
+    ///
+    /// `true` if BQ is enabled and ready for use, `false` otherwise.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// if (index.hasBQ()) {
+    ///     const results = index.searchBQ(query, 10);
+    /// } else {
+    ///     const results = index.search(query, 10);
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "hasBQ")]
+    #[must_use]
+    pub fn has_bq(&self) -> bool {
+        self.inner.bq_storage.is_some()
+    }
+
+    // =========================================================================
     // FILTERED SEARCH API (v0.5.0 — Week 23)
     // =========================================================================
 
@@ -1866,4 +2260,79 @@ fn parse_js_metadata_value(key: &str, value: &JsValue) -> Result<MetadataValue, 
     Err(JsValue::from_str(&format!(
         "Unsupported metadata value type for key '{key}'. Supported types: string, number, boolean, string[]"
     )))
+}
+
+// =============================================================================
+// HELPER FUNCTIONS FOR BQ HYBRID SEARCH (Week 28 RFC-002)
+// =============================================================================
+
+/// Options for hybrid BQ search.
+struct HybridSearchOptions {
+    /// Number of results to return.
+    k: usize,
+    /// Optional filter expression.
+    filter: Option<String>,
+    /// Whether to use binary quantization (default: true).
+    use_bq: bool,
+    /// Rescore factor for BQ (default: 3).
+    rescore_factor: usize,
+}
+
+/// Parse hybrid search options from a JavaScript object.
+///
+/// Expected object shape:
+/// ```javascript
+/// {
+///     k: 10,                    // required
+///     filter: 'category == "news"',  // optional
+///     useBQ: true,              // optional, default true
+///     rescoreFactor: 3          // optional, default 3
+/// }
+/// ```
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+fn parse_hybrid_search_options(options: &JsValue) -> Result<HybridSearchOptions, JsValue> {
+    if !options.is_object() {
+        return Err(JsValue::from_str(
+            "Options must be a JavaScript object with at least { k: number }",
+        ));
+    }
+
+    // Get k (required)
+    let k_js = Reflect::get(options, &JsValue::from_str("k"))?;
+    let k = k_js
+        .as_f64()
+        .ok_or_else(|| JsValue::from_str("Options.k is required and must be a positive number"))?
+        as usize;
+
+    // Get filter (optional)
+    let filter_js = Reflect::get(options, &JsValue::from_str("filter"))?;
+    let filter = if filter_js.is_undefined() || filter_js.is_null() {
+        None
+    } else {
+        filter_js.as_string()
+    };
+
+    // Get useBQ (optional, default true)
+    let use_bq_js = Reflect::get(options, &JsValue::from_str("useBQ"))?;
+    let use_bq = if use_bq_js.is_undefined() || use_bq_js.is_null() {
+        true
+    } else {
+        use_bq_js.as_bool().unwrap_or(true)
+    };
+
+    // Get rescoreFactor (optional, default 3)
+    let rescore_factor_js = Reflect::get(options, &JsValue::from_str("rescoreFactor"))?;
+    let rescore_factor = if rescore_factor_js.is_undefined() || rescore_factor_js.is_null() {
+        3
+    } else {
+        rescore_factor_js.as_f64().unwrap_or(3.0) as usize
+    };
+
+    Ok(HybridSearchOptions {
+        k,
+        filter,
+        use_bq,
+        rescore_factor,
+    })
 }

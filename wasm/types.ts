@@ -173,3 +173,78 @@ export interface FilteredSearchOptions {
  * - `NOT (status == "archived")`
  */
 export type FilterExpression = string;
+
+// =============================================================================
+// BINARY QUANTIZATION TYPES (v0.6.0 — Week 28 RFC-002)
+// =============================================================================
+
+/**
+ * Search result from Binary Quantization search.
+ *
+ * BQ search uses Hamming distance on binary-quantized vectors for fast
+ * approximate search. Lower distance means more similar.
+ */
+export interface BQSearchResult {
+  /** Unique identifier of the matched vector */
+  id: VectorId;
+  /** Hamming distance from query (lower is more similar) */
+  distance: number;
+}
+
+/**
+ * Options for hybrid search combining BQ and metadata filtering.
+ *
+ * @example
+ * ```typescript
+ * const results = client.searchHybrid(queryVector, {
+ *   k: 10,
+ *   filter: 'category == "news"',
+ *   useBQ: true,
+ *   rescoreFactor: 4
+ * });
+ * ```
+ */
+export interface HybridSearchOptions {
+  /** Number of results to return */
+  k: number;
+  /**
+   * Optional filter expression string.
+   * If provided, only vectors matching the filter are returned.
+   */
+  filter?: string;
+  /**
+   * Whether to use Binary Quantization for initial candidate generation.
+   * When true, BQ is used for fast approximate search, then results are
+   * rescored using full-precision vectors.
+   * @default false
+   */
+  useBQ?: boolean;
+  /**
+   * Rescore factor for BQ search.
+   * Generates k * rescoreFactor candidates with BQ, then rescores with F32.
+   * Higher values improve recall but increase latency.
+   * Only used when useBQ is true.
+   * @default 4
+   */
+  rescoreFactor?: number;
+}
+
+/**
+ * Binary Quantization configuration.
+ *
+ * BQ provides 32x memory reduction by encoding each vector dimension as a
+ * single bit (positive = 1, non-positive = 0).
+ *
+ * Trade-offs:
+ * - Memory: 32x reduction (128 bytes → 4 bytes for 1024d vectors)
+ * - Speed: 3-5x faster search using Hamming distance
+ * - Recall: ~70-85% without rescoring, ~95% with rescoring
+ */
+export interface BinaryQuantizationInfo {
+  /** Whether BQ is enabled for this index */
+  enabled: boolean;
+  /** Number of bytes per quantized vector (dimensions / 8) */
+  bytesPerVector: number;
+  /** Estimated memory savings compared to F32 storage */
+  memorySavingsRatio: number;
+}

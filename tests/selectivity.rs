@@ -149,7 +149,7 @@ mod heuristic_selectivity {
         let selectivity = estimate_filter_selectivity(&filter);
 
         assert!(
-            selectivity >= 0.0 && selectivity <= 1.0,
+            (0.0..=1.0).contains(&selectivity),
             "Selectivity must be in [0.0, 1.0], got {}",
             selectivity
         );
