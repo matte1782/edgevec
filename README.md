@@ -75,6 +75,7 @@ Try EdgeVec directly in your browser:
 
 | Demo | Description |
 |:-----|:------------|
+| [**Cyberpunk Demo**](wasm/examples/v060_cyberpunk_demo.html) | Full-featured v0.6.0 showcase with cyberpunk UI |
 | [**v0.6.0 Demo**](wasm/examples/v060_demo.html) | BQ vs F32 comparison, metadata filtering, memory pressure |
 | [**Filter Playground**](wasm/examples/filter-playground.html) | Interactive filter syntax explorer with live parsing |
 | [**Benchmark Dashboard**](wasm/examples/benchmark-dashboard.html) | Performance comparison vs competitors |

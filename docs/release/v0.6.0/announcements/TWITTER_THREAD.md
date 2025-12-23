@@ -20,7 +20,7 @@ Binary Quantization compresses 768-dim vectors from 3KB to 96 bytes while mainta
 
 Perfect for mobile/edge deployment where memory matters.
 
-Demo: https://github.com/matte1782/edgevec
+Demo: https://github.com/matte1782/edgevec/blob/main/wasm/examples/v060_cyberpunk_demo.html
 
 /2
 
