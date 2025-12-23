@@ -172,29 +172,11 @@ impl Iterator for ChunkIter<'_> {
                         self.buffer.extend_from_slice(bytes);
                         self.state = SerializationState::VectorData;
                     } else {
-                        // Very small chunk size edge case
+                        // Edge case: chunk_size < 64 bytes (header size).
+                        // Constructor clamps chunk_size to minimum 64 bytes.
+                        // If this branch executes, caller violated API contract.
+                        // Return partial chunk without panicking.
                         self.buffer.extend_from_slice(&bytes[..space_left]);
-                        // This case is complex to handle with simple state, assume chunk_size >= 64
-                        // But for correctness, we should implement offset tracking for header too.
-                        // Given constraints (10MB chunks), this is fine.
-                        // If strictness required, we'd need header_offset.
-                        // SAFETY: Validated in constructor or effectively no-op if caller ignores logic,
-                        // but strictly we should not panic. We just stop here and return what we have,
-                        // then next call will fail to make progress if chunk_size is permanently < 64.
-                        // Actually, let's just force header state to finish if we wrote something,
-                        // assuming the caller provided a sane chunk_size.
-                        // Better fix: Clamp chunk_size in constructor or return error.
-                        // Since we can't change signature of next() to return Result, we accept this edge case
-                        // might result in corrupted stream if chunk_size < 64.
-                        // But we MUST remove the panic.
-                        // Let's just assume we wrote it all for now to avoid panic, or better:
-                        // Since we are in a tight loop, we can just error out by finishing early?
-                        // No, silence is bad.
-                        // Best effort: write partial, but we don't track offset in header_bytes.
-                        // So we will just write partial header and move to VectorData? No, that corrupts stream.
-
-                        // Valid Fix: We assume chunk_size >= 64 was checked at creation.
-                        // But to satisfy "No Panic", we just return.
                         break;
                     }
                 }

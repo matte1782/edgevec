@@ -5,7 +5,7 @@
 //!
 //! # Supported Platforms
 //!
-//! - **x86_64 with AVX2**: Uses `_mm256_xor_si256` + lookup-based popcount
+//! - **x86_64 with AVX2**: Uses `_mm256_xor_si256` + native popcnt extraction
 //! - **x86_64 with popcnt**: Uses native `popcnt` instruction on u64 chunks
 //! - **aarch64 with NEON**: Uses `veorq_u8` + `vcntq_u8` for parallel popcount
 //! - **All platforms**: Scalar fallback using `count_ones()`
@@ -117,56 +117,38 @@ pub fn scalar_popcount_xor(a: &[u8], b: &[u8]) -> u32 {
         .sum()
 }
 
-/// x86_64 AVX2 implementation.
+/// x86_64 AVX2 implementation using native popcnt instruction.
 ///
-/// Processes 32 bytes at a time using AVX2 XOR and a lookup-based popcount.
+/// Processes 32 bytes at a time using AVX2 XOR, then extracts 4×u64 values
+/// and uses native popcnt via count_ones(). This is faster than the PSHUFB
+/// lookup table method on modern CPUs (Haswell+) that have hardware popcnt.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 unsafe fn avx2_popcount_xor(a: &[u8], b: &[u8]) -> u32 {
-    use std::arch::x86_64::{
-        _mm256_add_epi8, _mm256_and_si256, _mm256_extracti128_si256, _mm256_loadu_si256,
-        _mm256_sad_epu8, _mm256_set1_epi8, _mm256_setr_epi8, _mm256_setzero_si256,
-        _mm256_shuffle_epi8, _mm256_srli_epi16, _mm256_xor_si256, _mm_add_epi64, _mm_extract_epi64,
-    };
+    use std::arch::x86_64::{__m256i, _mm256_extract_epi64, _mm256_loadu_si256, _mm256_xor_si256};
 
     let mut total = 0u32;
     let len = a.len();
-
-    // Lookup table for 4-bit popcount (stored as 16 bytes)
-    // Each index 0-15 contains the popcount of that 4-bit value
-    let lookup = _mm256_setr_epi8(
-        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3,
-        3, 4,
-    );
-    let low_mask = _mm256_set1_epi8(0x0F);
 
     // Process 32 bytes at a time
     let chunks = len / 32;
     for i in 0..chunks {
         let offset = i * 32;
-        let va = _mm256_loadu_si256(a.as_ptr().add(offset).cast());
-        let vb = _mm256_loadu_si256(b.as_ptr().add(offset).cast());
+        let va = _mm256_loadu_si256(a.as_ptr().add(offset).cast::<__m256i>());
+        let vb = _mm256_loadu_si256(b.as_ptr().add(offset).cast::<__m256i>());
 
         // XOR the vectors
         let xor = _mm256_xor_si256(va, vb);
 
-        // Popcount using lookup table
-        // Split each byte into low and high nibbles, look up each
-        let lo = _mm256_and_si256(xor, low_mask);
-        let hi = _mm256_and_si256(_mm256_srli_epi16(xor, 4), low_mask);
-        let popcnt_lo = _mm256_shuffle_epi8(lookup, lo);
-        let popcnt_hi = _mm256_shuffle_epi8(lookup, hi);
-        let popcnt = _mm256_add_epi8(popcnt_lo, popcnt_hi);
+        // Extract 4×u64 and use native popcnt instruction.
+        // count_ones() compiles to popcnt on x86_64 with hardware support.
+        let v0 = _mm256_extract_epi64(xor, 0) as u64;
+        let v1 = _mm256_extract_epi64(xor, 1) as u64;
+        let v2 = _mm256_extract_epi64(xor, 2) as u64;
+        let v3 = _mm256_extract_epi64(xor, 3) as u64;
 
-        // Horizontal sum
-        // SAFETY: The sum of popcounts of 32 bytes is at most 32*8=256,
-        // which fits in a u32. The i64 result is always non-negative.
-        let sum = _mm256_sad_epu8(popcnt, _mm256_setzero_si256());
-        let sum_lo = _mm256_extracti128_si256(sum, 0);
-        let sum_hi = _mm256_extracti128_si256(sum, 1);
-        let sum128 = _mm_add_epi64(sum_lo, sum_hi);
-        total += (_mm_extract_epi64(sum128, 0) + _mm_extract_epi64(sum128, 1)) as u32;
+        total += v0.count_ones() + v1.count_ones() + v2.count_ones() + v3.count_ones();
     }
 
     // Handle remainder with scalar

@@ -15,8 +15,8 @@
 //!
 //! 1. Load 96 bytes in 3 × 256-bit YMM registers
 //! 2. XOR corresponding registers to find differing bits
-//! 3. Population count using lookup table method (AVX2 lacks native popcount)
-//! 4. Horizontal sum across all registers
+//! 3. Population count using native popcnt instruction (extract 4×u64, sum count_ones())
+//! 4. Sum results across all registers
 //!
 //! # Safety
 //!
@@ -26,11 +26,7 @@
 //! 3. No undefined behavior in pointer arithmetic
 
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::{
-    __m256i, _mm256_add_epi8, _mm256_and_si256, _mm256_extract_epi64, _mm256_loadu_si256,
-    _mm256_sad_epu8, _mm256_set1_epi8, _mm256_setr_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
-    _mm256_srli_epi16, _mm256_xor_si256,
-};
+use std::arch::x86_64::{__m256i, _mm256_extract_epi64, _mm256_loadu_si256, _mm256_xor_si256};
 
 /// AVX2-accelerated Hamming distance for 96-byte binary vectors.
 ///
@@ -99,21 +95,17 @@ pub(crate) unsafe fn hamming_distance_avx2(a: &[u8; 96], b: &[u8; 96]) -> u32 {
     pop0 + pop1 + pop2
 }
 
-/// AVX2 population count using lookup table method.
+/// AVX2 population count using native popcnt instruction.
 ///
 /// # Algorithm
 ///
-/// AVX2 doesn't provide native popcount (AVX-512 has VPOPCNTDQ).
-/// We use the SSSE3 PSHUFB-based lookup table technique:
-///
-/// 1. Split each byte into low/high nibbles (4 bits each)
-/// 2. Use PSHUFB to look up popcount for each nibble in a 16-entry table
-/// 3. Add low + high nibble counts to get full byte popcount
-/// 4. Horizontal sum all byte counts
+/// Extract 4 × 64-bit values from the 256-bit register and use the native
+/// hardware popcnt instruction via count_ones(). This is faster than the
+/// PSHUFB lookup table method on modern CPUs (Haswell+) that have popcnt.
 ///
 /// # Safety
 ///
-/// This function is safe to call after `is_x86_feature_detected!("avx2")`.
+/// Caller must ensure AVX2 is available via `is_x86_feature_detected!("avx2")`.
 ///
 /// # Arguments
 ///
@@ -125,77 +117,16 @@ pub(crate) unsafe fn hamming_distance_avx2(a: &[u8; 96], b: &[u8; 96]) -> u32 {
 #[target_feature(enable = "avx2")]
 #[inline]
 #[cfg(target_arch = "x86_64")]
+#[allow(clippy::cast_sign_loss)] // Values are bit patterns, not signed integers
 unsafe fn popcount_avx2(v: __m256i) -> u32 {
-    // SAFETY: AVX2 feature is enabled via #[target_feature]
+    // Extract 4 × 64-bit values and use native popcnt instruction.
+    // count_ones() compiles to popcnt on x86_64 with hardware support.
+    let a = _mm256_extract_epi64(v, 0) as u64;
+    let b = _mm256_extract_epi64(v, 1) as u64;
+    let c = _mm256_extract_epi64(v, 2) as u64;
+    let d = _mm256_extract_epi64(v, 3) as u64;
 
-    // Lookup table: popcount for nibbles 0-15
-    // Index: nibble value, Value: number of 1 bits
-    // [0]=0, [1]=1, [2]=1, [3]=2, ..., [15]=4
-    let lookup = _mm256_setr_epi8(
-        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, // Low 128 bits
-        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, // High 128 bits
-    );
-
-    let low_mask = _mm256_set1_epi8(0x0F);
-
-    // Extract low and high nibbles
-    let lo = _mm256_and_si256(v, low_mask);
-    let hi = _mm256_and_si256(_mm256_srli_epi16(v, 4), low_mask);
-
-    // Lookup popcount for each nibble
-    let popcnt_lo = _mm256_shuffle_epi8(lookup, lo);
-    let popcnt_hi = _mm256_shuffle_epi8(lookup, hi);
-
-    // Add nibble counts to get byte counts
-    let popcnt = _mm256_add_epi8(popcnt_lo, popcnt_hi);
-
-    // Horizontal sum: reduce 32 bytes to single u32
-    horizontal_sum_avx2(popcnt)
-}
-
-/// Horizontal sum of bytes in a 256-bit AVX2 register.
-///
-/// # Algorithm
-///
-/// 1. Use _mm256_sad_epu8 (Sum of Absolute Differences) against zero
-///    This gives us 4 × 64-bit partial sums (one per 64-bit lane)
-/// 2. Extract all four 64-bit values
-/// 3. Add them together to get final sum
-///
-/// # Safety
-///
-/// This function is safe to call after `is_x86_feature_detected!("avx2")`.
-///
-/// # Arguments
-///
-/// * `v` - 256-bit register containing byte values to sum
-///
-/// # Returns
-///
-/// Sum of all bytes in the register (0..=8160 for max input 0xFF×32)
-#[target_feature(enable = "avx2")]
-#[inline]
-#[cfg(target_arch = "x86_64")]
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // _mm256_sad_epu8 returns unsigned values ≤8160
-unsafe fn horizontal_sum_avx2(v: __m256i) -> u32 {
-    // SAFETY: AVX2 feature is enabled via #[target_feature]
-
-    // SAD against zero gives sum of absolute values
-    // Since all values are unsigned, this is just a sum
-    // Result: 4 × 64-bit partial sums in the register
-    let zero = _mm256_setzero_si256();
-    let sad = _mm256_sad_epu8(v, zero);
-
-    // Extract the 4 × 64-bit partial sums
-    // _mm256_sad_epu8 places sums at specific positions in the register
-    // The values are guaranteed to fit in u32 (max 8 × 255 = 2040 per lane)
-    let sum0 = _mm256_extract_epi64(sad, 0) as u32;
-    let sum1 = _mm256_extract_epi64(sad, 1) as u32;
-    let sum2 = _mm256_extract_epi64(sad, 2) as u32;
-    let sum3 = _mm256_extract_epi64(sad, 3) as u32;
-
-    // Add all partial sums
-    sum0 + sum1 + sum2 + sum3
+    a.count_ones() + b.count_ones() + c.count_ones() + d.count_ones()
 }
 
 #[cfg(test)]
