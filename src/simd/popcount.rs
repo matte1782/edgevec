@@ -124,7 +124,11 @@ pub fn scalar_popcount_xor(a: &[u8], b: &[u8]) -> u32 {
 /// lookup table method on modern CPUs (Haswell+) that have hardware popcnt.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_ptr_alignment
+)]
 unsafe fn avx2_popcount_xor(a: &[u8], b: &[u8]) -> u32 {
     use std::arch::x86_64::{__m256i, _mm256_extract_epi64, _mm256_loadu_si256, _mm256_xor_si256};
 

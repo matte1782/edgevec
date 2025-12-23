@@ -117,10 +117,11 @@ pub(crate) unsafe fn hamming_distance_avx2(a: &[u8; 96], b: &[u8; 96]) -> u32 {
 #[target_feature(enable = "avx2")]
 #[inline]
 #[cfg(target_arch = "x86_64")]
-#[allow(clippy::cast_sign_loss)] // Values are bit patterns, not signed integers
+#[allow(clippy::cast_sign_loss, clippy::many_single_char_names)]
 unsafe fn popcount_avx2(v: __m256i) -> u32 {
     // Extract 4 × 64-bit values and use native popcnt instruction.
     // count_ones() compiles to popcnt on x86_64 with hardware support.
+    // Variable names (a,b,c,d) are standard for lane extraction.
     let a = _mm256_extract_epi64(v, 0) as u64;
     let b = _mm256_extract_epi64(v, 1) as u64;
     let c = _mm256_extract_epi64(v, 2) as u64;
