@@ -321,7 +321,12 @@
                 const summaryText = simdSupported
                     ? `All tests passed. SIMD128 acceleration is active.
 Average search latency: ${avgLatency.toFixed(3)}ms
-Insert throughput: ${(1000 / insertTime * 1000).toFixed(0)} vectors/sec`
+Insert throughput: ${(1000 / insertTime * 1000).toFixed(0)} vectors/sec
+
+SIMD Usage (v0.7.0):
+• L2/Dot distance: SIMD for dim ≥ 16 (128-dim uses SIMD)
+• Binary Quantization: SIMD for all sizes
+• Hamming distance: SIMD for all sizes`
                     : `Tests passed with scalar fallback.
 This browser does not support WASM SIMD128.
 Performance may be slower than SIMD-enabled browsers.
