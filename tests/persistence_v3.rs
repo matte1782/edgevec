@@ -276,16 +276,18 @@ fn test_all_deleted_persistence() {
 }
 
 #[test]
-fn test_version_is_0_3() {
+fn test_version_is_0_4() {
     // Verify the current version constants
+    // v0.4 adds metadata support (RFC-002)
     assert_eq!(
-        VERSION_MINOR, 3,
-        "Current version should be 0.3 for soft-delete support"
+        VERSION_MINOR, 4,
+        "Current version should be 0.4 for metadata support"
     );
 
-    // FileHeader should report soft-delete support
+    // FileHeader should report soft-delete support (added in v0.3, still works in v0.4)
     let header = FileHeader::new(4);
     assert!(header.supports_soft_delete());
+    // v0.4 is current, so no migration needed
     assert!(!header.needs_migration());
 }
 
