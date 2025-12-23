@@ -94,31 +94,51 @@ python -m http.server 8080
 
 ## Performance
 
+EdgeVec v0.7.0 uses **SIMD instructions** for 2x+ faster vector operations on modern browsers.
+
+### Distance Calculation (Native Benchmark)
+
+| Dimension | Dot Product | L2 Distance | Throughput |
+|:----------|:------------|:------------|:-----------|
+| 128 | 55 ns | 66 ns | 2.3 Gelem/s |
+| 384 | 188 ns | 184 ns | 2.1 Gelem/s |
+| 768 | 374 ns | 358 ns | 2.1 Gelem/s |
+| 1536 | 761 ns | 693 ns | 2.1 Gelem/s |
+
 ### Search Latency (768D vectors, k=10)
 
 | Scale | EdgeVec | Target | Status |
 |:------|:--------|:-------|:-------|
-| 10k vectors | **88 us** | <1 ms | 11x under |
-| 50k vectors | **167 us** | <1 ms | 6x under |
-| 100k vectors | **329 us** | <1 ms | 3x under |
+| 1k vectors | **380 us** | <1 ms | 2.6x under |
+| 10k vectors | **938 us** | <1 ms | PASS |
 
-### Competitive Comparison (10k vectors, 128D)
+### Hamming Distance (Binary Quantization)
 
-| Library | Search P50 | Type | Notes |
-|:--------|:-----------|:-----|:------|
-| **EdgeVec** | **0.20 ms** | WASM | Fastest WASM solution |
-| hnswlib-node | 0.05 ms | Native C++ | Requires compilation |
-| voy | 4.78 ms | WASM | k-d tree algorithm |
+| Operation | Time | Throughput |
+|:----------|:-----|:-----------|
+| 768-bit pair | 4.5 ns | 40 GiB/s |
+| Batch 10k | 79 us | 127 Melem/s |
 
-**EdgeVec is 24x faster than voy** for search while both are pure WASM.
+### Browser Support
+
+| Browser | SIMD | Performance |
+|:--------|:-----|:------------|
+| Chrome 91+ | YES | Full speed |
+| Firefox 89+ | YES | Full speed |
+| Safari 16.4+ | YES | Full speed (macOS) |
+| Edge 91+ | YES | Full speed |
+| iOS Safari | NO | Scalar fallback |
+
+> **Note:** iOS Safari doesn't support WASM SIMD. EdgeVec automatically uses scalar
+> fallback, which is ~2x slower but still functional.
 
 ### Bundle Size
 
-| Package | Size (gzip) | Target | Status |
-|:--------|:------------|:-------|:-------|
-| edgevec | **217 KB** | <500 KB | 57% under |
+| Package | Size (gzip) | Notes |
+|:--------|:------------|:------|
+| edgevec | **217 KB** | SIMD enabled (541 KB uncompressed) |
 
-[Full benchmarks ->](docs/benchmarks/competitive_analysis_v2.md)
+[Full benchmark report ->](docs/benchmarks/2025-12-24_simd_benchmark.md)
 
 ---
 
@@ -281,6 +301,7 @@ For these use cases, consider [Pinecone](https://pinecone.io), [Qdrant](https://
 
 ## Version History
 
+- **v0.7.0** — SIMD acceleration (2x+ speedup), WASM SIMD128 enabled for dim >= 16
 - **v0.6.0** — Binary quantization (32x memory), metadata storage, memory pressure API
 - **v0.5.4** — iOS Safari compatibility fixes
 - **v0.5.3** — crates.io publishing fix (package size reduction)

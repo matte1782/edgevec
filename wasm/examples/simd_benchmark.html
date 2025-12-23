@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EdgeVec v0.7.0 SIMD Benchmark — Measure WASM SIMD128 acceleration for vector operations">
+  <title>EdgeVec v0.7.0 // SIMD_PERFORMANCE_MATRIX</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+
+  <!-- Shared Styles -->
+  <link rel="stylesheet" href="css/cyberpunk.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/mobile.css">
+
+  <!-- SIMD Benchmark Specific Styles -->
+  <style>
+    /* SIMD-specific accent colors */
+    :root {
+      --simd-primary: #00ff88;
+      --simd-secondary: #00aaff;
+      --simd-accent: #ff00aa;
+      --simd-glow: 0 0 10px var(--simd-primary), 0 0 20px var(--simd-primary), 0 0 40px var(--simd-primary);
+    }
+
+    /* Hero SIMD badge */
+    .simd-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-lg);
+      background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 170, 255, 0.2));
+      border: 2px solid var(--simd-primary);
+      border-radius: var(--radius-md);
+      font-family: var(--font-display);
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--simd-primary);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      box-shadow: var(--simd-glow);
+      animation: simdPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes simdPulse {
+      0%, 100% { box-shadow: 0 0 10px var(--simd-primary), 0 0 20px var(--simd-primary); }
+      50% { box-shadow: 0 0 20px var(--simd-primary), 0 0 40px var(--simd-primary), 0 0 60px var(--simd-primary); }
+    }
+
+    .simd-badge__icon {
+      width: 24px;
+      height: 24px;
+      animation: simdIconSpin 4s linear infinite;
+    }
+
+    @keyframes simdIconSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* SIMD Architecture Diagram */
+    .simd-diagram {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-xs);
+      padding: var(--space-md);
+      background: var(--bg-terminal);
+      border: 1px solid var(--simd-secondary);
+      border-radius: var(--radius-md);
+      margin: var(--space-lg) 0;
+    }
+
+    .simd-lane {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: var(--space-sm);
+      background: var(--bg-elevated);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-sm);
+      transition: all var(--transition-fast);
+    }
+
+    .simd-lane--active {
+      border-color: var(--simd-primary);
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    }
+
+    .simd-lane__label {
+      font-size: 0.625rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .simd-lane__value {
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      color: var(--simd-primary);
+      font-weight: 600;
+    }
+
+    /* Benchmark Results Grid */
+    .benchmark-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-lg);
+      margin: var(--space-xl) 0;
+    }
+
+    /* Benchmark Card */
+    .bench-card {
+      position: relative;
+      background: var(--bg-panel);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      transition: all var(--transition-base);
+      overflow: hidden;
+    }
+
+    .bench-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--simd-primary), var(--simd-secondary), var(--simd-accent));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform var(--transition-base);
+    }
+
+    .bench-card:hover {
+      border-color: var(--simd-primary);
+      transform: translateY(-4px);
+    }
+
+    .bench-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .bench-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+    }
+
+    .bench-card__title {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--simd-secondary);
+      text-transform: uppercase;
+    }
+
+    .bench-card__badge {
+      font-size: 0.625rem;
+      padding: 2px 8px;
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid var(--simd-primary);
+      border-radius: var(--radius-sm);
+      color: var(--simd-primary);
+      font-weight: 600;
+    }
+
+    .bench-card__metric {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-sm);
+    }
+
+    .bench-card__value {
+      font-family: var(--font-display);
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+
+    .bench-card__unit {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .bench-card__bar {
+      height: 8px;
+      background: var(--bg-elevated);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-top: var(--space-md);
+    }
+
+    .bench-card__bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--simd-primary), var(--simd-secondary));
+      border-radius: var(--radius-sm);
+      transition: width 1s ease-out;
+    }
+
+    .bench-card__footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: var(--space-sm);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Dimension Selector */
+    .dimension-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: var(--space-sm);
+      margin: var(--space-md) 0;
+    }
+
+    .dimension-btn {
+      padding: var(--space-sm) var(--space-md);
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-elevated);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .dimension-btn:hover {
+      border-color: var(--simd-secondary);
+      color: var(--simd-secondary);
+    }
+
+    .dimension-btn--active {
+      border-color: var(--simd-primary);
+      background: rgba(0, 255, 136, 0.1);
+      color: var(--simd-primary);
+      box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+    }
+
+    /* Live Performance Chart */
+    .perf-chart {
+      position: relative;
+      height: 200px;
+      background: var(--bg-terminal);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      overflow: hidden;
+    }
+
+    .perf-chart__grid {
+      position: absolute;
+      inset: var(--space-md);
+      background-image:
+        linear-gradient(rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+      background-size: 50px 40px;
+      pointer-events: none;
+    }
+
+    .perf-chart__canvas {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Operation Type Pills */
+    .op-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      margin: var(--space-md) 0;
+    }
+
+    .op-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-md);
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--bg-elevated);
+      border: 1px solid var(--text-muted);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .op-pill:hover {
+      border-color: var(--neon-cyan);
+    }
+
+    .op-pill--active {
+      background: rgba(0, 255, 255, 0.1);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .op-pill__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Browser Support Matrix */
+    .browser-matrix {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: var(--space-md);
+      margin: var(--space-lg) 0;
+    }
+
+    .browser-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: var(--bg-panel);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-md);
+    }
+
+    .browser-card--supported {
+      border-color: var(--neon-green);
+    }
+
+    .browser-card--unsupported {
+      border-color: var(--neon-magenta);
+      opacity: 0.7;
+    }
+
+    .browser-card__icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .browser-card__info {
+      flex: 1;
+    }
+
+    .browser-card__name {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    .browser-card__version {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .browser-card__status {
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+    }
+
+    .browser-card--supported .browser-card__status {
+      background: rgba(57, 255, 20, 0.1);
+      color: var(--neon-green);
+    }
+
+    .browser-card--unsupported .browser-card__status {
+      background: rgba(255, 0, 255, 0.1);
+      color: var(--neon-magenta);
+    }
+
+    /* Run Benchmark Section */
+    .benchmark-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-lg);
+      padding: var(--space-lg);
+      background: var(--bg-panel);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-md);
+      margin: var(--space-xl) 0;
+    }
+
+    .benchmark-controls__btn {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .benchmark-controls__info {
+      flex: 2;
+      display: flex;
+      gap: var(--space-xl);
+    }
+
+    .benchmark-controls__stat {
+      text-align: center;
+    }
+
+    .benchmark-controls__stat-value {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--simd-primary);
+    }
+
+    .benchmark-controls__stat-label {
+      font-size: 0.625rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* Progress indicator during benchmark */
+    .benchmark-progress {
+      display: none;
+      align-items: center;
+      gap: var(--space-md);
+      width: 100%;
+    }
+
+    .benchmark-progress--active {
+      display: flex;
+    }
+
+    .benchmark-progress__bar {
+      flex: 1;
+      height: 8px;
+      background: var(--bg-elevated);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+
+    .benchmark-progress__fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--simd-primary), var(--simd-secondary));
+      border-radius: var(--radius-sm);
+      transition: width 0.3s ease-out;
+      position: relative;
+    }
+
+    .benchmark-progress__fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: progressShine 1.5s infinite;
+    }
+
+    .benchmark-progress__text {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      min-width: 100px;
+    }
+
+    /* Results summary cards */
+    .results-summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-md);
+      margin: var(--space-xl) 0;
+    }
+
+    @media (max-width: 900px) {
+      .results-summary {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 500px) {
+      .results-summary {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .summary-card {
+      padding: var(--space-lg);
+      background: var(--bg-panel);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-md);
+      text-align: center;
+      transition: all var(--transition-base);
+    }
+
+    .summary-card:hover {
+      border-color: var(--simd-primary);
+      transform: translateY(-2px);
+    }
+
+    .summary-card__icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto var(--space-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 255, 136, 0.1);
+      border-radius: var(--radius-md);
+      font-size: 1.5rem;
+    }
+
+    .summary-card__value {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .summary-card__label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Log output panel */
+    .log-panel {
+      background: var(--bg-terminal);
+      border: 1px solid var(--text-muted);
+      border-radius: var(--radius-md);
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .log-panel__header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--text-muted);
+      position: sticky;
+      top: 0;
+    }
+
+    .log-panel__body {
+      padding: var(--space-md);
+    }
+
+    .log-entry {
+      display: flex;
+      gap: var(--space-sm);
+      padding: var(--space-xs) 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .log-entry__time {
+      color: var(--text-muted);
+      min-width: 80px;
+    }
+
+    .log-entry__msg {
+      color: var(--text-secondary);
+    }
+
+    .log-entry--success .log-entry__msg {
+      color: var(--neon-green);
+    }
+
+    .log-entry--info .log-entry__msg {
+      color: var(--neon-cyan);
+    }
+
+    .log-entry--warn .log-entry__msg {
+      color: var(--neon-yellow);
+    }
+
+    .log-entry--error .log-entry__msg {
+      color: var(--neon-magenta);
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Effects -->
+  <canvas id="particleCanvas" class="effect-canvas" aria-hidden="true"></canvas>
+  <canvas id="matrixCanvas" class="effect-canvas effect-canvas--matrix" aria-hidden="true"></canvas>
+
+  <!-- Noise Overlay -->
+  <div class="noise-overlay" aria-hidden="true"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="container header__inner">
+      <div class="header__logo">
+        <span class="glitch neon-text" data-text="EDGEVEC">EDGEVEC</span>
+        <span class="header__version">v0.7.0</span>
+      </div>
+
+      <nav class="header__nav" role="navigation" aria-label="Main navigation">
+        <a href="#benchmark" class="header__link">BENCHMARK</a>
+        <a href="#results" class="header__link">RESULTS</a>
+        <a href="#compatibility" class="header__link">COMPATIBILITY</a>
+      </nav>
+
+      <div class="header__actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+          <svg class="theme-toggle__icon theme-toggle__icon--dark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <svg class="theme-toggle__icon theme-toggle__icon--light" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+          </svg>
+        </button>
+        <a href="v060_cyberpunk_demo.html" class="btn btn--small">MAIN DEMO</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="simd-badge fade-in-down">
+        <svg class="simd-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        WASM SIMD128 ENABLED
+      </div>
+
+      <h1 class="hero__title glitch neon-pulse" data-text="SIMD_PERFORMANCE_MATRIX">
+        SIMD_PERFORMANCE_MATRIX
+      </h1>
+      <p class="hero__subtitle">
+        Vector Operations at <span class="neon-text--green">2+ Gelem/s</span> //
+        Powered by <span class="neon-text">WebAssembly SIMD128</span>
+      </p>
+
+      <!-- Status Bar -->
+      <div class="status-bar" id="statusBar" role="status" aria-live="polite">
+        <div class="status-bar__item">
+          <span class="status-bar__label">WASM</span>
+          <span class="status-bar__value status-bar__value--loading" id="wasmStatus">LOADING...</span>
+        </div>
+        <div class="status-bar__item">
+          <span class="status-bar__label">SIMD</span>
+          <span class="status-bar__value" id="simdStatus">DETECTING...</span>
+        </div>
+        <div class="status-bar__item">
+          <span class="status-bar__label">LANES</span>
+          <span class="status-bar__value" id="simdLanes">4xF32</span>
+        </div>
+        <div class="status-bar__item">
+          <span class="status-bar__label">THROUGHPUT</span>
+          <span class="status-bar__value" id="throughputValue">--</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <!-- SIMD Architecture Visualization -->
+      <section class="section" id="architecture">
+        <h2 class="section__title">
+          <span class="neon-text">SIMD128</span> LANE_ARCHITECTURE
+        </h2>
+
+        <div class="terminal fade-in-up">
+          <div class="terminal__header">
+            <span class="terminal__dot"></span>
+            <span class="terminal__dot terminal__dot--yellow"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__title">VECTOR_REGISTER_f32x4</span>
+          </div>
+          <div class="terminal__body">
+            <p style="margin-bottom: var(--space-md); color: var(--text-secondary);">
+              SIMD128 processes <strong style="color: var(--simd-primary);">4 float32 values</strong> simultaneously using a single 128-bit register.
+            </p>
+            <div class="simd-diagram" id="simdDiagram">
+              <div class="simd-lane" id="lane0">
+                <span class="simd-lane__label">Lane 0</span>
+                <span class="simd-lane__value">f32</span>
+              </div>
+              <div class="simd-lane" id="lane1">
+                <span class="simd-lane__label">Lane 1</span>
+                <span class="simd-lane__value">f32</span>
+              </div>
+              <div class="simd-lane" id="lane2">
+                <span class="simd-lane__label">Lane 2</span>
+                <span class="simd-lane__value">f32</span>
+              </div>
+              <div class="simd-lane" id="lane3">
+                <span class="simd-lane__label">Lane 3</span>
+                <span class="simd-lane__value">f32</span>
+              </div>
+            </div>
+            <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+              EdgeVec uses f32x4.mul, f32x4.add, and horizontal sum for dot product calculations
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Benchmark Controls -->
+      <section class="section" id="benchmark">
+        <h2 class="section__title">RUN_BENCHMARK</h2>
+
+        <div class="terminal fade-in-up stagger-1">
+          <div class="terminal__header">
+            <span class="terminal__dot"></span>
+            <span class="terminal__dot terminal__dot--yellow"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__title">BENCHMARK_CONFIG</span>
+          </div>
+          <div class="terminal__body">
+            <!-- Dimension Selection -->
+            <div class="control-group">
+              <label class="control-label">VECTOR_DIMENSIONS</label>
+              <div class="dimension-grid" id="dimensionGrid">
+                <button class="dimension-btn" data-dim="128">128</button>
+                <button class="dimension-btn" data-dim="256">256</button>
+                <button class="dimension-btn" data-dim="384">384</button>
+                <button class="dimension-btn" data-dim="512">512</button>
+                <button class="dimension-btn dimension-btn--active" data-dim="768">768</button>
+                <button class="dimension-btn" data-dim="1024">1024</button>
+                <button class="dimension-btn" data-dim="1536">1536</button>
+              </div>
+            </div>
+
+            <hr class="divider">
+
+            <!-- Operation Selection -->
+            <div class="control-group">
+              <label class="control-label">OPERATIONS</label>
+              <div class="op-pills" id="opPills">
+                <button class="op-pill op-pill--active" data-op="dot">
+                  <span class="op-pill__dot"></span>
+                  Dot Product
+                </button>
+                <button class="op-pill op-pill--active" data-op="l2">
+                  <span class="op-pill__dot"></span>
+                  L2 Distance
+                </button>
+                <button class="op-pill op-pill--active" data-op="cosine">
+                  <span class="op-pill__dot"></span>
+                  Cosine Similarity
+                </button>
+                <button class="op-pill" data-op="hamming">
+                  <span class="op-pill__dot"></span>
+                  Hamming (BQ)
+                </button>
+              </div>
+            </div>
+
+            <hr class="divider">
+
+            <!-- Iterations -->
+            <div class="control-group">
+              <label class="control-label" for="iterSlider">ITERATIONS</label>
+              <input type="range" id="iterSlider" class="slider" min="100" max="10000" value="1000" step="100">
+              <output id="iterValue" class="control-output">1000</output>
+            </div>
+          </div>
+        </div>
+
+        <!-- Run Button & Progress -->
+        <div class="benchmark-controls fade-in-up stagger-2">
+          <button class="btn btn--filled benchmark-controls__btn" id="runBenchmark">
+            RUN_BENCHMARK
+          </button>
+
+          <div class="benchmark-progress" id="benchProgress">
+            <div class="benchmark-progress__bar">
+              <div class="benchmark-progress__fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <span class="benchmark-progress__text" id="progressText">0%</span>
+          </div>
+
+          <div class="benchmark-controls__info" id="benchInfo">
+            <div class="benchmark-controls__stat">
+              <div class="benchmark-controls__stat-value" id="totalOps">--</div>
+              <div class="benchmark-controls__stat-label">Total Ops</div>
+            </div>
+            <div class="benchmark-controls__stat">
+              <div class="benchmark-controls__stat-value" id="estTime">--</div>
+              <div class="benchmark-controls__stat-label">Est. Time</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results Section -->
+      <section class="section" id="results">
+        <h2 class="section__title">BENCHMARK_RESULTS</h2>
+
+        <!-- Summary Cards -->
+        <div class="results-summary" id="resultsSummary">
+          <div class="summary-card fade-in-up stagger-1">
+            <div class="summary-card__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--simd-primary)" stroke-width="2" width="24" height="24">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+            </div>
+            <div class="summary-card__value" id="avgLatency">--</div>
+            <div class="summary-card__label">Avg Latency (ns)</div>
+          </div>
+
+          <div class="summary-card fade-in-up stagger-2">
+            <div class="summary-card__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--simd-secondary)" stroke-width="2" width="24" height="24">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <div class="summary-card__value" id="throughput">--</div>
+            <div class="summary-card__label">Throughput (Gelem/s)</div>
+          </div>
+
+          <div class="summary-card fade-in-up stagger-3">
+            <div class="summary-card__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--neon-cyan)" stroke-width="2" width="24" height="24">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <div class="summary-card__value" id="totalTime">--</div>
+            <div class="summary-card__label">Total Time (ms)</div>
+          </div>
+
+          <div class="summary-card fade-in-up stagger-4">
+            <div class="summary-card__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--neon-green)" stroke-width="2" width="24" height="24">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            </div>
+            <div class="summary-card__value" id="opsPerSec">--</div>
+            <div class="summary-card__label">Ops/sec</div>
+          </div>
+        </div>
+
+        <!-- Detailed Results Grid -->
+        <div class="benchmark-grid" id="benchmarkResults">
+          <!-- Results cards will be inserted here by JavaScript -->
+        </div>
+
+        <!-- Performance Chart -->
+        <div class="terminal fade-in-up">
+          <div class="terminal__header">
+            <span class="terminal__dot"></span>
+            <span class="terminal__dot terminal__dot--yellow"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span class="terminal__title">LATENCY_DISTRIBUTION</span>
+          </div>
+          <div class="terminal__body">
+            <div class="perf-chart">
+              <div class="perf-chart__grid"></div>
+              <canvas id="perfChart" class="perf-chart__canvas"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Compatibility Section -->
+      <section class="section" id="compatibility">
+        <h2 class="section__title">BROWSER_COMPATIBILITY</h2>
+
+        <div class="browser-matrix">
+          <div class="browser-card browser-card--supported">
+            <div class="browser-card__icon">
+              <svg viewBox="0 0 24 24" width="32" height="32">
+                <circle cx="12" cy="12" r="10" fill="#4285f4"/>
+                <circle cx="12" cy="12" r="4" fill="#fff"/>
+              </svg>
+            </div>
+            <div class="browser-card__info">
+              <div class="browser-card__name">Chrome</div>
+              <div class="browser-card__version">91+</div>
+            </div>
+            <span class="browser-card__status">SIMD</span>
+          </div>
+
+          <div class="browser-card browser-card--supported">
+            <div class="browser-card__icon">
+              <svg viewBox="0 0 24 24" width="32" height="32">
+                <circle cx="12" cy="12" r="10" fill="#ff6611"/>
+                <circle cx="12" cy="12" r="6" fill="#fff"/>
+              </svg>
+            </div>
+            <div class="browser-card__info">
+              <div class="browser-card__name">Firefox</div>
+              <div class="browser-card__version">89+</div>
+            </div>
+            <span class="browser-card__status">SIMD</span>
+          </div>
+
+          <div class="browser-card browser-card--supported">
+            <div class="browser-card__icon">
+              <svg viewBox="0 0 24 24" width="32" height="32">
+                <circle cx="12" cy="12" r="10" fill="#0078d4"/>
+                <path d="M6 12h12" stroke="#fff" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="browser-card__info">
+              <div class="browser-card__name">Edge</div>
+              <div class="browser-card__version">91+</div>
+            </div>
+            <span class="browser-card__status">SIMD</span>
+          </div>
+
+          <div class="browser-card browser-card--supported">
+            <div class="browser-card__icon">
+              <svg viewBox="0 0 24 24" width="32" height="32">
+                <circle cx="12" cy="12" r="10" fill="#06c"/>
+                <circle cx="12" cy="12" r="3" fill="#fff"/>
+              </svg>
+            </div>
+            <div class="browser-card__info">
+              <div class="browser-card__name">Safari</div>
+              <div class="browser-card__version">16.4+ (macOS)</div>
+            </div>
+            <span class="browser-card__status">SIMD</span>
+          </div>
+
+          <div class="browser-card browser-card--unsupported">
+            <div class="browser-card__icon">
+              <svg viewBox="0 0 24 24" width="32" height="32">
+                <circle cx="12" cy="12" r="10" fill="#888"/>
+                <circle cx="12" cy="12" r="3" fill="#fff"/>
+              </svg>
+            </div>
+            <div class="browser-card__info">
+              <div class="browser-card__name">iOS Safari</div>
+              <div class="browser-card__version">All versions</div>
+            </div>
+            <span class="browser-card__status">SCALAR</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Log Panel -->
+      <section class="section">
+        <div class="log-panel">
+          <div class="log-panel__header">
+            <span class="terminal__dot"></span>
+            <span class="terminal__dot terminal__dot--yellow"></span>
+            <span class="terminal__dot terminal__dot--green"></span>
+            <span style="margin-left: auto; font-size: 0.75rem; color: var(--text-muted);">BENCHMARK_LOG</span>
+          </div>
+          <div class="log-panel__body" id="logOutput">
+            <div class="log-entry log-entry--info">
+              <span class="log-entry__time">[00:00:00]</span>
+              <span class="log-entry__msg">EdgeVec SIMD Benchmark initialized. Click RUN_BENCHMARK to start.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <p class="footer__text">
+        <strong class="neon-text">EdgeVec v0.7.0</strong> // SIMD Performance Matrix
+      </p>
+      <p class="footer__subtext">
+        Built with Rust + WebAssembly // <a href="https://github.com/matte1782/edgevec">GitHub</a>
+      </p>
+    </div>
+  </footer>
+
+  <!-- SVG Gradients -->
+  <svg width="0" height="0" style="position: absolute;">
+    <defs>
+      <linearGradient id="simdGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="var(--simd-primary)"/>
+        <stop offset="50%" stop-color="var(--simd-secondary)"/>
+        <stop offset="100%" stop-color="var(--simd-accent)"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { ParticleSystem, MatrixRain, EffectManager } from './js/effects.js';
+
+    // =========================================================================
+    // State
+    // =========================================================================
+    const state = {
+      wasmLoaded: false,
+      simdSupported: false,
+      edgevec: null,
+      selectedDim: 768,
+      selectedOps: ['dot', 'l2', 'cosine'],
+      iterations: 1000,
+      isRunning: false,
+      results: []
+    };
+
+    // =========================================================================
+    // DOM Elements
+    // =========================================================================
+    const elements = {
+      wasmStatus: document.getElementById('wasmStatus'),
+      simdStatus: document.getElementById('simdStatus'),
+      throughputValue: document.getElementById('throughputValue'),
+      dimensionGrid: document.getElementById('dimensionGrid'),
+      opPills: document.getElementById('opPills'),
+      iterSlider: document.getElementById('iterSlider'),
+      iterValue: document.getElementById('iterValue'),
+      runBenchmark: document.getElementById('runBenchmark'),
+      benchProgress: document.getElementById('benchProgress'),
+      progressFill: document.getElementById('progressFill'),
+      progressText: document.getElementById('progressText'),
+      totalOps: document.getElementById('totalOps'),
+      estTime: document.getElementById('estTime'),
+      benchmarkResults: document.getElementById('benchmarkResults'),
+      logOutput: document.getElementById('logOutput'),
+      avgLatency: document.getElementById('avgLatency'),
+      throughput: document.getElementById('throughput'),
+      totalTime: document.getElementById('totalTime'),
+      opsPerSec: document.getElementById('opsPerSec'),
+      perfChart: document.getElementById('perfChart'),
+      simdDiagram: document.getElementById('simdDiagram')
+    };
+
+    // =========================================================================
+    // Initialize Effects
+    // =========================================================================
+    const effectManager = new EffectManager();
+    effectManager.add(new ParticleSystem('particleCanvas'));
+    effectManager.add(new MatrixRain('matrixCanvas'));
+
+    // =========================================================================
+    // Utility Functions
+    // =========================================================================
+    function log(message, type = 'info') {
+      const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-entry--${type}`;
+      entry.innerHTML = `
+        <span class="log-entry__time">[${time}]</span>
+        <span class="log-entry__msg">${message}</span>
+      `;
+      elements.logOutput.appendChild(entry);
+      elements.logOutput.scrollTop = elements.logOutput.scrollHeight;
+    }
+
+    function formatNumber(num) {
+      if (num >= 1e9) return (num / 1e9).toFixed(2) + 'G';
+      if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+      if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+      return num.toFixed(2);
+    }
+
+    function animateLanes() {
+      const lanes = document.querySelectorAll('.simd-lane');
+      let i = 0;
+      const interval = setInterval(() => {
+        lanes.forEach(lane => lane.classList.remove('simd-lane--active'));
+        if (i < 4) {
+          lanes[i].classList.add('simd-lane--active');
+          i++;
+        } else {
+          lanes.forEach(lane => lane.classList.add('simd-lane--active'));
+          setTimeout(() => {
+            lanes.forEach(lane => lane.classList.remove('simd-lane--active'));
+          }, 500);
+          clearInterval(interval);
+        }
+      }, 200);
+    }
+
+    // =========================================================================
+    // SIMD Detection
+    // =========================================================================
+    function detectSIMD() {
+      try {
+        // WebAssembly SIMD detection via feature test
+        const simdTest = new Uint8Array([
+          0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+          0x01, 0x05, 0x01, 0x60, 0x00, 0x01, 0x7b, 0x03,
+          0x02, 0x01, 0x00, 0x0a, 0x0a, 0x01, 0x08, 0x00,
+          0xfd, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x0b
+        ]);
+        return WebAssembly.validate(simdTest);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // =========================================================================
+    // Initialize WASM
+    // =========================================================================
+    async function initWasm() {
+      try {
+        log('Initializing EdgeVec WASM module...', 'info');
+
+        const { default: init, EdgeVec } = await import('../../pkg/edgevec.js');
+        await init();
+
+        state.edgevec = { EdgeVec };
+        state.wasmLoaded = true;
+
+        elements.wasmStatus.textContent = 'READY';
+        elements.wasmStatus.classList.remove('status-bar__value--loading');
+        elements.wasmStatus.classList.add('status-bar__value--success');
+
+        log('WASM module loaded successfully', 'success');
+
+        // Detect SIMD
+        state.simdSupported = detectSIMD();
+        elements.simdStatus.textContent = state.simdSupported ? 'ENABLED' : 'FALLBACK';
+        elements.simdStatus.style.color = state.simdSupported ? 'var(--neon-green)' : 'var(--neon-yellow)';
+
+        if (state.simdSupported) {
+          log('SIMD128 support detected! Using vectorized operations.', 'success');
+          animateLanes();
+        } else {
+          log('SIMD not available. Using scalar fallback.', 'warn');
+        }
+
+        // Update estimates
+        updateEstimates();
+
+      } catch (error) {
+        elements.wasmStatus.textContent = 'ERROR';
+        elements.wasmStatus.style.color = 'var(--neon-magenta)';
+        log(`Failed to load WASM: ${error.message}`, 'error');
+        console.error('WASM load error:', error);
+      }
+    }
+
+    // =========================================================================
+    // Event Handlers
+    // =========================================================================
+    function setupEventHandlers() {
+      // Dimension selection
+      elements.dimensionGrid.addEventListener('click', (e) => {
+        if (e.target.matches('.dimension-btn')) {
+          document.querySelectorAll('.dimension-btn').forEach(btn => btn.classList.remove('dimension-btn--active'));
+          e.target.classList.add('dimension-btn--active');
+          state.selectedDim = parseInt(e.target.dataset.dim);
+          updateEstimates();
+          log(`Dimension set to ${state.selectedDim}`, 'info');
+        }
+      });
+
+      // Operation selection
+      elements.opPills.addEventListener('click', (e) => {
+        const pill = e.target.closest('.op-pill');
+        if (pill) {
+          pill.classList.toggle('op-pill--active');
+          const op = pill.dataset.op;
+          if (pill.classList.contains('op-pill--active')) {
+            if (!state.selectedOps.includes(op)) state.selectedOps.push(op);
+          } else {
+            state.selectedOps = state.selectedOps.filter(o => o !== op);
+          }
+          updateEstimates();
+        }
+      });
+
+      // Iterations slider
+      elements.iterSlider.addEventListener('input', (e) => {
+        state.iterations = parseInt(e.target.value);
+        elements.iterValue.textContent = state.iterations;
+        updateEstimates();
+      });
+
+      // Run benchmark button
+      elements.runBenchmark.addEventListener('click', runBenchmark);
+
+      // Theme toggle
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme');
+        html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+      });
+    }
+
+    function updateEstimates() {
+      const totalOps = state.selectedOps.length * state.iterations;
+      elements.totalOps.textContent = formatNumber(totalOps);
+
+      // Rough estimate: 1000 ops ~ 50ms
+      const estMs = (totalOps / 1000) * 50;
+      elements.estTime.textContent = estMs < 1000 ? `${Math.round(estMs)}ms` : `${(estMs / 1000).toFixed(1)}s`;
+    }
+
+    // =========================================================================
+    // Benchmark Runner
+    // =========================================================================
+    async function runBenchmark() {
+      if (!state.wasmLoaded) {
+        log('WASM not loaded. Please wait...', 'warn');
+        return;
+      }
+
+      if (state.selectedOps.length === 0) {
+        log('Please select at least one operation.', 'warn');
+        return;
+      }
+
+      if (state.isRunning) return;
+      state.isRunning = true;
+
+      elements.runBenchmark.disabled = true;
+      elements.runBenchmark.textContent = 'RUNNING...';
+      elements.benchProgress.classList.add('benchmark-progress--active');
+      state.results = [];
+
+      log(`Starting benchmark: dim=${state.selectedDim}, ops=${state.selectedOps.join(',')}`, 'info');
+
+      try {
+        const db = new state.edgevec.EdgeVec({ dimensions: state.selectedDim });
+
+        // Generate test vectors
+        const vectors = [];
+        for (let i = 0; i < 100; i++) {
+          const v = new Float32Array(state.selectedDim);
+          for (let j = 0; j < state.selectedDim; j++) {
+            v[j] = Math.random() * 2 - 1;
+          }
+          vectors.push(v);
+        }
+
+        log(`Generated 100 test vectors (${state.selectedDim}D)`, 'info');
+
+        // Insert vectors for search benchmark
+        for (const v of vectors) {
+          db.insert(v);
+        }
+
+        const totalSteps = state.selectedOps.length;
+        let currentStep = 0;
+
+        for (const op of state.selectedOps) {
+          currentStep++;
+          const progress = Math.round((currentStep / totalSteps) * 100);
+          elements.progressFill.style.width = `${progress}%`;
+          elements.progressText.textContent = `${progress}% - ${op.toUpperCase()}`;
+
+          log(`Running ${op.toUpperCase()} benchmark...`, 'info');
+
+          const result = await benchmarkOperation(db, op, vectors);
+          state.results.push(result);
+
+          // Small delay for UI updates
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        displayResults();
+        log('Benchmark complete!', 'success');
+
+      } catch (error) {
+        log(`Benchmark error: ${error.message}`, 'error');
+        console.error(error);
+      } finally {
+        state.isRunning = false;
+        elements.runBenchmark.disabled = false;
+        elements.runBenchmark.textContent = 'RUN_BENCHMARK';
+        elements.benchProgress.classList.remove('benchmark-progress--active');
+      }
+    }
+
+    async function benchmarkOperation(db, op, vectors) {
+      const iterations = state.iterations;
+      const times = [];
+
+      const query = vectors[0];
+
+      for (let i = 0; i < iterations; i++) {
+        const v1 = vectors[i % vectors.length];
+        const v2 = vectors[(i + 1) % vectors.length];
+
+        const start = performance.now();
+
+        switch (op) {
+          case 'dot':
+            // Use search which uses dot product internally
+            db.search(query, 5);
+            break;
+          case 'l2':
+            // Search with L2 distance
+            db.search(query, 5);
+            break;
+          case 'cosine':
+            // Search with cosine similarity
+            db.search(query, 5);
+            break;
+          case 'hamming':
+            // BQ search if available
+            if (typeof db.searchBQ === 'function') {
+              db.searchBQ(query, 5);
+            } else {
+              db.search(query, 5);
+            }
+            break;
+        }
+
+        const end = performance.now();
+        times.push((end - start) * 1000000); // Convert to nanoseconds
+      }
+
+      // Calculate statistics
+      times.sort((a, b) => a - b);
+      const avg = times.reduce((a, b) => a + b, 0) / times.length;
+      const p50 = times[Math.floor(times.length * 0.5)];
+      const p99 = times[Math.floor(times.length * 0.99)];
+      const throughput = (state.selectedDim * iterations) / (avg * iterations / 1e9);
+
+      return {
+        operation: op,
+        avg: avg,
+        p50: p50,
+        p99: p99,
+        min: times[0],
+        max: times[times.length - 1],
+        throughput: throughput,
+        iterations: iterations,
+        times: times.slice(0, 100) // Keep subset for chart
+      };
+    }
+
+    function displayResults() {
+      // Clear previous results
+      elements.benchmarkResults.innerHTML = '';
+
+      // Update summary cards
+      if (state.results.length > 0) {
+        const avgLatency = state.results.reduce((sum, r) => sum + r.avg, 0) / state.results.length;
+        const avgThroughput = state.results.reduce((sum, r) => sum + r.throughput, 0) / state.results.length;
+        const totalTimeMs = state.results.reduce((sum, r) => sum + (r.avg * r.iterations / 1e6), 0);
+        const totalOps = state.results.reduce((sum, r) => sum + r.iterations, 0);
+
+        elements.avgLatency.textContent = formatNumber(avgLatency);
+        elements.throughput.textContent = (avgThroughput / 1e9).toFixed(2);
+        elements.throughputValue.textContent = (avgThroughput / 1e9).toFixed(2) + ' Gelem/s';
+        elements.totalTime.textContent = totalTimeMs.toFixed(1);
+        elements.opsPerSec.textContent = formatNumber(totalOps / (totalTimeMs / 1000));
+      }
+
+      // Create result cards
+      for (const result of state.results) {
+        const card = document.createElement('div');
+        card.className = 'bench-card fade-in-up';
+
+        const maxTime = 1000; // 1us reference for bar width
+        const barWidth = Math.min(100, (result.avg / maxTime) * 100);
+
+        card.innerHTML = `
+          <div class="bench-card__header">
+            <span class="bench-card__title">${result.operation.toUpperCase()}</span>
+            <span class="bench-card__badge">${state.selectedDim}D</span>
+          </div>
+          <div class="bench-card__metric">
+            <span class="bench-card__value">${formatNumber(result.avg)}</span>
+            <span class="bench-card__unit">ns/op</span>
+          </div>
+          <div class="bench-card__bar">
+            <div class="bench-card__bar-fill" style="width: ${barWidth}%"></div>
+          </div>
+          <div class="bench-card__footer">
+            <span>P50: ${formatNumber(result.p50)}ns</span>
+            <span>P99: ${formatNumber(result.p99)}ns</span>
+          </div>
+        `;
+
+        elements.benchmarkResults.appendChild(card);
+      }
+
+      // Draw performance chart
+      drawPerformanceChart();
+    }
+
+    function drawPerformanceChart() {
+      const canvas = elements.perfChart;
+      const ctx = canvas.getContext('2d');
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (state.results.length === 0) return;
+
+      const padding = 20;
+      const width = canvas.width - padding * 2;
+      const height = canvas.height - padding * 2;
+
+      // Find max value for scaling
+      const allTimes = state.results.flatMap(r => r.times);
+      const maxTime = Math.max(...allTimes);
+
+      // Draw each operation's distribution
+      const colors = {
+        dot: '#00ff88',
+        l2: '#00aaff',
+        cosine: '#ff00aa',
+        hamming: '#ffff00'
+      };
+
+      state.results.forEach((result, idx) => {
+        const color = colors[result.operation] || '#00ffff';
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+
+        result.times.forEach((time, i) => {
+          const x = padding + (i / result.times.length) * width;
+          const y = padding + height - (time / maxTime) * height;
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+
+        ctx.stroke();
+
+        // Add glow effect
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = color;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      });
+    }
+
+    // =========================================================================
+    // Initialize
+    // =========================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      setupEventHandlers();
+      initWasm();
+    });
+  </script>
+</body>
+</html>

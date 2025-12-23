@@ -216,6 +216,10 @@ harness = false
 name = "bq_recall"
 harness = false
 
+[[bench]]
+name = "simd_comparison"
+harness = false
+
 [[example]]
 name = "batch_insert"
 
