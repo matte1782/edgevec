@@ -1,0 +1,829 @@
+/* ==========================================================================
+   EDGEVEC ANIMATION STYLES
+   GPU-accelerated animations and transitions
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Page Load Animations
+   -------------------------------------------------------------------------- */
+.fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.fade-in-down {
+  animation: fadeInDown 0.5s ease-out forwards;
+}
+
+.fade-in-left {
+  animation: fadeInLeft 0.5s ease-out forwards;
+}
+
+.fade-in-right {
+  animation: fadeInRight 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Staggered animations */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+
+/* --------------------------------------------------------------------------
+   Hover Effects
+   -------------------------------------------------------------------------- */
+.hover-glow {
+  transition: box-shadow var(--transition-base);
+}
+
+.hover-glow:hover {
+  box-shadow: var(--glow-cyan);
+}
+
+.hover-lift {
+  transition: transform var(--transition-base);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+.hover-scale {
+  transition: transform var(--transition-base);
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* --------------------------------------------------------------------------
+   Loading States
+   -------------------------------------------------------------------------- */
+.loading-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.loading-dots__dot {
+  width: 8px;
+  height: 8px;
+  background: var(--neon-cyan);
+  border-radius: 50%;
+  animation: loadingDotBounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots__dot:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots__dot:nth-child(2) { animation-delay: -0.16s; }
+.loading-dots__dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes loadingDotBounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Pulse ring */
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--neon-cyan);
+  border-radius: inherit;
+  animation: pulseRing 2s ease-out infinite;
+}
+
+@keyframes pulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Data Visualization Animations
+   -------------------------------------------------------------------------- */
+.bar-grow {
+  transform-origin: bottom;
+  animation: barGrow 0.6s ease-out forwards;
+}
+
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.number-count {
+  animation: numberCount 1s ease-out forwards;
+}
+
+@keyframes numberCount {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.line-draw {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: lineDraw 2s ease-out forwards;
+}
+
+@keyframes lineDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Attention Animations
+   -------------------------------------------------------------------------- */
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.bounce {
+  animation: bounce 0.5s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.jello {
+  animation: jello 0.9s ease-in-out;
+}
+
+@keyframes jello {
+  0%, 100% { transform: skewX(0) skewY(0); }
+  11.1% { transform: skewX(-4deg) skewY(-4deg); }
+  22.2% { transform: skewX(3deg) skewY(3deg); }
+  33.3% { transform: skewX(-2deg) skewY(-2deg); }
+  44.4% { transform: skewX(1deg) skewY(1deg); }
+  55.5% { transform: skewX(-0.5deg) skewY(-0.5deg); }
+}
+
+/* --------------------------------------------------------------------------
+   Success/Error States
+   -------------------------------------------------------------------------- */
+.success-check {
+  animation: successCheck 0.5s ease-out forwards;
+}
+
+@keyframes successCheck {
+  0% {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.error-shake {
+  animation: errorShake 0.4s ease-in-out;
+  border-color: var(--neon-magenta) !important;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+/* --------------------------------------------------------------------------
+   Cyber Effects
+   -------------------------------------------------------------------------- */
+/* Flicker */
+.flicker {
+  animation: flicker 3s infinite;
+}
+
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 22%, 24%, 55% {
+    opacity: 0.4;
+  }
+}
+
+/* Scanline sweep */
+.scanline-sweep {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanline-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(0, 255, 255, 0.2),
+    transparent
+  );
+  animation: scanlineSweep 3s linear infinite;
+}
+
+@keyframes scanlineSweep {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+/* Hologram effect */
+.hologram {
+  position: relative;
+}
+
+.hologram::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    0deg,
+    transparent 0%,
+    rgba(0, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 100% 4px;
+  animation: hologramLines 0.1s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes hologramLines {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+/* --------------------------------------------------------------------------
+   Data Transfer Effect
+   -------------------------------------------------------------------------- */
+.data-stream {
+  position: relative;
+  overflow: hidden;
+}
+
+.data-stream::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 255, 255, 0.3),
+    transparent
+  );
+  animation: dataStream 2s linear infinite;
+}
+
+@keyframes dataStream {
+  0% { left: -50%; }
+  100% { left: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   Text Typing Effect
+   -------------------------------------------------------------------------- */
+.typing {
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid var(--neon-cyan);
+  animation:
+    typing 3s steps(40) forwards,
+    typingCursor 0.75s step-end infinite;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes typingCursor {
+  0%, 100% { border-color: transparent; }
+  50% { border-color: var(--neon-cyan); }
+}
+
+/* --------------------------------------------------------------------------
+   Matrix Rain Background
+   -------------------------------------------------------------------------- */
+.matrix-bg {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(0, 255, 255, 0.05) 0%,
+      transparent 10%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 2px,
+      rgba(0, 255, 255, 0.03) 2px,
+      rgba(0, 255, 255, 0.03) 4px
+    );
+  animation: matrixRain 30s linear infinite;
+}
+
+@keyframes matrixRain {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 0 1000px, 0 0; }
+}
+
+/* --------------------------------------------------------------------------
+   Result Card Advanced Animations (Day 7)
+   -------------------------------------------------------------------------- */
+
+/* Enhanced entrance animation with blur */
+@keyframes resultCardEnterAdvanced {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+    filter: blur(10px);
+  }
+  50% {
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.result-card--enter {
+  animation: resultCardEnterAdvanced 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+}
+
+/* Exit Animation */
+@keyframes resultCardExit {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.95);
+  }
+}
+
+.result-card--exit {
+  animation: resultCardExit 0.3s ease-in forwards;
+}
+
+/* Rank Number Glow */
+@keyframes rankPulse {
+  0%, 100% {
+    text-shadow:
+      0 0 5px var(--neon-cyan),
+      0 0 10px var(--neon-cyan),
+      0 0 20px var(--neon-cyan);
+  }
+  50% {
+    text-shadow:
+      0 0 10px var(--neon-cyan),
+      0 0 20px var(--neon-cyan),
+      0 0 40px var(--neon-cyan),
+      0 0 60px var(--neon-cyan);
+  }
+}
+
+.result-card__rank {
+  animation: rankPulse 2s ease-in-out infinite;
+}
+
+/* Distance Bar Fill */
+.result-card__distance-bar {
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: var(--space-sm);
+}
+
+.result-card__distance-bar-fill {
+  height: 100%;
+  background: var(--gradient-neon);
+  border-radius: var(--radius-sm);
+  transform-origin: left;
+  animation: distanceBarFill 0.8s ease-out forwards;
+  transform: scaleX(0);
+}
+
+@keyframes distanceBarFill {
+  to {
+    transform: scaleX(var(--fill-percent, 1));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Button Ripple Effect
+   -------------------------------------------------------------------------- */
+.btn__ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0);
+  animation: ripple 0.6s linear;
+  pointer-events: none;
+}
+
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Search Box Focus Animation
+   -------------------------------------------------------------------------- */
+.search-box__input:focus {
+  box-shadow:
+    0 0 0 2px var(--bg-terminal),
+    0 0 0 4px var(--neon-cyan),
+    0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+@keyframes searchPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* --------------------------------------------------------------------------
+   Chart Animations
+   -------------------------------------------------------------------------- */
+.chart__line {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  animation: chartLineDraw 1.5s ease-out forwards;
+}
+
+@keyframes chartLineDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+.chart__dots circle {
+  opacity: 0;
+  animation: chartDotAppear 0.3s ease-out forwards;
+}
+
+.chart__dots circle:nth-child(1) { animation-delay: 0.1s; }
+.chart__dots circle:nth-child(2) { animation-delay: 0.2s; }
+.chart__dots circle:nth-child(3) { animation-delay: 0.3s; }
+.chart__dots circle:nth-child(4) { animation-delay: 0.4s; }
+.chart__dots circle:nth-child(5) { animation-delay: 0.5s; }
+.chart__dots circle:nth-child(6) { animation-delay: 0.6s; }
+.chart__dots circle:nth-child(7) { animation-delay: 0.7s; }
+.chart__dots circle:nth-child(8) { animation-delay: 0.8s; }
+.chart__dots circle:nth-child(9) { animation-delay: 0.9s; }
+.chart__dots circle:nth-child(10) { animation-delay: 1.0s; }
+
+@keyframes chartDotAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Gauge Animation
+   -------------------------------------------------------------------------- */
+.gauge__progress {
+  transition: stroke-dashoffset 1s ease-out;
+}
+
+@keyframes gaugeTextPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.gauge--warning .gauge__progress {
+  stroke: var(--neon-yellow);
+  filter: drop-shadow(0 0 10px var(--neon-yellow));
+}
+
+.gauge--critical .gauge__progress {
+  stroke: var(--neon-magenta);
+  filter: drop-shadow(0 0 10px var(--neon-magenta));
+  animation: gaugeCriticalPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes gaugeCriticalPulse {
+  0%, 100% { filter: drop-shadow(0 0 10px var(--neon-magenta)); }
+  50% { filter: drop-shadow(0 0 20px var(--neon-magenta)); }
+}
+
+/* --------------------------------------------------------------------------
+   Status Bar Animation
+   -------------------------------------------------------------------------- */
+.status-bar__value--success {
+  animation: statusSuccess 0.5s ease;
+  color: var(--neon-green);
+}
+
+@keyframes statusSuccess {
+  0% { transform: scale(1.3); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* --------------------------------------------------------------------------
+   Hero Section Animations
+   -------------------------------------------------------------------------- */
+.hero__title {
+  animation: heroTitleAppear 1s ease-out;
+}
+
+@keyframes heroTitleAppear {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px);
+    filter: blur(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.hero__subtitle {
+  animation: heroSubtitleAppear 1s ease-out 0.3s backwards;
+}
+
+@keyframes heroSubtitleAppear {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Metric Card Animations
+   -------------------------------------------------------------------------- */
+@keyframes metricIconBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.metric-card:hover .metric-card__icon {
+  animation: metricIconBounce 0.5s ease;
+}
+
+/* Value update flash */
+.metric-card__value--flash {
+  animation: valueFlash 0.3s ease;
+}
+
+@keyframes valueFlash {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.5); }
+}
+
+/* --------------------------------------------------------------------------
+   Counter Animation
+   -------------------------------------------------------------------------- */
+.counter {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.counter--animate {
+  animation: counterBlink 0.1s ease-in-out;
+}
+
+@keyframes counterBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* --------------------------------------------------------------------------
+   Page Transitions
+   -------------------------------------------------------------------------- */
+.page-transition {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-void);
+  z-index: 9999;
+  pointer-events: none;
+  transform: translateY(100%);
+}
+
+.page-transition--active {
+  animation: pageTransitionSlide 0.5s ease-in-out;
+}
+
+@keyframes pageTransitionSlide {
+  0% { transform: translateY(100%); }
+  50% { transform: translateY(0); }
+  100% { transform: translateY(-100%); }
+}
+
+/* --------------------------------------------------------------------------
+   Scroll Reveal Animation
+   -------------------------------------------------------------------------- */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.animate-on-scroll.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Scroll animation classes used by initScrollAnimations() */
+.scroll-hidden {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+              transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.scroll-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Scroll animation variants */
+.scroll-visible.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.scroll-visible.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.scroll-visible.animate-fade-in-left {
+  animation: fadeInLeft 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.scroll-visible.animate-fade-in-right {
+  animation: fadeInRight 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.scroll-visible.animate-scale-in {
+  animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* --------------------------------------------------------------------------
+   GPU Optimization Hints
+   -------------------------------------------------------------------------- */
+.will-animate {
+  will-change: transform, opacity;
+}
+
+.hardware-accelerate {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   Respect User Preferences
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .fade-in-up,
+  .fade-in-down,
+  .fade-in-left,
+  .fade-in-right,
+  .bar-grow,
+  .line-draw,
+  .shake,
+  .bounce,
+  .jello,
+  .flicker,
+  .hologram::before,
+  .data-stream::before,
+  .typing,
+  .matrix-bg {
+    animation: none !important;
+  }
+
+  .loading-dots__dot {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  .scanline-sweep::after,
+  .pulse-ring::after {
+    display: none;
+  }
+}

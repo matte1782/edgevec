@@ -7,7 +7,7 @@
 //!
 //! - [`ScalarQuantizer`]: SQ8 quantization (f32 -> u8), 4x compression
 //! - [`BinaryQuantizer`]: Binary quantization (f32 -> bit), 32x compression (fixed 768D)
-//! - [`BinaryVector`]: Variable-dimension binary quantization (any dimension divisible by 8)
+//! - `BinaryVector`: Variable-dimension binary quantization (any dimension divisible by 8)
 //!
 //! # Example
 //!
@@ -59,7 +59,7 @@ pub mod simd;
 
 /// Variable-dimension binary quantization.
 ///
-/// This module provides [`BinaryVector`] which supports any dimension
+/// This module provides `BinaryVector` which supports any dimension
 /// divisible by 8, unlike the fixed 768D [`BinaryQuantizer`].
 pub mod variable;
 

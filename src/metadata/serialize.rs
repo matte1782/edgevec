@@ -210,7 +210,7 @@ impl MetadataStore {
     /// Serializes the metadata store to JSON format (for debugging/interop).
     ///
     /// JSON is human-readable and useful for debugging, but less compact than
-    /// Postcard. Use [`to_postcard`] for production persistence.
+    /// Postcard. Use [`Self::to_postcard`] for production persistence.
     ///
     /// # Returns
     ///

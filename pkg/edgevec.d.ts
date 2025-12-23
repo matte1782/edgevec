@@ -70,6 +70,24 @@ export class EdgeVec {
    */
   save(name: string): Promise<void>;
   /**
+   * Check if inserts are allowed based on memory pressure.
+   *
+   * Returns `false` if memory is at critical level and
+   * `blockInsertsOnCritical` is enabled.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * if (index.canInsert()) {
+   *     const id = index.insert(vector);
+   * } else {
+   *     console.warn('Memory critical, insert blocked');
+   *     showMemoryWarning();
+   * }
+   * ```
+   */
+  canInsert(): boolean;
+  /**
    * Check if a vector is deleted (tombstoned).
    *
    * # Arguments
@@ -440,6 +458,18 @@ export class EdgeVec {
    */
   needsCompaction(): boolean;
   /**
+   * Get the current memory configuration.
+   *
+   * # Returns
+   *
+   * MemoryConfig object with current settings.
+   *
+   * # Errors
+   *
+   * Returns an error if serialization fails (should not happen in practice).
+   */
+  getMemoryConfig(): any;
+  /**
    * Inserts a batch of vectors into the index (flat array format).
    *
    * **Note:** This is the legacy API. For the new API, use `insertBatch` which
@@ -459,6 +489,37 @@ export class EdgeVec {
    * Returns error if dimensions mismatch, vector contains NaNs, or ID overflows.
    */
   insertBatchFlat(vectors: Float32Array, count: number): Uint32Array;
+  /**
+   * Configure memory pressure thresholds.
+   *
+   * # Arguments
+   *
+   * * `config` - MemoryConfig object with optional fields:
+   *   - `warningThreshold`: Warning threshold percentage (default: 80)
+   *   - `criticalThreshold`: Critical threshold percentage (default: 95)
+   *   - `autoCompactOnWarning`: Auto-compact when warning threshold reached
+   *   - `blockInsertsOnCritical`: Block inserts when critical threshold reached
+   *
+   * # Errors
+   *
+   * Returns an error if:
+   * - `config` is not a valid MemoryConfig object
+   * - `warningThreshold` is not between 0 and 100
+   * - `criticalThreshold` is not between 0 and 100
+   * - `warningThreshold` is greater than or equal to `criticalThreshold`
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * index.setMemoryConfig({
+   *     warningThreshold: 70,
+   *     criticalThreshold: 90,
+   *     autoCompactOnWarning: true,
+   *     blockInsertsOnCritical: true
+   * });
+   * ```
+   */
+  setMemoryConfig(config: any): void;
   /**
    * Soft-delete multiple vectors using BigUint64Array (modern browsers).
    *
@@ -660,6 +721,44 @@ export class EdgeVec {
    */
   deleteAllMetadata(vector_id: number): boolean;
   /**
+   * Get current memory pressure state.
+   *
+   * Returns memory usage statistics and pressure level.
+   * Use this to implement graceful degradation in your app.
+   *
+   * # Returns
+   *
+   * MemoryPressure object with:
+   * - `level`: "normal", "warning", or "critical"
+   * - `usedBytes`: Bytes currently allocated
+   * - `totalBytes`: Total WASM heap size
+   * - `usagePercent`: Usage as percentage (0-100)
+   *
+   * # Errors
+   *
+   * Returns an error if serialization fails (should not happen in practice).
+   *
+   * # Thresholds
+   *
+   * - Normal: <80% usage
+   * - Warning: 80-95% usage (consider reducing data)
+   * - Critical: >95% usage (risk of OOM, stop inserts)
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const pressure = index.getMemoryPressure();
+   * if (pressure.level === 'warning') {
+   *     console.warn('Memory pressure high, consider compacting');
+   *     index.compact();
+   * } else if (pressure.level === 'critical') {
+   *     console.error('Memory critical, stopping inserts');
+   *     // Disable insert button, show warning to user
+   * }
+   * ```
+   */
+  getMemoryPressure(): any;
+  /**
    * Get all metadata for a vector by ID (alias for getAllMetadata).
    *
    * This is an alias for `getAllMetadata()` provided for API consistency
@@ -806,6 +905,36 @@ export class EdgeVec {
    */
   softDeleteBatchCompat(ids: Float64Array): WasmBatchDeleteResult;
   /**
+   * Get memory recommendation based on current state.
+   *
+   * Provides actionable guidance based on memory pressure level.
+   *
+   * # Returns
+   *
+   * MemoryRecommendation object with:
+   * - `action`: "none", "compact", or "reduce"
+   * - `message`: Human-readable description
+   * - `canInsert`: Whether inserts are allowed
+   * - `suggestCompact`: Whether compaction would help
+   *
+   * # Errors
+   *
+   * Returns an error if serialization fails (should not happen in practice).
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const rec = index.getMemoryRecommendation();
+   * if (rec.action === 'compact' && rec.suggestCompact) {
+   *     index.compact();
+   * } else if (rec.action === 'reduce') {
+   *     showMemoryWarning(rec.message);
+   *     disableInsertButton();
+   * }
+   * ```
+   */
+  getMemoryRecommendation(): any;
+  /**
    * Batch insert with progress callback (W14.1).
    *
    * Inserts multiple vectors while reporting progress to a JavaScript callback.
@@ -943,6 +1072,32 @@ export class EdgeVec {
    * ```
    */
   compact(): WasmCompactionResult;
+  /**
+   * Enables binary quantization on this index.
+   *
+   * Binary quantization reduces memory usage by 32x (from 32 bits to 1 bit per dimension)
+   * while maintaining ~85-95% recall. BQ is automatically enabled for dimensions divisible by 8.
+   *
+   * # Errors
+   *
+   * Returns an error if:
+   * - Dimensions are not divisible by 8 (required for BQ)
+   * - BQ is already enabled
+   *
+   * # Example
+   *
+   * ```javascript
+   * const db = new EdgeVec(config);
+   * db.enableBQ();  // Enable BQ for faster search
+   *
+   * // Insert vectors (BQ codes computed automatically)
+   * db.insert(vector);
+   *
+   * // Use BQ search
+   * const results = db.searchBQ(query, 10);
+   * ```
+   */
+  enableBQ(): void;
   /**
    * Search using binary quantization (fast, approximate).
    *
@@ -1353,13 +1508,18 @@ export interface InitOutput {
   readonly batchinsertresult_ids: (a: number, b: number) => void;
   readonly batchinsertresult_inserted: (a: number) => number;
   readonly batchinsertresult_total: (a: number) => number;
+  readonly edgevec_canInsert: (a: number) => number;
   readonly edgevec_compact: (a: number, b: number) => void;
   readonly edgevec_compactionThreshold: (a: number) => number;
   readonly edgevec_compactionWarning: (a: number, b: number) => void;
   readonly edgevec_deleteAllMetadata: (a: number, b: number) => number;
   readonly edgevec_deleteMetadata: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly edgevec_deletedCount: (a: number) => number;
+  readonly edgevec_enableBQ: (a: number, b: number) => void;
   readonly edgevec_getAllMetadata: (a: number, b: number) => number;
+  readonly edgevec_getMemoryConfig: (a: number, b: number) => void;
+  readonly edgevec_getMemoryPressure: (a: number, b: number) => void;
+  readonly edgevec_getMemoryRecommendation: (a: number, b: number) => void;
   readonly edgevec_getMetadata: (a: number, b: number, c: number, d: number) => number;
   readonly edgevec_hasBQ: (a: number) => number;
   readonly edgevec_hasMetadata: (a: number, b: number, c: number, d: number) => number;
@@ -1384,6 +1544,7 @@ export interface InitOutput {
   readonly edgevec_searchHybrid: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_searchWithFilter: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_setCompactionThreshold: (a: number, b: number) => void;
+  readonly edgevec_setMemoryConfig: (a: number, b: number, c: number) => void;
   readonly edgevec_setMetadata: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_softDelete: (a: number, b: number, c: number) => void;
   readonly edgevec_softDeleteBatch: (a: number, b: number, c: number) => void;
@@ -1427,9 +1588,9 @@ export interface InitOutput {
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
   readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
-  readonly __wasm_bindgen_func_elem_1608: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_1592: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_2123: (a: number, b: number, c: number, d: number) => void;
+  readonly __wasm_bindgen_func_elem_1731: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_1715: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_2243: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export3: (a: number) => void;

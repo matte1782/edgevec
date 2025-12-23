@@ -16,10 +16,15 @@ use wasm_bindgen::prelude::*;
 mod batch;
 pub mod filter;
 mod iterator;
+mod memory;
 mod metadata;
 
 pub use batch::{BatchInsertConfig, BatchInsertResult};
 pub use iterator::PersistenceIterator;
+pub use memory::{
+    track_batch_insert, track_vector_insert, MemoryConfig, MemoryPressure, MemoryPressureLevel,
+    MemoryRecommendation,
+};
 pub use metadata::JsMetadataValue;
 
 /// Interface to the JavaScript IndexedDB backend.
@@ -128,6 +133,9 @@ pub struct EdgeVec {
     /// Metadata store for attaching key-value pairs to vectors.
     #[serde(default)]
     metadata: MetadataStore,
+    /// Memory pressure configuration (skipped during serialization).
+    #[serde(skip, default)]
+    memory_config: MemoryConfig,
     /// Safety guard for iterators (skipped during serialization).
     #[serde(skip, default = "default_liveness")]
     liveness: Arc<AtomicBool>,
@@ -193,6 +201,7 @@ impl EdgeVec {
             inner: index,
             storage,
             metadata: MetadataStore::new(),
+            memory_config: MemoryConfig::default(),
             liveness: Arc::new(AtomicBool::new(true)),
         })
     }
@@ -234,10 +243,14 @@ impl EdgeVec {
             );
         }
 
+        // insert() automatically handles BQ storage when enabled (via insert_impl Step 6)
         let id = self
             .inner
             .insert(&vec, &mut self.storage)
             .map_err(EdgeVecError::from)?;
+
+        // Track memory allocation for memory pressure monitoring
+        track_vector_insert(self.inner.config.dimensions);
 
         // Safety: VectorId is u64, we cast to u32 as requested by API.
         if id.0 > u64::from(u32::MAX) {
@@ -302,6 +315,7 @@ impl EdgeVec {
             // Safety: bounds checked by logic above (vec_data len == count * dim)
             let vector_slice = &vec_data[start..end];
 
+            // insert() automatically handles BQ storage when enabled (via insert_impl Step 6)
             let id = self
                 .inner
                 .insert(vector_slice, &mut self.storage)
@@ -314,6 +328,9 @@ impl EdgeVec {
             }
             ids.push(id.0 as u32);
         }
+
+        // Track memory allocation for the batch
+        track_batch_insert(count, self.inner.config.dimensions);
 
         Ok(Uint32Array::from(&ids[..]))
     }
@@ -1239,6 +1256,9 @@ impl EdgeVec {
             .insert_with_metadata(&mut self.storage, &vec, metadata)
             .map_err(EdgeVecError::from)?;
 
+        // Track memory allocation for memory pressure monitoring
+        track_vector_insert(self.inner.config.dimensions);
+
         // Safety: VectorId is u64, we cast to u32 as requested by API.
         if id.0 > u64::from(u32::MAX) {
             return Err(EdgeVecError::Validation("Vector ID overflowed u32".to_string()).into());
@@ -1774,6 +1794,36 @@ impl EdgeVec {
         self.inner.bq_storage.is_some()
     }
 
+    /// Enables binary quantization on this index.
+    ///
+    /// Binary quantization reduces memory usage by 32x (from 32 bits to 1 bit per dimension)
+    /// while maintaining ~85-95% recall. BQ is automatically enabled for dimensions divisible by 8.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Dimensions are not divisible by 8 (required for BQ)
+    /// - BQ is already enabled
+    ///
+    /// # Example
+    ///
+    /// ```javascript
+    /// const db = new EdgeVec(config);
+    /// db.enableBQ();  // Enable BQ for faster search
+    ///
+    /// // Insert vectors (BQ codes computed automatically)
+    /// db.insert(vector);
+    ///
+    /// // Use BQ search
+    /// const results = db.searchBQ(query, 10);
+    /// ```
+    #[wasm_bindgen(js_name = "enableBQ")]
+    pub fn enable_bq(&mut self) -> Result<(), JsValue> {
+        self.inner
+            .enable_bq(&self.storage)
+            .map_err(|e| EdgeVecError::from(e).into())
+    }
+
     // =========================================================================
     // FILTERED SEARCH API (v0.5.0 — Week 23)
     // =========================================================================
@@ -1954,6 +2004,218 @@ impl EdgeVec {
         serde_json::to_string(&response)
             .map_err(|e| JsValue::from_str(&format!("Serialization error: {e}")))
     }
+
+    // =========================================================================
+    // MEMORY PRESSURE API (v0.6.0 — Week 28 RFC-002)
+    // =========================================================================
+
+    /// Get current memory pressure state.
+    ///
+    /// Returns memory usage statistics and pressure level.
+    /// Use this to implement graceful degradation in your app.
+    ///
+    /// # Returns
+    ///
+    /// MemoryPressure object with:
+    /// - `level`: "normal", "warning", or "critical"
+    /// - `usedBytes`: Bytes currently allocated
+    /// - `totalBytes`: Total WASM heap size
+    /// - `usagePercent`: Usage as percentage (0-100)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails (should not happen in practice).
+    ///
+    /// # Thresholds
+    ///
+    /// - Normal: <80% usage
+    /// - Warning: 80-95% usage (consider reducing data)
+    /// - Critical: >95% usage (risk of OOM, stop inserts)
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const pressure = index.getMemoryPressure();
+    /// if (pressure.level === 'warning') {
+    ///     console.warn('Memory pressure high, consider compacting');
+    ///     index.compact();
+    /// } else if (pressure.level === 'critical') {
+    ///     console.error('Memory critical, stopping inserts');
+    ///     // Disable insert button, show warning to user
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "getMemoryPressure")]
+    pub fn get_memory_pressure(&self) -> Result<JsValue, JsValue> {
+        let pressure = MemoryPressure::current_with_thresholds(
+            self.memory_config.warning_threshold,
+            self.memory_config.critical_threshold,
+        );
+        serde_wasm_bindgen::to_value(&pressure).map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Configure memory pressure thresholds.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - MemoryConfig object with optional fields:
+    ///   - `warningThreshold`: Warning threshold percentage (default: 80)
+    ///   - `criticalThreshold`: Critical threshold percentage (default: 95)
+    ///   - `autoCompactOnWarning`: Auto-compact when warning threshold reached
+    ///   - `blockInsertsOnCritical`: Block inserts when critical threshold reached
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `config` is not a valid MemoryConfig object
+    /// - `warningThreshold` is not between 0 and 100
+    /// - `criticalThreshold` is not between 0 and 100
+    /// - `warningThreshold` is greater than or equal to `criticalThreshold`
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// index.setMemoryConfig({
+    ///     warningThreshold: 70,
+    ///     criticalThreshold: 90,
+    ///     autoCompactOnWarning: true,
+    ///     blockInsertsOnCritical: true
+    /// });
+    /// ```
+    #[wasm_bindgen(js_name = "setMemoryConfig")]
+    pub fn set_memory_config(&mut self, config: JsValue) -> Result<(), JsValue> {
+        let config: MemoryConfig = serde_wasm_bindgen::from_value(config)
+            .map_err(|e| JsValue::from_str(&format!("Invalid config: {e}")))?;
+
+        // Validate thresholds
+        if config.warning_threshold <= 0.0 || config.warning_threshold >= 100.0 {
+            return Err(JsValue::from_str(
+                "warningThreshold must be between 0 and 100",
+            ));
+        }
+        if config.critical_threshold <= 0.0 || config.critical_threshold >= 100.0 {
+            return Err(JsValue::from_str(
+                "criticalThreshold must be between 0 and 100",
+            ));
+        }
+        if config.warning_threshold >= config.critical_threshold {
+            return Err(JsValue::from_str(
+                "warningThreshold must be less than criticalThreshold",
+            ));
+        }
+
+        self.memory_config = config;
+        Ok(())
+    }
+
+    /// Check if inserts are allowed based on memory pressure.
+    ///
+    /// Returns `false` if memory is at critical level and
+    /// `blockInsertsOnCritical` is enabled.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// if (index.canInsert()) {
+    ///     const id = index.insert(vector);
+    /// } else {
+    ///     console.warn('Memory critical, insert blocked');
+    ///     showMemoryWarning();
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "canInsert")]
+    #[must_use]
+    pub fn can_insert(&self) -> bool {
+        if !self.memory_config.block_inserts_on_critical {
+            return true;
+        }
+
+        let pressure = MemoryPressure::current_with_thresholds(
+            self.memory_config.warning_threshold,
+            self.memory_config.critical_threshold,
+        );
+        pressure.level != MemoryPressureLevel::Critical
+    }
+
+    /// Get memory recommendation based on current state.
+    ///
+    /// Provides actionable guidance based on memory pressure level.
+    ///
+    /// # Returns
+    ///
+    /// MemoryRecommendation object with:
+    /// - `action`: "none", "compact", or "reduce"
+    /// - `message`: Human-readable description
+    /// - `canInsert`: Whether inserts are allowed
+    /// - `suggestCompact`: Whether compaction would help
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails (should not happen in practice).
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const rec = index.getMemoryRecommendation();
+    /// if (rec.action === 'compact' && rec.suggestCompact) {
+    ///     index.compact();
+    /// } else if (rec.action === 'reduce') {
+    ///     showMemoryWarning(rec.message);
+    ///     disableInsertButton();
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "getMemoryRecommendation")]
+    pub fn get_memory_recommendation(&self) -> Result<JsValue, JsValue> {
+        let pressure = MemoryPressure::current_with_thresholds(
+            self.memory_config.warning_threshold,
+            self.memory_config.critical_threshold,
+        );
+
+        let needs_compaction = self.inner.needs_compaction();
+
+        let recommendation = match pressure.level {
+            MemoryPressureLevel::Normal => MemoryRecommendation {
+                action: "none".to_string(),
+                message: "Memory usage is healthy.".to_string(),
+                can_insert: true,
+                suggest_compact: needs_compaction,
+            },
+            MemoryPressureLevel::Warning => MemoryRecommendation {
+                action: "compact".to_string(),
+                message: format!(
+                    "Memory usage at {:.1}%. Consider running compact() to free deleted vectors.",
+                    pressure.usage_percent
+                ),
+                can_insert: true,
+                suggest_compact: needs_compaction,
+            },
+            MemoryPressureLevel::Critical => MemoryRecommendation {
+                action: "reduce".to_string(),
+                message: format!(
+                    "Memory usage critical at {:.1}%. Inserts blocked. Run compact() or delete vectors.",
+                    pressure.usage_percent
+                ),
+                can_insert: !self.memory_config.block_inserts_on_critical,
+                suggest_compact: true,
+            },
+        };
+
+        serde_wasm_bindgen::to_value(&recommendation).map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Get the current memory configuration.
+    ///
+    /// # Returns
+    ///
+    /// MemoryConfig object with current settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails (should not happen in practice).
+    #[wasm_bindgen(js_name = "getMemoryConfig")]
+    pub fn get_memory_config(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(&self.memory_config)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
 }
 
 /// Result of a compaction operation (v0.3.0).
@@ -2075,8 +2337,9 @@ impl<'a> EdgeVecMetadataAdapter<'a> {
 impl crate::filter::MetadataStore for EdgeVecMetadataAdapter<'_> {
     #[allow(clippy::cast_possible_truncation)]
     fn get_metadata(&self, id: usize) -> Option<&HashMap<String, MetadataValue>> {
-        // EdgeVec uses u32 for vector IDs, cast from usize
-        self.store.get_all(id as u32)
+        // Filter uses 0-indexed iteration (0..total), but VectorId is 1-indexed.
+        // Add 1 to convert from filter's 0-based index to VectorId's 1-based ID.
+        self.store.get_all((id + 1) as u32)
     }
 
     fn len(&self) -> usize {

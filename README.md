@@ -6,9 +6,9 @@
 [![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/matte1782/edgevec/blob/main/LICENSE-MIT)
 
 > **The first WASM-native vector database.**
-> Filter, delete, persist — all in the browser.
+> Binary quantization, metadata filtering, memory management — all in the browser.
 
-EdgeVec is an embedded vector database built in Rust with first-class WebAssembly support. It brings server-grade vector database features to the browser: metadata filtering, soft delete, persistence, and sub-millisecond search.
+EdgeVec is an embedded vector database built in Rust with first-class WebAssembly support. It brings server-grade vector database features to the browser: **32x memory reduction** via binary quantization, metadata filtering, soft delete, persistence, and sub-millisecond search.
 
 ---
 
@@ -17,15 +17,17 @@ EdgeVec is an embedded vector database built in Rust with first-class WebAssembl
 | Feature | EdgeVec | hnswlib-wasm | Pinecone |
 |:--------|:-------:|:------------:|:--------:|
 | Vector Search | Yes | Yes | Yes |
+| **Binary Quantization** | **Yes (32x)** | No | No |
 | **Metadata Filtering** | **Yes** | No | Yes |
 | **SQL-like Queries** | **Yes** | No | Yes |
+| **Memory Pressure API** | **Yes** | No | No |
 | **Soft Delete** | **Yes** | No | Yes |
 | **Persistence** | **Yes** | No | Yes |
 | Browser-native | Yes | Yes | No |
 | No server required | Yes | Yes | No |
 | Offline capable | Yes | Yes | No |
 
-**EdgeVec is the only WASM vector database with filtered search.**
+**EdgeVec is the only WASM vector database with binary quantization and filtered search.**
 
 ---
 
@@ -36,33 +38,33 @@ npm install edgevec
 ```
 
 ```typescript
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVec } from 'edgevec';
 
 await init();
 
-// Create a 768-dimensional index
-const config = new EdgeVecConfig(768);
-const db = new EdgeVec(config);
+// Create index (768D for embeddings like OpenAI, Cohere)
+const db = new EdgeVec({ dimensions: 768 });
 
-// Insert vectors with metadata
+// Insert vectors with metadata (v0.6.0)
 const vector = new Float32Array(768).map(() => Math.random());
-const id = db.insert(vector);
-// Store metadata separately for filtering
-metadata[id] = { category: "books", price: 29.99, inStock: true };
+const id = db.insertWithMetadata(vector, {
+    category: "books",
+    price: 29.99,
+    inStock: true
+});
 
-// Search with filter
+// Search with filter expression (v0.6.0)
 const query = new Float32Array(768).map(() => Math.random());
-const results = db.search(query, 10);
+const results = db.searchFiltered(query, 'category = "books" AND price < 50', 10);
 
-// Filter results client-side (v0.5 pattern)
-const filtered = results.filter(r =>
-    metadata[r.id]?.category === "books" &&
-    metadata[r.id]?.price < 50
-);
+// Fast BQ search with rescoring — 32x less memory, 95% recall (v0.6.0)
+const fastResults = db.searchBQ(query, 10);
 
-// Or use the Filter API for complex expressions
-import { Filter } from 'edgevec';
-const filter = Filter.parse('category = "books" AND price < 50');
+// Monitor memory pressure (v0.6.0)
+const pressure = db.getMemoryPressure();
+if (pressure.level === 'warning') {
+    db.compact();  // Free deleted vectors
+}
 ```
 
 ---
@@ -73,6 +75,7 @@ Try EdgeVec directly in your browser:
 
 | Demo | Description |
 |:-----|:------------|
+| [**v0.6.0 Demo**](wasm/examples/v060_demo.html) | BQ vs F32 comparison, metadata filtering, memory pressure |
 | [**Filter Playground**](wasm/examples/filter-playground.html) | Interactive filter syntax explorer with live parsing |
 | [**Benchmark Dashboard**](wasm/examples/benchmark-dashboard.html) | Performance comparison vs competitors |
 | [**Soft Delete Demo**](wasm/examples/soft_delete.html) | Tombstone-based deletion with compaction |
@@ -112,7 +115,7 @@ python -m http.server 8080
 
 | Package | Size (gzip) | Target | Status |
 |:--------|:------------|:-------|:-------|
-| edgevec | **227 KB** | <500 KB | 55% under |
+| edgevec | **217 KB** | <500 KB | 57% under |
 
 [Full benchmarks ->](docs/benchmarks/competitive_analysis_v2.md)
 
@@ -120,28 +123,70 @@ python -m http.server 8080
 
 ## Database Features
 
-### Metadata Filtering (v0.5)
+### Binary Quantization (v0.6.0)
 
-EdgeVec supports SQL-like filter expressions:
+32x memory reduction with minimal recall loss:
 
 ```javascript
-// Comparison operators
-'price > 100'
-'category = "electronics"'
-'rating >= 4.5'
+// BQ is auto-enabled for dimensions divisible by 8
+const db = new EdgeVec({ dimensions: 768 });
 
-// Boolean logic
-'category = "books" AND price < 50'
-'brand = "Sony" OR brand = "Samsung"'
-'inStock = true AND NOT discontinued = true'
+// Raw BQ search (~85% recall, ~5x faster)
+const bqResults = db.searchBQ(query, 10);
 
-// Complex expressions
-'(category = "electronics" AND price < 500) OR rating >= 4.8'
+// BQ + rescore (~95% recall, ~3x faster)
+const rescoredResults = db.searchBQRescored(query, 10, 5);
 ```
 
-**15 operators supported:** `=`, `!=`, `>`, `<`, `>=`, `<=`, `IN`, `NOT IN`, `CONTAINS`, `STARTS_WITH`, `ENDS_WITH`, `IS NULL`, `IS NOT NULL`, `AND`, `OR`, `NOT`
+| Mode | Memory (100k × 768D) | Speed | Recall@10 |
+|:-----|:---------------------|:------|:----------|
+| F32 (baseline) | ~300 MB | 1x | 100% |
+| BQ raw | **~10 MB** | 5x | ~85% |
+| BQ + rescore(5) | **~10 MB** | 3x | ~95% |
+
+### Metadata Filtering (v0.6.0)
+
+Insert vectors with metadata, search with SQL-like filter expressions:
+
+```javascript
+// Insert with metadata
+db.insertWithMetadata(vector, {
+    category: "electronics",
+    price: 299.99,
+    tags: ["featured", "sale"]
+});
+
+// Search with filter
+db.searchFiltered(query, 'category = "electronics" AND price < 500', 10);
+db.searchFiltered(query, 'tags ANY ["featured"]', 10);  // Array membership
+
+// Complex expressions
+db.searchFiltered(query,
+    '(category = "electronics" OR category = "books") AND price < 100',
+    10
+);
+```
+
+**Operators:** `=`, `!=`, `>`, `<`, `>=`, `<=`, `AND`, `OR`, `NOT`, `ANY`
 
 [Filter syntax documentation ->](docs/api/FILTER_SYNTAX.md)
+
+### Memory Pressure API (v0.6.0)
+
+Monitor and control WASM heap usage:
+
+```javascript
+const pressure = db.getMemoryPressure();
+// { level: 'normal', usedBytes: 52428800, totalBytes: 268435456, usagePercent: 19.5 }
+
+if (pressure.level === 'warning') {
+    db.compact();  // Free deleted vectors
+}
+
+if (!db.canInsert()) {
+    console.warn('Memory critical, inserts blocked');
+}
+```
 
 ### Soft Delete & Compaction
 
@@ -235,9 +280,10 @@ For these use cases, consider [Pinecone](https://pinecone.io), [Qdrant](https://
 
 ## Version History
 
+- **v0.6.0** — Binary quantization (32x memory), metadata storage, memory pressure API
+- **v0.5.4** — iOS Safari compatibility fixes
 - **v0.5.3** — crates.io publishing fix (package size reduction)
 - **v0.5.2** — npm TypeScript compilation fix
-- **v0.5.1** — README update for npm display
 - **v0.5.0** — Metadata filtering with SQL-like syntax, Filter Playground demo
 - **v0.4.0** — Documentation sprint, benchmark dashboard, chaos testing
 - **v0.3.0** — Soft delete API, compaction, persistence format v3

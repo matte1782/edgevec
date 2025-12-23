@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="EdgeVec v0.6.0 Demo - Binary Quantization, Metadata Filtering, and Hybrid Search">
+    <title>EdgeVec v0.6.0 | BQ + Metadata Demo</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a0f' width='100' height='100'/><polygon fill='%2300ffff' points='50,10 90,30 90,70 50,90 10,70 10,30'/><polygon fill='%230a0a0f' points='50,25 75,37 75,63 50,75 25,63 25,37'/><circle fill='%23ff00ff' cx='50' cy='50' r='8'/></svg>">
+    <style>
+        /* EdgeVec v0.6.0 Demo - Cyberpunk Theme */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        :root {
+            --bg-void: #030306;
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #0f0f18;
+            --bg-card: #12121c;
+            --cyan: #00ffff;
+            --cyan-dim: #00aaaa;
+            --magenta: #ff00ff;
+            --green: #00ff88;
+            --red: #ff3366;
+            --yellow: #ffff00;
+            --white: #e8e8f0;
+            --gray-100: #b0b0c0;
+            --gray-300: #606080;
+            --border: #252535;
+            --glow-cyan: 0 0 20px rgba(0, 255, 255, 0.3);
+            --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-void);
+            color: var(--white);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(90deg, rgba(0,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(rgba(0,255,255,0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+            border-bottom: 1px solid var(--border);
+            padding: 20px 30px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+        }
+
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--cyan);
+            text-shadow: 0 0 10px rgba(0,255,255,0.5);
+        }
+
+        .version-badge {
+            background: linear-gradient(135deg, var(--magenta), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--gray-300);
+            transition: all 0.3s;
+        }
+
+        .status-dot.ready {
+            background: var(--green);
+            box-shadow: var(--glow-green);
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+            position: relative;
+            z-index: 10;
+        }
+
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: var(--cyan);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            border-color: var(--cyan-dim);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .card h3 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            color: var(--cyan);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        label {
+            color: var(--gray-100);
+            font-size: 0.85rem;
+        }
+
+        input[type="number"], input[type="text"], select {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--white);
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--cyan);
+        }
+
+        button {
+            padding: 14px 24px;
+            background: linear-gradient(135deg, var(--cyan-dim), var(--cyan));
+            border: none;
+            border-radius: 8px;
+            color: var(--bg-void);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: var(--glow-cyan);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--white);
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, var(--red), #ff5577);
+        }
+
+        .results-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--cyan);
+        }
+
+        .metric-value.bq {
+            color: var(--magenta);
+        }
+
+        .metric-value.fast {
+            color: var(--green);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--gray-100);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 5px;
+        }
+
+        .log {
+            background: var(--bg-void);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--gray-300);
+        }
+
+        .log-success {
+            color: var(--green);
+        }
+
+        .log-info {
+            color: var(--cyan);
+        }
+
+        .log-warning {
+            color: var(--yellow);
+        }
+
+        .log-error {
+            color: var(--red);
+        }
+
+        .comparison-bar {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .bar-container {
+            flex: 1;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .bar-label {
+            font-size: 0.75rem;
+            color: var(--gray-100);
+            margin-bottom: 5px;
+        }
+
+        .bar-track {
+            height: 20px;
+            background: var(--bg-void);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease-out;
+        }
+
+        .bar-fill.f32 {
+            background: linear-gradient(90deg, var(--cyan), var(--cyan-dim));
+        }
+
+        .bar-fill.bq {
+            background: linear-gradient(90deg, var(--magenta), #aa00aa);
+        }
+
+        .feature-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .tag {
+            padding: 6px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: var(--gray-100);
+        }
+
+        .tag.active {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        /* Memory Pressure Styles */
+        .memory-display {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .memory-level {
+            text-align: center;
+        }
+
+        .level-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--gray-100);
+        }
+
+        .level-badge.normal {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .level-badge.warning {
+            background: rgba(255, 255, 0, 0.2);
+            border-color: var(--yellow);
+            color: var(--yellow);
+        }
+
+        .level-badge.critical {
+            background: rgba(255, 51, 102, 0.2);
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .memory-bar-container {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .memory-bar-track {
+            height: 24px;
+            background: var(--bg-void);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .memory-bar-fill {
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.5s ease-out, background 0.3s;
+            background: linear-gradient(90deg, var(--green), var(--cyan));
+        }
+
+        .memory-bar-fill.warning {
+            background: linear-gradient(90deg, var(--yellow), #ffaa00);
+        }
+
+        .memory-bar-fill.critical {
+            background: linear-gradient(90deg, var(--red), #ff5577);
+        }
+
+        .memory-stats {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--gray-100);
+        }
+
+        .memory-details {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: var(--gray-100);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 100 100">
+                    <polygon fill="#00ffff" points="50,10 90,30 90,70 50,90 10,70 10,30"/>
+                    <polygon fill="#0a0a0f" points="50,25 75,37 75,63 50,75 25,63 25,37"/>
+                    <circle fill="#ff00ff" cx="50" cy="50" r="8"/>
+                </svg>
+                <div>
+                    <span class="logo-text">EDGEVEC</span>
+                    <div class="version-badge">v0.6.0 RFC-002</div>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Loading WASM...</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="cards">
+            <!-- Index Configuration -->
+            <div class="card">
+                <h3><span>&#9881;</span> Index Configuration</h3>
+                <div class="controls">
+                    <div>
+                        <label>Dimensions</label>
+                        <input type="number" id="dimensions" value="128" min="2" max="2048">
+                    </div>
+                    <div>
+                        <label>Vector Count</label>
+                        <input type="number" id="vectorCount" value="1000" min="10" max="100000">
+                    </div>
+                    <div>
+                        <label>Enable Binary Quantization</label>
+                        <select id="enableBQ">
+                            <option value="true" selected>Yes (8x memory savings)</option>
+                            <option value="false">No (Full precision)</option>
+                        </select>
+                    </div>
+                    <button id="createIndex" disabled>Create Index</button>
+                </div>
+            </div>
+
+            <!-- Metadata Filter -->
+            <div class="card">
+                <h3><span>&#128269;</span> Metadata Filter</h3>
+                <div class="controls">
+                    <div>
+                        <label>Filter Expression</label>
+                        <input type="text" id="filterExpr" value='category = "tech"' placeholder='category = "news" AND active = true'>
+                    </div>
+                    <div>
+                        <label>k (neighbors)</label>
+                        <input type="number" id="kValue" value="10" min="1" max="100">
+                    </div>
+                    <div class="feature-tags">
+                        <span class="tag active" data-filter='category = "tech"'>tech</span>
+                        <span class="tag" data-filter='category = "news"'>news</span>
+                        <span class="tag" data-filter='category = "sports"'>sports</span>
+                        <span class="tag" data-filter='active = true'>active</span>
+                        <span class="tag" data-filter='score > 0.5'>high score</span>
+                    </div>
+                    <button id="runSearch" disabled>Search (F32 + BQ)</button>
+                </div>
+            </div>
+
+            <!-- Memory Pressure -->
+            <div class="card">
+                <h3><span>&#128200;</span> Memory Pressure</h3>
+                <div class="controls">
+                    <div class="memory-display">
+                        <div class="memory-level" id="memoryLevel">
+                            <span class="level-badge" id="levelBadge">--</span>
+                        </div>
+                        <div class="memory-bar-container">
+                            <div class="memory-bar-track">
+                                <div class="memory-bar-fill" id="memoryBarFill" style="width: 0%"></div>
+                            </div>
+                            <div class="memory-stats" id="memoryStats">-- / -- MB</div>
+                        </div>
+                    </div>
+                    <div class="memory-details" id="memoryDetails">
+                        <div>Usage: <span id="memoryPercent">--</span>%</div>
+                        <div>Can Insert: <span id="canInsert">--</span></div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="refreshMemory" class="secondary" disabled>Refresh</button>
+                        <button id="insertMore" class="secondary" disabled>+1000 Vectors</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="results-panel">
+            <h2>Performance Comparison</h2>
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-value" id="vectorsIndexed">0</div>
+                    <div class="metric-label">Vectors Indexed</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="metadataCount">0</div>
+                    <div class="metric-label">With Metadata</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="f32Time">--</div>
+                    <div class="metric-label">F32 Search (ms)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value bq" id="bqTime">--</div>
+                    <div class="metric-label">BQ Search (ms)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value fast" id="speedup">--</div>
+                    <div class="metric-label">Speedup</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="recall">--</div>
+                    <div class="metric-label">BQ Recall</div>
+                </div>
+            </div>
+
+            <div class="comparison-bar">
+                <div class="bar-container">
+                    <div class="bar-label">F32 (Full Precision)</div>
+                    <div class="bar-track">
+                        <div class="bar-fill f32" id="f32Bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="bar-container">
+                    <div class="bar-label">BQ (Binary Quantized)</div>
+                    <div class="bar-track">
+                        <div class="bar-fill bq" id="bqBar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <h2 style="margin-top: 25px;">Activity Log</h2>
+            <div class="log" id="log"></div>
+        </div>
+    </main>
+
+    <script type="module">
+        import init, { EdgeVec, validateFilter } from '../../pkg/edgevec.js';
+
+        // State
+        let wasmReady = false;
+        let index = null;
+        const categories = ['tech', 'news', 'sports', 'entertainment'];
+
+        // DOM Elements
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const createBtn = document.getElementById('createIndex');
+        const searchBtn = document.getElementById('runSearch');
+        const logEl = document.getElementById('log');
+        const refreshMemoryBtn = document.getElementById('refreshMemory');
+        const insertMoreBtn = document.getElementById('insertMore');
+
+        // Logging
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${message}</span>`;
+            logEl.insertBefore(entry, logEl.firstChild);
+        }
+
+        // Initialize WASM
+        async function initWasm() {
+            try {
+                await init();
+                wasmReady = true;
+                statusDot.classList.add('ready');
+                statusText.textContent = 'WASM Ready';
+                createBtn.disabled = false;
+                log('WASM initialized successfully', 'success');
+            } catch (e) {
+                log(`WASM init failed: ${e.message}`, 'error');
+            }
+        }
+
+        // Create Index
+        createBtn.addEventListener('click', async () => {
+            const dims = parseInt(document.getElementById('dimensions').value);
+            const count = parseInt(document.getElementById('vectorCount').value);
+            const useBQ = document.getElementById('enableBQ').value === 'true';
+
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating...';
+            log(`Creating index: ${dims}D, ${count} vectors, BQ=${useBQ}`, 'info');
+
+            try {
+                // Create index
+                index = new EdgeVec({ dimensions: dims });
+
+                const startInsert = performance.now();
+
+                // Insert vectors with metadata
+                for (let i = 0; i < count; i++) {
+                    const vector = new Float32Array(dims);
+                    for (let d = 0; d < dims; d++) {
+                        vector[d] = Math.random() * 2 - 1;
+                    }
+
+                    const metadata = {
+                        category: categories[i % 4],
+                        score: Math.random(),
+                        active: i % 2 === 0,
+                        index: i
+                    };
+
+                    index.insertWithMetadata(vector, metadata);
+
+                    // Progress update
+                    if ((i + 1) % 100 === 0) {
+                        await new Promise(r => setTimeout(r, 0)); // Yield to UI
+                    }
+                }
+
+                const insertTime = (performance.now() - startInsert).toFixed(1);
+                log(`Inserted ${count} vectors in ${insertTime}ms`, 'success');
+
+                // Update metrics
+                document.getElementById('vectorsIndexed').textContent = count;
+                document.getElementById('metadataCount').textContent = count;
+
+                searchBtn.disabled = false;
+                refreshMemoryBtn.disabled = false;
+                insertMoreBtn.disabled = false;
+                createBtn.textContent = 'Index Created';
+
+                // Update memory pressure display
+                updateMemoryPressure();
+            } catch (e) {
+                log(`Error: ${e.message}`, 'error');
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create Index';
+            }
+        });
+
+        // Memory Pressure Functions
+        function updateMemoryPressure() {
+            if (!index) return;
+
+            try {
+                const pressure = index.getMemoryPressure();
+                const levelBadge = document.getElementById('levelBadge');
+                const memoryBarFill = document.getElementById('memoryBarFill');
+                const memoryStats = document.getElementById('memoryStats');
+                const memoryPercent = document.getElementById('memoryPercent');
+                const canInsertEl = document.getElementById('canInsert');
+
+                // Update level badge
+                levelBadge.textContent = pressure.level.toUpperCase();
+                levelBadge.className = 'level-badge ' + pressure.level;
+
+                // Update bar
+                memoryBarFill.style.width = pressure.usage_percent + '%';
+                memoryBarFill.className = 'memory-bar-fill ' + pressure.level;
+
+                // Update stats
+                const usedMB = (pressure.used_bytes / 1024 / 1024).toFixed(1);
+                const totalMB = (pressure.total_bytes / 1024 / 1024).toFixed(1);
+                memoryStats.textContent = `${usedMB} / ${totalMB} MB`;
+                memoryPercent.textContent = pressure.usage_percent.toFixed(1);
+
+                // Update can insert
+                const canInsert = index.canInsert();
+                canInsertEl.textContent = canInsert ? 'Yes' : 'No';
+                canInsertEl.style.color = canInsert ? 'var(--green)' : 'var(--red)';
+
+                log(`Memory: ${pressure.level} (${pressure.usage_percent.toFixed(1)}%)`,
+                    pressure.level === 'normal' ? 'info' : pressure.level === 'warning' ? 'warning' : 'error');
+            } catch (e) {
+                log(`Memory check failed: ${e.message}`, 'warning');
+            }
+        }
+
+        // Refresh memory button
+        refreshMemoryBtn.addEventListener('click', () => {
+            updateMemoryPressure();
+        });
+
+        // Insert more vectors button
+        insertMoreBtn.addEventListener('click', async () => {
+            if (!index) return;
+
+            const dims = parseInt(document.getElementById('dimensions').value);
+            const currentCount = parseInt(document.getElementById('vectorsIndexed').textContent);
+
+            insertMoreBtn.disabled = true;
+            insertMoreBtn.textContent = 'Inserting...';
+
+            try {
+                for (let i = 0; i < 1000; i++) {
+                    const vector = new Float32Array(dims);
+                    for (let d = 0; d < dims; d++) {
+                        vector[d] = Math.random() * 2 - 1;
+                    }
+
+                    const metadata = {
+                        category: categories[Math.floor(Math.random() * 4)],
+                        score: Math.random(),
+                        active: Math.random() > 0.5,
+                        index: currentCount + i
+                    };
+
+                    index.insertWithMetadata(vector, metadata);
+
+                    if ((i + 1) % 100 === 0) {
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                }
+
+                const newCount = currentCount + 1000;
+                document.getElementById('vectorsIndexed').textContent = newCount;
+                document.getElementById('metadataCount').textContent = newCount;
+
+                log(`Inserted 1000 more vectors (total: ${newCount})`, 'success');
+                updateMemoryPressure();
+            } catch (e) {
+                log(`Insert error: ${e.message}`, 'error');
+            }
+
+            insertMoreBtn.disabled = false;
+            insertMoreBtn.textContent = '+1000 Vectors';
+        });
+
+        // Filter tag clicks
+        document.querySelectorAll('.tag').forEach(tag => {
+            tag.addEventListener('click', () => {
+                document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+                tag.classList.add('active');
+                document.getElementById('filterExpr').value = tag.dataset.filter;
+            });
+        });
+
+        // Search
+        searchBtn.addEventListener('click', async () => {
+            if (!index) return;
+
+            const k = parseInt(document.getElementById('kValue').value);
+            const filterExpr = document.getElementById('filterExpr').value;
+            const dims = parseInt(document.getElementById('dimensions').value);
+
+            // Generate random query
+            const query = new Float32Array(dims);
+            for (let d = 0; d < dims; d++) {
+                query[d] = Math.random() * 2 - 1;
+            }
+
+            log(`Searching: k=${k}, filter="${filterExpr}"`, 'info');
+
+            try {
+                // F32 search
+                const f32Start = performance.now();
+                const f32Results = index.searchFiltered(query, filterExpr, k);
+                const f32Time = performance.now() - f32Start;
+
+                // BQ search (if available)
+                let bqTime = 0;
+                let bqResults = [];
+                try {
+                    const bqStart = performance.now();
+                    bqResults = index.searchBQ(query, k * 5); // Overfetch for filtering
+                    bqTime = performance.now() - bqStart;
+                } catch (e) {
+                    log('BQ not enabled for this index', 'warning');
+                }
+
+                // Update metrics
+                document.getElementById('f32Time').textContent = f32Time.toFixed(2);
+                document.getElementById('bqTime').textContent = bqTime > 0 ? bqTime.toFixed(2) : '--';
+
+                const speedup = bqTime > 0 ? (f32Time / bqTime).toFixed(1) + 'x' : '--';
+                document.getElementById('speedup').textContent = speedup;
+
+                // Calculate recall (if both available)
+                if (f32Results.length > 0 && bqResults.length > 0) {
+                    const f32Ids = new Set(f32Results.map(r => r.id));
+                    const bqIds = new Set(bqResults.slice(0, k).map(r => r[0]));
+                    let overlap = 0;
+                    bqIds.forEach(id => { if (f32Ids.has(id)) overlap++; });
+                    const recall = (overlap / Math.min(k, f32Ids.size) * 100).toFixed(1);
+                    document.getElementById('recall').textContent = recall + '%';
+                }
+
+                // Update bars (normalized to slower one)
+                const maxTime = Math.max(f32Time, bqTime || f32Time);
+                document.getElementById('f32Bar').style.width = (f32Time / maxTime * 100) + '%';
+                document.getElementById('bqBar').style.width = ((bqTime || 0) / maxTime * 100) + '%';
+
+                log(`F32: ${f32Results.length} results in ${f32Time.toFixed(2)}ms`, 'success');
+                if (bqTime > 0) {
+                    log(`BQ: ${bqResults.length} candidates in ${bqTime.toFixed(2)}ms (${speedup} faster)`, 'success');
+                }
+
+            } catch (e) {
+                log(`Search error: ${e.message}`, 'error');
+            }
+        });
+
+        // Initialize
+        initWasm();
+    </script>
+</body>
+</html>

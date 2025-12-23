@@ -458,6 +458,7 @@ impl VectorStorage {
         let idx = (id.0 as usize) - 1;
         let dim = self.dimensions as usize;
         let start = idx * dim;
+        let end = start + dim;
 
         match &self.config {
             StorageType::Float32 => {
@@ -465,14 +466,30 @@ impl VectorStorage {
                     !self.data_f32.is_empty(),
                     "get_vector called on storage without f32 data"
                 );
-                Cow::Borrowed(&self.data_f32[start..start + dim])
+                assert!(
+                    end <= self.data_f32.len(),
+                    "get_vector: VectorId {} out of bounds (idx={}, end={}, data_len={})",
+                    id.0,
+                    idx,
+                    end,
+                    self.data_f32.len()
+                );
+                Cow::Borrowed(&self.data_f32[start..end])
             }
             StorageType::QuantizedU8(_) => {
                 assert!(
                     !self.quantized_data.is_empty(),
                     "get_vector called on storage without quantized data"
                 );
-                let q_data = &self.quantized_data[start..start + dim];
+                assert!(
+                    end <= self.quantized_data.len(),
+                    "get_vector: VectorId {} out of bounds (idx={}, end={}, data_len={})",
+                    id.0,
+                    idx,
+                    end,
+                    self.quantized_data.len()
+                );
+                let q_data = &self.quantized_data[start..end];
                 let q = self
                     .quantizer
                     .as_ref()

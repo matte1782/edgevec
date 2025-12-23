@@ -1,7 +1,7 @@
 # TypeScript API Reference
 
-**Version:** EdgeVec v0.5.3
-**Last Updated:** 2025-12-19
+**Version:** EdgeVec v0.6.0
+**Last Updated:** 2025-12-22
 
 ---
 

@@ -154,7 +154,7 @@ impl MetadataStore {
     /// - If the key doesn't exist, it's created (subject to key count limit).
     /// - If the key already exists, its value is overwritten.
     ///
-    /// Use [`update`] if you want to fail when the key doesn't exist.
+    /// Use [`Self::update`] if you want to fail when the key doesn't exist.
     ///
     /// # Arguments
     ///
@@ -218,7 +218,7 @@ impl MetadataStore {
 
     /// Updates an existing metadata key-value pair.
     ///
-    /// Unlike [`insert`], this method fails if the key doesn't exist.
+    /// Unlike [`Self::insert`], this method fails if the key doesn't exist.
     /// Use this when you want to ensure you're modifying an existing value.
     ///
     /// # Arguments

@@ -236,7 +236,8 @@ impl HnswIndex {
 
     /// Convenience method with default rescore factor.
     ///
-    /// Uses rescore_factor = 3, which provides good recall/speed balance.
+    /// Uses rescore_factor = 5, which provides good recall/speed balance.
+    /// For maximum recall (>0.90), use rescore_factor = 10 or higher.
     ///
     /// # Errors
     ///
@@ -264,7 +265,25 @@ impl HnswIndex {
         k: usize,
         storage: &VectorStorage,
     ) -> Result<Vec<(VectorId, f32)>, GraphError> {
-        self.search_bq_rescored(query, k, 3, storage)
+        self.search_bq_rescored(query, k, 5, storage)
+    }
+
+    /// High-recall BQ search (rescore_factor = 15).
+    ///
+    /// Use this when recall is critical and latency is acceptable.
+    /// Achieves >0.90 recall on most datasets.
+    ///
+    /// # Errors
+    ///
+    /// - `GraphError::BqNotEnabled` if BQ storage is not initialized.
+    /// - `GraphError::DimensionMismatch` if query dimension is wrong.
+    pub fn search_bq_high_recall(
+        &self,
+        query: &[f32],
+        k: usize,
+        storage: &VectorStorage,
+    ) -> Result<Vec<(VectorId, f32)>, GraphError> {
+        self.search_bq_rescored(query, k, 15, storage)
     }
 
     /// Internal BQ search using Hamming distance.
@@ -349,7 +368,9 @@ impl HnswIndex {
         k: usize,
         bq_storage: &BinaryVectorStorage,
     ) -> Result<Vec<(VectorId, u32)>, GraphError> {
-        let ef = self.config.ef_construction.max(k as u32) as usize;
+        // Use ef_search (not ef_construction) for search beam width
+        // Higher ef_search = better recall but slower search
+        let ef = self.config.ef_search.max(k as u32) as usize;
 
         let mut visited: HashSet<NodeId> = HashSet::new();
         let mut candidates: BinaryHeap<Reverse<BqCandidate>> = BinaryHeap::new();

@@ -1,4 +1,4 @@
-import { IndexedDbBackend } from './snippets/edgevec-2248952a92ddd6ed/src/js/storage.js';
+import { IndexedDbBackend } from './snippets/edgevec-98e271a617b3aceb/src/js/storage.js';
 
 let wasm;
 
@@ -20,6 +20,71 @@ function _assertClass(instance, klass) {
 const CLOSURE_DTORS = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(state => state.dtor(state.a, state.b));
+
+function debugString(val) {
+    // primitive types
+    const type = typeof val;
+    if (type == 'number' || type == 'boolean' || val == null) {
+        return  `${val}`;
+    }
+    if (type == 'string') {
+        return `"${val}"`;
+    }
+    if (type == 'symbol') {
+        const description = val.description;
+        if (description == null) {
+            return 'Symbol';
+        } else {
+            return `Symbol(${description})`;
+        }
+    }
+    if (type == 'function') {
+        const name = val.name;
+        if (typeof name == 'string' && name.length > 0) {
+            return `Function(${name})`;
+        } else {
+            return 'Function';
+        }
+    }
+    // objects
+    if (Array.isArray(val)) {
+        const length = val.length;
+        let debug = '[';
+        if (length > 0) {
+            debug += debugString(val[0]);
+        }
+        for(let i = 1; i < length; i++) {
+            debug += ', ' + debugString(val[i]);
+        }
+        debug += ']';
+        return debug;
+    }
+    // Test for built-in
+    const builtInMatches = /\[object ([^\]]+)\]/.exec(toString.call(val));
+    let className;
+    if (builtInMatches && builtInMatches.length > 1) {
+        className = builtInMatches[1];
+    } else {
+        // Failed to match the standard '[object ClassName]'
+        return toString.call(val);
+    }
+    if (className == 'Object') {
+        // we're a user defined class or Object
+        // JSON.stringify avoids problems with cycles, and is generally much
+        // easier than looping through ownProperties of `val`.
+        try {
+            return 'Object(' + JSON.stringify(val) + ')';
+        } catch (_) {
+            return 'Object';
+        }
+    }
+    // errors
+    if (val instanceof Error) {
+        return `${val.name}: ${val.message}\n${val.stack}`;
+    }
+    // TODO we could test for more things here, like `Set`s and `Map`s.
+    return className;
+}
 
 function dropObject(idx) {
     if (idx < 132) return;
@@ -224,12 +289,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_1608(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_1608(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_1731(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_1731(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_2123(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_2123(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_2243(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_2243(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -446,6 +511,28 @@ export class EdgeVec {
         const len0 = WASM_VECTOR_LEN;
         const ret = wasm.edgevec_save(this.__wbg_ptr, ptr0, len0);
         return takeObject(ret);
+    }
+    /**
+     * Check if inserts are allowed based on memory pressure.
+     *
+     * Returns `false` if memory is at critical level and
+     * `blockInsertsOnCritical` is enabled.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * if (index.canInsert()) {
+     *     const id = index.insert(vector);
+     * } else {
+     *     console.warn('Memory critical, insert blocked');
+     *     showMemoryWarning();
+     * }
+     * ```
+     * @returns {boolean}
+     */
+    canInsert() {
+        const ret = wasm.edgevec_canInsert(this.__wbg_ptr);
+        return ret !== 0;
     }
     /**
      * Check if a vector is deleted (tombstoned).
@@ -997,6 +1084,33 @@ export class EdgeVec {
         return ret !== 0;
     }
     /**
+     * Get the current memory configuration.
+     *
+     * # Returns
+     *
+     * MemoryConfig object with current settings.
+     *
+     * # Errors
+     *
+     * Returns an error if serialization fails (should not happen in practice).
+     * @returns {any}
+     */
+    getMemoryConfig() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_getMemoryConfig(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Inserts a batch of vectors into the index (flat array format).
      *
      * **Note:** This is the legacy API. For the new API, use `insertBatch` which
@@ -1029,6 +1143,50 @@ export class EdgeVec {
                 throw takeObject(r1);
             }
             return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Configure memory pressure thresholds.
+     *
+     * # Arguments
+     *
+     * * `config` - MemoryConfig object with optional fields:
+     *   - `warningThreshold`: Warning threshold percentage (default: 80)
+     *   - `criticalThreshold`: Critical threshold percentage (default: 95)
+     *   - `autoCompactOnWarning`: Auto-compact when warning threshold reached
+     *   - `blockInsertsOnCritical`: Block inserts when critical threshold reached
+     *
+     * # Errors
+     *
+     * Returns an error if:
+     * - `config` is not a valid MemoryConfig object
+     * - `warningThreshold` is not between 0 and 100
+     * - `criticalThreshold` is not between 0 and 100
+     * - `warningThreshold` is greater than or equal to `criticalThreshold`
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * index.setMemoryConfig({
+     *     warningThreshold: 70,
+     *     criticalThreshold: 90,
+     *     autoCompactOnWarning: true,
+     *     blockInsertsOnCritical: true
+     * });
+     * ```
+     * @param {any} config
+     */
+    setMemoryConfig(config) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_setMemoryConfig(retptr, this.__wbg_ptr, addHeapObject(config));
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            if (r1) {
+                throw takeObject(r0);
+            }
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
@@ -1314,6 +1472,59 @@ export class EdgeVec {
         return ret !== 0;
     }
     /**
+     * Get current memory pressure state.
+     *
+     * Returns memory usage statistics and pressure level.
+     * Use this to implement graceful degradation in your app.
+     *
+     * # Returns
+     *
+     * MemoryPressure object with:
+     * - `level`: "normal", "warning", or "critical"
+     * - `usedBytes`: Bytes currently allocated
+     * - `totalBytes`: Total WASM heap size
+     * - `usagePercent`: Usage as percentage (0-100)
+     *
+     * # Errors
+     *
+     * Returns an error if serialization fails (should not happen in practice).
+     *
+     * # Thresholds
+     *
+     * - Normal: <80% usage
+     * - Warning: 80-95% usage (consider reducing data)
+     * - Critical: >95% usage (risk of OOM, stop inserts)
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const pressure = index.getMemoryPressure();
+     * if (pressure.level === 'warning') {
+     *     console.warn('Memory pressure high, consider compacting');
+     *     index.compact();
+     * } else if (pressure.level === 'critical') {
+     *     console.error('Memory critical, stopping inserts');
+     *     // Disable insert button, show warning to user
+     * }
+     * ```
+     * @returns {any}
+     */
+    getMemoryPressure() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_getMemoryPressure(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Get all metadata for a vector by ID (alias for getAllMetadata).
      *
      * This is an alias for `getAllMetadata()` provided for API consistency
@@ -1508,6 +1719,51 @@ export class EdgeVec {
                 throw takeObject(r1);
             }
             return WasmBatchDeleteResult.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Get memory recommendation based on current state.
+     *
+     * Provides actionable guidance based on memory pressure level.
+     *
+     * # Returns
+     *
+     * MemoryRecommendation object with:
+     * - `action`: "none", "compact", or "reduce"
+     * - `message`: Human-readable description
+     * - `canInsert`: Whether inserts are allowed
+     * - `suggestCompact`: Whether compaction would help
+     *
+     * # Errors
+     *
+     * Returns an error if serialization fails (should not happen in practice).
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const rec = index.getMemoryRecommendation();
+     * if (rec.action === 'compact' && rec.suggestCompact) {
+     *     index.compact();
+     * } else if (rec.action === 'reduce') {
+     *     showMemoryWarning(rec.message);
+     *     disableInsertButton();
+     * }
+     * ```
+     * @returns {any}
+     */
+    getMemoryRecommendation() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_getMemoryRecommendation(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
@@ -1733,6 +1989,44 @@ export class EdgeVec {
                 throw takeObject(r1);
             }
             return WasmCompactionResult.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Enables binary quantization on this index.
+     *
+     * Binary quantization reduces memory usage by 32x (from 32 bits to 1 bit per dimension)
+     * while maintaining ~85-95% recall. BQ is automatically enabled for dimensions divisible by 8.
+     *
+     * # Errors
+     *
+     * Returns an error if:
+     * - Dimensions are not divisible by 8 (required for BQ)
+     * - BQ is already enabled
+     *
+     * # Example
+     *
+     * ```javascript
+     * const db = new EdgeVec(config);
+     * db.enableBQ();  // Enable BQ for faster search
+     *
+     * // Insert vectors (BQ codes computed automatically)
+     * db.insert(vector);
+     *
+     * // Use BQ search
+     * const results = db.searchBQ(query, 10);
+     * ```
+     */
+    enableBQ() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_enableBQ(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            if (r1) {
+                throw takeObject(r0);
+            }
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
@@ -2593,10 +2887,28 @@ function __wbg_get_imports() {
         const ret = Error(getStringFromWasm0(arg0, arg1));
         return addHeapObject(ret);
     };
+    imports.wbg.__wbg_String_8f0eb39a4a4c2f66 = function(arg0, arg1) {
+        const ret = String(getObject(arg1));
+        const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len1 = WASM_VECTOR_LEN;
+        getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+        getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+    };
     imports.wbg.__wbg___wbindgen_boolean_get_dea25b33882b895b = function(arg0) {
         const v = getObject(arg0);
         const ret = typeof(v) === 'boolean' ? v : undefined;
         return isLikeNone(ret) ? 0xFFFFFF : ret ? 1 : 0;
+    };
+    imports.wbg.__wbg___wbindgen_debug_string_adfb662ae34724b6 = function(arg0, arg1) {
+        const ret = debugString(getObject(arg1));
+        const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+        const len1 = WASM_VECTOR_LEN;
+        getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+        getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+    };
+    imports.wbg.__wbg___wbindgen_in_0d3e1e8f0c669317 = function(arg0, arg1) {
+        const ret = getObject(arg0) in getObject(arg1);
+        return ret;
     };
     imports.wbg.__wbg___wbindgen_is_function_8d400b8b1af978cd = function(arg0) {
         const ret = typeof(getObject(arg0)) === 'function';
@@ -2619,6 +2931,14 @@ function __wbg_get_imports() {
         const ret = getObject(arg0) === undefined;
         return ret;
     };
+    imports.wbg.__wbg___wbindgen_jsval_loose_eq_766057600fdd1b0d = function(arg0, arg1) {
+        const ret = getObject(arg0) == getObject(arg1);
+        return ret;
+    };
+    imports.wbg.__wbg___wbindgen_memory_a342e963fbcabd68 = function() {
+        const ret = wasm.memory;
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg___wbindgen_number_get_9619185a74197f95 = function(arg0, arg1) {
         const obj = getObject(arg1);
         const ret = typeof(obj) === 'number' ? obj : undefined;
@@ -2638,6 +2958,14 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbg__wbg_cb_unref_87dfb5aaa0cbcea7 = function(arg0) {
         getObject(arg0)._wbg_cb_unref();
+    };
+    imports.wbg.__wbg_buffer_063cd102cc769a1c = function(arg0) {
+        const ret = getObject(arg0).buffer;
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbg_byteLength_166ad9a51ecaa5f1 = function(arg0) {
+        const ret = getObject(arg0).byteLength;
+        return ret;
     };
     imports.wbg.__wbg_call_3020136f7a2d6e44 = function() { return handleError(function (arg0, arg1, arg2) {
         const ret = getObject(arg0).call(getObject(arg1), getObject(arg2));
@@ -2691,8 +3019,32 @@ function __wbg_get_imports() {
         const ret = Reflect.get(getObject(arg0), getObject(arg1));
         return addHeapObject(ret);
     }, arguments) };
+    imports.wbg.__wbg_get_with_ref_key_1dc361bd10053bfe = function(arg0, arg1) {
+        const ret = getObject(arg0)[getObject(arg1)];
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbg_info_ce6bcc489c22f6f0 = function(arg0) {
         console.info(getObject(arg0));
+    };
+    imports.wbg.__wbg_instanceof_ArrayBuffer_f3320d2419cd0355 = function(arg0) {
+        let result;
+        try {
+            result = getObject(arg0) instanceof ArrayBuffer;
+        } catch (_) {
+            result = false;
+        }
+        const ret = result;
+        return ret;
+    };
+    imports.wbg.__wbg_instanceof_Uint8Array_da54ccc9d3e09434 = function(arg0) {
+        let result;
+        try {
+            result = getObject(arg0) instanceof Uint8Array;
+        } catch (_) {
+            result = false;
+        }
+        const ret = result;
+        return ret;
     };
     imports.wbg.__wbg_instanceof_Window_b5cf7783caa68180 = function(arg0) {
         let result;
@@ -2762,7 +3114,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_2123(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_2243(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -2835,7 +3187,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_randomFillSync_ac0988aba3254290 = function() { return handleError(function (arg0, arg1) {
         getObject(arg0).randomFillSync(takeObject(arg1));
     }, arguments) };
-    imports.wbg.__wbg_read_a68635a97e5352a0 = function() { return handleError(function (arg0, arg1) {
+    imports.wbg.__wbg_read_4b87ebfb9daf2382 = function() { return handleError(function (arg0, arg1) {
         const ret = IndexedDbBackend.read(getStringFromWasm0(arg0, arg1));
         return addHeapObject(ret);
     }, arguments) };
@@ -2846,6 +3198,9 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_resolve_fd5bfbaa4ce36e1e = function(arg0) {
         const ret = Promise.resolve(getObject(arg0));
         return addHeapObject(ret);
+    };
+    imports.wbg.__wbg_set_3f1d0b984ed272ed = function(arg0, arg1, arg2) {
+        getObject(arg0)[takeObject(arg1)] = takeObject(arg2);
     };
     imports.wbg.__wbg_set_781438a03c0c3c81 = function() { return handleError(function (arg0, arg1, arg2) {
         const ret = Reflect.set(getObject(arg0), getObject(arg1), getObject(arg2));
@@ -2896,7 +3251,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_warn_6e567d0d926ff881 = function(arg0) {
         console.warn(getObject(arg0));
     };
-    imports.wbg.__wbg_write_a46dfda682f6e473 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
+    imports.wbg.__wbg_write_eab4b5dfa9d6d182 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
         const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getArrayU8FromWasm0(arg2, arg3));
         return addHeapObject(ret);
     }, arguments) };
@@ -2905,9 +3260,9 @@ function __wbg_get_imports() {
         const ret = getStringFromWasm0(arg0, arg1);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_cast_902a70736b89c8fd = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 119, function: Function { arguments: [Externref], shim_idx: 120, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_1592, __wasm_bindgen_func_elem_1608);
+    imports.wbg.__wbindgen_cast_4625c577ab2ec9ee = function(arg0) {
+        // Cast intrinsic for `U64 -> Externref`.
+        const ret = BigInt.asUintN(64, arg0);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_cast_cb9088102bce6b30 = function(arg0, arg1) {
@@ -2918,6 +3273,11 @@ function __wbg_get_imports() {
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {
         // Cast intrinsic for `F64 -> Externref`.
         const ret = arg0;
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbindgen_cast_f0471e20a57dc27a = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 127, function: Function { arguments: [Externref], shim_idx: 128, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_1715, __wasm_bindgen_func_elem_1731);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_object_clone_ref = function(arg0) {

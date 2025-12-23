@@ -7,9 +7,161 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned (v0.6.0)
-- ARM/NEON SIMD optimization verification
-- Integrated metadata storage (server-side pattern)
+### Added
+- **`enableBQ()`** — WASM method to enable binary quantization after index creation
+  - Required for BQ search methods (`searchBQ`, `searchBQRescored`)
+  - Dimensions must be divisible by 8
+  - Automatically encodes existing vectors on enable
+
+### Changed
+- **WASM Bundle Optimized** — Applied wasm-opt `-Oz` with `--strip-debug` and `--strip-producers`
+  - **524 KB → 477 KB** (9.2% reduction, 47 KB saved)
+  - Now **well under 500 KB target**
+  - Gzipped: 217 KB (unchanged — gzip already compresses efficiently)
+  - Optimization flags: `--enable-bulk-memory --enable-nontrapping-float-to-int`
+
+### Planned (v0.7.0)
+- Soft-delete BQ tracking optimization
+- Incremental persistence for large indices
+- Vector compression enhancements
+
+---
+
+## [0.6.0] - 2025-12-22 — RFC-002: Binary Quantization + Metadata Storage
+
+**Focus:** RFC-002 Implementation — Binary Quantization for 32x memory savings and integrated metadata storage.
+
+### Added
+
+#### Binary Quantization (RFC-002 Phase 2)
+
+- **`searchBQ(query, k)`** — Fast binary search using Hamming distance
+  - 3-5x faster than F32 search
+  - 32x memory reduction (768D: 3072 bytes → 96 bytes)
+  - SIMD-optimized popcount (AVX2/SSE on x86, NEON on ARM)
+
+- **`searchBQRescored(query, k, rescoreFactor)`** — High-recall hybrid search
+  - BQ candidate retrieval + F32 rescoring
+  - >0.90 recall@10 with rescoreFactor=15 (RFC-002 target achieved)
+  - Factor 5: ~95% recall, 2.5x faster
+  - Factor 10: ~98% recall, 2x faster
+
+- **`HnswIndex::with_bq(config, storage)`** — Create BQ-enabled index
+- **`insert_bq(vector, storage)`** — Insert with automatic BQ encoding
+- **`has_bq()`** — Check if BQ is enabled
+
+#### Metadata Storage (RFC-002 Phase 1)
+
+- **`insertWithMetadata(vector, metadata)`** — Insert vectors with key-value metadata
+  - Supports: String, Integer, Float, Boolean, StringArray
+  - Automatic cleanup on soft-delete
+
+- **`searchFiltered(query, filter, k)`** — Search with metadata filter expressions
+  - Comparison: `=`, `!=`, `>`, `>=`, `<`, `<=`
+  - Logical: `AND`, `OR`, `NOT`
+  - Array membership: `ANY ["value1", "value2"]`
+  - Grouping with parentheses
+
+- **`getMetadata(id)`** — Retrieve metadata for a vector
+- **`MetadataStore`** — Core Rust metadata storage with HashMap-based indexing
+
+#### Memory Management (RFC-002 Phase 3)
+
+- **`getMemoryPressure()`** — Monitor WASM heap usage
+  - Returns: level (normal/warning/critical), usedBytes, totalBytes, usagePercent
+
+- **`setMemoryConfig(config)`** — Configure thresholds
+  - warning_threshold: default 70%
+  - critical_threshold: default 90%
+  - block_inserts_at_critical: default true
+
+- **`canInsert()`** — Check if inserts allowed (respects memory pressure)
+- **`getMemoryRecommendation()`** — Actionable memory management guidance
+- **Allocation tracking** — Track memory usage per insert operation
+
+#### WASM Bindings (RFC-002 Phase 3)
+
+- Complete TypeScript type definitions for all new APIs
+- **`EdgeVec`** class with full BQ + metadata + memory pressure support
+- **`validateFilter()`** — Validate filter expression syntax
+
+#### Integration Tests
+
+- **`tests/hybrid_search.rs`** — 5 tests for BQ + filter search
+  - Basic hybrid search, complex filters, array ANY operator
+  - Fallback when BQ disabled, recall validation
+
+- **`tests/bq_persistence.rs`** — 7 tests for BQ index persistence
+  - Save/load roundtrip, F32 search after load
+  - Metadata preservation, BQ state documentation
+
+- **`tests/bq_recall_roundtrip.rs`** — 7 tests for BQ recall validation
+  - RFC-002 target validation (>0.90 recall)
+  - High-recall mode testing
+
+#### Browser Demo
+
+- **`wasm/examples/v060_demo.html`** — Interactive v0.6.0 showcase
+  - Cyberpunk-themed UI matching previous demos
+  - BQ vs F32 performance comparison with visual bars
+  - Metadata filter tags with preset expressions
+  - Memory pressure monitoring with live updates
+  - Recall metrics display
+
+### Changed
+
+- Filter syntax: `=` operator (not `==`), `ANY ["value"]` for array membership
+- Persistence format: v0.4 with metadata section (Postcard serialization)
+- BQ not persisted: regenerated from F32 vectors on load (expected behavior)
+
+### Performance (RFC-002 Targets)
+
+| Metric | Result | Target | Status |
+|:-------|:-------|:-------|:-------|
+| BQ memory reduction | 32x | 8-32x | ✅ Achieved |
+| SIMD popcount speedup | 6.9x vs scalar | >5x | ✅ Achieved |
+| BQ search speedup | 3-5x vs F32 | 2-5x | ✅ Achieved |
+| BQ+rescore recall@10 | 0.936 | >0.90 | ✅ Achieved |
+| Filter evaluation | <1μs/vector | <10μs | ✅ Achieved |
+
+### Migration Guide
+
+#### From v0.5.x
+
+v0.6.0 is backward compatible with v0.5.x snapshots:
+
+```javascript
+// v0.5.x snapshots load automatically
+import { EdgeVec } from 'edgevec';
+
+const index = new EdgeVec({ dimensions: 768 });
+index.loadSnapshot(v05Snapshot);  // Auto-migrates
+
+// New features available immediately
+index.insertWithMetadata(vector, { category: 'news' });
+const results = index.searchFiltered(query, 'category = "news"', 10);
+```
+
+#### Enabling Binary Quantization
+
+```javascript
+const index = new EdgeVec({ dimensions: 768 });
+
+// Insert vectors (BQ auto-enabled for dimension divisible by 8)
+index.insertWithMetadata(vector, { category: 'tech' });
+
+// Fast BQ search with rescoring (~95% recall, 3x faster)
+const results = index.searchBQ(query, 10);
+```
+
+#### Filter Syntax (Important Changes)
+
+```javascript
+// Correct v0.6.0 syntax
+index.searchFiltered(query, 'category = "news"', 10);          // = not ==
+index.searchFiltered(query, 'tags ANY ["featured"]', 10);      // ANY for arrays
+index.searchFiltered(query, 'score > 0.5 AND active = true', 10);
+```
 
 ---
 
@@ -529,6 +681,8 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
+| 0.6.0 | 2025-12-22 | **RFC-002:** Binary Quantization (32x memory), Metadata Storage, Memory Pressure |
+| 0.5.4 | 2025-12-20 | iOS Safari compatibility fixes |
 | 0.5.3 | 2025-12-19 | **FIX:** crates.io publishing (package size reduction) |
 | 0.5.2 | 2025-12-19 | **FIX:** npm TypeScript compilation |
 | 0.5.1 | 2025-12-19 | README update for npm display |
@@ -552,7 +706,9 @@ This version was internal only, not published to crates.io or npm.
 
 ---
 
-[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/matte1782/edgevec/compare/v0.5.4...v0.6.0
+[0.5.4]: https://github.com/matte1782/edgevec/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/matte1782/edgevec/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/matte1782/edgevec/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/matte1782/edgevec/compare/v0.5.0...v0.5.1

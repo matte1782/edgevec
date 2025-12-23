@@ -1,0 +1,4 @@
+Username gahooa:
+Thank you for explaining that. It helps.
+
+When you are using EdgeVec -- how do you get the embeddings? (I like your personal notes example)

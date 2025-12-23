@@ -159,20 +159,9 @@ impl HnswIndex {
         }
 
         // Step 2: Insert into F32 storage and HNSW graph
-        let vector_id = self.insert(vector, storage)?;
-
-        // Step 3: If BQ enabled, quantize and insert
-        if let Some(ref mut bq_storage) = self.bq_storage {
-            let bv = BinaryVector::quantize(vector)
-                .map_err(|e| GraphError::Quantization(e.to_string()))?;
-
-            // BQ storage uses same ID scheme as F32 storage
-            bq_storage
-                .insert(&bv)
-                .map_err(|e| GraphError::Storage(e.to_string()))?;
-        }
-
-        Ok(vector_id)
+        // Note: insert_impl now automatically handles BQ insertion when enabled,
+        // so no manual BQ insertion is needed here anymore.
+        self.insert(vector, storage)
     }
 
     /// Generic implementation of insert for a specific metric.
@@ -302,6 +291,17 @@ impl HnswIndex {
         // Step 5: Update global entry point if needed
         if self.entry_point().is_none() || level > start_layer {
             self.set_entry_point(new_node_id);
+        }
+
+        // Step 6: If BQ is enabled, quantize and insert into BQ storage
+        // This ensures all insert methods (insert, insert_with_metadata, batch_insert)
+        // automatically maintain BQ storage consistency.
+        if let Some(ref mut bq_storage) = self.bq_storage {
+            let bv = BinaryVector::quantize(vector)
+                .map_err(|e| GraphError::Quantization(e.to_string()))?;
+            bq_storage
+                .insert(&bv)
+                .map_err(|e| GraphError::Storage(e.to_string()))?;
         }
 
         Ok(vector_id)

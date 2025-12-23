@@ -215,6 +215,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn test_is_optimal_with_full_x86_features() {
         let caps = SimdCapabilities {
             avx2: true,
@@ -222,11 +223,11 @@ mod tests {
             sse42: true,
             neon: false,
         };
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         assert!(caps.is_optimal());
     }
 
     #[test]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn test_is_optimal_missing_avx2() {
         let caps = SimdCapabilities {
             avx2: false,
@@ -234,11 +235,11 @@ mod tests {
             sse42: true,
             neon: false,
         };
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         assert!(!caps.is_optimal());
     }
 
     #[test]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn test_is_optimal_missing_fma() {
         let caps = SimdCapabilities {
             avx2: true,
@@ -246,11 +247,11 @@ mod tests {
             sse42: true,
             neon: false,
         };
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         assert!(!caps.is_optimal());
     }
 
     #[test]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn test_performance_warning_none_when_optimal() {
         let caps = SimdCapabilities {
             avx2: true,
@@ -258,11 +259,11 @@ mod tests {
             sse42: true,
             neon: false,
         };
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         assert!(caps.performance_warning().is_none());
     }
 
     #[test]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn test_performance_warning_present_when_suboptimal() {
         let caps = SimdCapabilities {
             avx2: false,
@@ -270,19 +271,17 @@ mod tests {
             sse42: true,
             neon: false,
         };
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            let warning = caps.performance_warning();
-            assert!(warning.is_some());
-            let msg = warning.unwrap();
-            assert!(msg.contains("AVX2"));
-            assert!(msg.contains("FMA"));
-            assert!(msg.contains("60-78%"));
-            assert!(msg.contains("target-cpu=native"));
-        }
+        let warning = caps.performance_warning();
+        assert!(warning.is_some());
+        let msg = warning.unwrap();
+        assert!(msg.contains("AVX2"));
+        assert!(msg.contains("FMA"));
+        assert!(msg.contains("60-78%"));
+        assert!(msg.contains("target-cpu=native"));
     }
 
     #[test]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn test_performance_warning_missing_only_avx2() {
         let caps = SimdCapabilities {
             avx2: false,
@@ -290,14 +289,11 @@ mod tests {
             sse42: true,
             neon: false,
         };
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            let warning = caps.performance_warning();
-            assert!(warning.is_some());
-            let msg = warning.unwrap();
-            assert!(msg.contains("AVX2"));
-            assert!(!msg.contains("FMA"));
-        }
+        let warning = caps.performance_warning();
+        assert!(warning.is_some());
+        let msg = warning.unwrap();
+        assert!(msg.contains("AVX2"));
+        assert!(!msg.contains("FMA"));
     }
 
     #[test]

@@ -13,6 +13,7 @@
 //! - `CapacityExceeded` → `CAPACITY_EXCEEDED`
 //! - `InternalError` → `INTERNAL_ERROR`
 
+use super::memory::track_batch_insert;
 use crate::batch::BatchInsertable;
 use crate::error::BatchError;
 use js_sys::{Array, Float32Array};
@@ -193,6 +194,12 @@ pub fn insert_batch_impl(
         &mut edge_vec.storage,
         None::<fn(usize, usize)>,
     )?;
+
+    // Track memory allocation for memory pressure monitoring
+    let inserted_count = ids.len();
+    if inserted_count > 0 {
+        track_batch_insert(inserted_count, edge_vec.inner.config.dimensions);
+    }
 
     Ok(BatchInsertResult::from_ids(ids, total))
 }
