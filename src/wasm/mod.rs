@@ -979,7 +979,8 @@ impl EdgeVec {
         key: &str,
         value: &metadata::JsMetadataValue,
     ) -> Result<(), JsError> {
-        self.metadata
+        self.inner
+            .metadata
             .insert(vector_id, key, value.inner.clone())
             .map_err(metadata::metadata_error_to_js)
     }
@@ -1007,7 +1008,7 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "getMetadata")]
     #[must_use]
     pub fn get_metadata(&self, vector_id: u32, key: &str) -> Option<metadata::JsMetadataValue> {
-        metadata::metadata_value_to_js(self.metadata.get(vector_id, key))
+        metadata::metadata_value_to_js(self.inner.metadata.get(vector_id, key))
     }
 
     /// Gets all metadata for a vector as a JavaScript object.
@@ -1037,7 +1038,7 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "getAllMetadata")]
     #[must_use]
     pub fn get_all_metadata(&self, vector_id: u32) -> JsValue {
-        metadata::metadata_to_js_object(&self.metadata, vector_id)
+        metadata::metadata_to_js_object(&self.inner.metadata, vector_id)
     }
 
     /// Deletes a metadata key for a vector.
@@ -1065,7 +1066,8 @@ impl EdgeVec {
     /// ```
     #[wasm_bindgen(js_name = "deleteMetadata")]
     pub fn delete_metadata(&mut self, vector_id: u32, key: &str) -> Result<bool, JsError> {
-        self.metadata
+        self.inner
+            .metadata
             .delete(vector_id, key)
             .map_err(metadata::metadata_error_to_js)
     }
@@ -1091,7 +1093,7 @@ impl EdgeVec {
     /// ```
     #[wasm_bindgen(js_name = "deleteAllMetadata")]
     pub fn delete_all_metadata(&mut self, vector_id: u32) -> bool {
-        self.metadata.delete_all(vector_id)
+        self.inner.metadata.delete_all(vector_id)
     }
 
     /// Checks if a metadata key exists for a vector.
@@ -1115,7 +1117,7 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "hasMetadata")]
     #[must_use]
     pub fn has_metadata(&self, vector_id: u32, key: &str) -> bool {
-        self.metadata.has_key(vector_id, key)
+        self.inner.metadata.has_key(vector_id, key)
     }
 
     /// Returns the number of metadata keys for a vector.
@@ -1137,7 +1139,7 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "metadataKeyCount")]
     #[must_use]
     pub fn metadata_key_count(&self, vector_id: u32) -> usize {
-        self.metadata.key_count(vector_id)
+        self.inner.metadata.key_count(vector_id)
     }
 
     /// Returns the total number of vectors with metadata.
@@ -1155,7 +1157,7 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "metadataVectorCount")]
     #[must_use]
     pub fn metadata_vector_count(&self) -> usize {
-        self.metadata.vector_count()
+        self.inner.metadata.vector_count()
     }
 
     /// Returns the total number of metadata key-value pairs across all vectors.
@@ -1173,7 +1175,7 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "totalMetadataCount")]
     #[must_use]
     pub fn total_metadata_count(&self) -> usize {
-        self.metadata.total_key_count()
+        self.inner.metadata.total_key_count()
     }
 
     // =========================================================================
@@ -1345,7 +1347,7 @@ impl EdgeVec {
         let filter_expr = parse(filter).map_err(|e| filter::filter_error_to_jsvalue(&e))?;
 
         // Create metadata store adapter
-        let metadata_adapter = EdgeVecMetadataAdapter::new(&self.metadata, self.inner.len());
+        let metadata_adapter = EdgeVecMetadataAdapter::new(&self.inner.metadata, self.inner.len());
 
         // Execute filtered search with auto strategy
         let mut searcher = FilteredSearcher::new(&self.inner, &self.storage, &metadata_adapter);
@@ -1397,7 +1399,7 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "getVectorMetadata")]
     #[must_use]
     pub fn get_vector_metadata(&self, id: u32) -> JsValue {
-        metadata::metadata_to_js_object(&self.metadata, id)
+        metadata::metadata_to_js_object(&self.inner.metadata, id)
     }
 
     // =========================================================================
@@ -1700,7 +1702,11 @@ impl EdgeVec {
                 let mut filtered: Vec<_> = bq_candidates
                     .into_iter()
                     .filter(|(vid, _)| {
-                        let metadata = self.metadata.get_all(vid.0 as u32).unwrap_or(&empty_map);
+                        let metadata = self
+                            .inner
+                            .metadata
+                            .get_all(vid.0 as u32)
+                            .unwrap_or(&empty_map);
                         crate::filter::evaluate(&filter_expr, metadata).unwrap_or(false)
                     })
                     .take(opts.k)
@@ -1731,7 +1737,8 @@ impl EdgeVec {
         } else if let Some(ref filter_str) = opts.filter {
             // F32 + filter (no BQ)
             let filter_expr = parse(filter_str).map_err(|e| filter::filter_error_to_jsvalue(&e))?;
-            let metadata_adapter = EdgeVecMetadataAdapter::new(&self.metadata, self.inner.len());
+            let metadata_adapter =
+                EdgeVecMetadataAdapter::new(&self.inner.metadata, self.inner.len());
             let mut searcher = FilteredSearcher::new(&self.inner, &self.storage, &metadata_adapter);
             let result = searcher
                 .search_filtered(&query_vec, opts.k, Some(&filter_expr), FilterStrategy::Auto)
@@ -1944,7 +1951,7 @@ impl EdgeVec {
         };
 
         // Create metadata store adapter
-        let metadata_adapter = EdgeVecMetadataAdapter::new(&self.metadata, self.inner.len());
+        let metadata_adapter = EdgeVecMetadataAdapter::new(&self.inner.metadata, self.inner.len());
 
         // Execute filtered search
         let mut searcher = FilteredSearcher::new(&self.inner, &self.storage, &metadata_adapter);
@@ -1976,7 +1983,8 @@ impl EdgeVec {
                         id,
                         score: r.distance,
                         metadata: if include_metadata {
-                            self.metadata
+                            self.inner
+                                .metadata
                                 .get_all(id)
                                 .and_then(|m| serde_json::to_value(m).ok())
                         } else {
