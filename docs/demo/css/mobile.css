@@ -1,0 +1,587 @@
+/**
+ * EdgeVec Mobile Responsive Styles
+ * Touch-optimized layouts and iOS Safari fixes
+ * @version 0.6.0
+ */
+
+/* =============================================================================
+   Base Mobile Resets
+   ============================================================================= */
+
+/* Prevent iOS text size adjust */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Smooth scrolling with momentum on iOS */
+html,
+body {
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+}
+
+/* Prevent pull-to-refresh on Chrome Android */
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Fix for iOS Safari 100vh issue */
+.full-height {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height */
+}
+
+/* =============================================================================
+   Touch Target Optimization
+   ============================================================================= */
+
+/* Minimum touch target size: 44x44px (Apple HIG) / 48x48dp (Material) */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 12px;
+}
+
+/* Increase tap area without changing visual size */
+.tap-expand::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  bottom: -8px;
+  left: -8px;
+}
+
+/* Disable tap highlight on buttons (we have custom effects) */
+button,
+a,
+input,
+select,
+textarea,
+.btn,
+.filter-tag,
+.radio,
+.result-card {
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+/* Touch-friendly form controls */
+input[type="text"],
+input[type="number"],
+input[type="range"],
+select,
+textarea {
+  font-size: 16px; /* Prevents iOS zoom on focus */
+  touch-action: manipulation;
+}
+
+/* =============================================================================
+   Mobile Breakpoint: 768px
+   ============================================================================= */
+
+@media screen and (max-width: 768px) {
+  /* Typography scaling */
+  :root {
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 24px;
+  }
+
+  /* Header mobile */
+  .header {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .header__inner {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .header__logo {
+    flex: 1;
+  }
+
+  .header__nav {
+    display: none; /* Hide nav on mobile, could add hamburger menu */
+  }
+
+  .header__actions {
+    gap: var(--space-sm);
+  }
+
+  /* Hero section */
+  .hero {
+    padding: var(--space-xl) var(--space-md);
+  }
+
+  .hero__title {
+    font-size: var(--font-size-2xl);
+    word-break: break-word;
+  }
+
+  .hero__subtitle {
+    font-size: var(--font-size-sm);
+  }
+
+  /* Status bar stacking */
+  .status-bar {
+    flex-direction: column;
+    gap: var(--space-xs);
+    align-items: stretch;
+  }
+
+  .status-bar__item {
+    justify-content: space-between;
+    padding: var(--space-xs) var(--space-sm);
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .status-bar__item:last-child {
+    border-bottom: none;
+  }
+
+  /* Layout: single column on mobile */
+  .layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+  }
+
+  .sidebar {
+    order: 2; /* Move controls below results on mobile */
+  }
+
+  .content {
+    order: 1;
+  }
+
+  /* Terminal (control panel) */
+  .terminal {
+    max-height: none;
+  }
+
+  .terminal__body {
+    padding: var(--space-md);
+  }
+
+  /* Control groups */
+  .control-group {
+    margin-bottom: var(--space-md);
+  }
+
+  /* Filter tags */
+  .filter-tags {
+    flex-wrap: wrap;
+  }
+
+  .filter-tag {
+    flex: 0 0 auto;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  /* Search box */
+  .search-box__input {
+    font-size: 16px;
+    padding: var(--space-md);
+  }
+
+  .search-box__btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  /* Results grid */
+  .results {
+    gap: var(--space-md);
+  }
+
+  /* Grid layouts */
+  .grid--2,
+  .grid--3,
+  .grid--4 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Metric cards */
+  .metric-card {
+    padding: var(--space-md);
+  }
+
+  .metric-card__value {
+    font-size: var(--font-size-xl);
+  }
+
+  /* Memory stats */
+  .memory-stats {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .memory-stats__item {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .memory-stats__item:last-child {
+    border-bottom: none;
+  }
+
+  /* Footer */
+  .footer {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .footer__inner {
+    flex-direction: column;
+    gap: var(--space-sm);
+    text-align: center;
+  }
+
+  /* Sections */
+  .section {
+    padding: var(--space-xl) var(--space-md);
+  }
+
+  .section__title {
+    font-size: var(--font-size-xl);
+  }
+}
+
+/* =============================================================================
+   Small Mobile Breakpoint: 480px
+   ============================================================================= */
+
+@media screen and (max-width: 480px) {
+  /* Even smaller typography */
+  :root {
+    --font-size-base: 13px;
+    --font-size-lg: 15px;
+    --font-size-xl: 18px;
+    --font-size-2xl: 22px;
+  }
+
+  /* Tighter spacing */
+  .container {
+    padding-left: var(--space-sm);
+    padding-right: var(--space-sm);
+  }
+
+  /* Header logo */
+  .header__logo .glitch {
+    font-size: 18px;
+  }
+
+  .header__version {
+    font-size: 10px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: var(--space-lg) var(--space-sm);
+  }
+
+  .hero__title {
+    font-size: 20px;
+    letter-spacing: 0.05em;
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    justify-content: center;
+    padding: var(--space-md);
+  }
+
+  .btn--small {
+    width: auto;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  /* Radio group vertical layout */
+  .radio-group {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .radio {
+    padding: var(--space-sm);
+  }
+
+  /* Result cards */
+  .result-card {
+    padding: var(--space-sm);
+  }
+
+  .result-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+
+  /* Memory gauge */
+  .memory-gauge {
+    max-width: 200px;
+    margin: 0 auto;
+  }
+
+  /* Filter tags scroll */
+  .filter-tags {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: var(--space-xs);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filter-tags::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .filter-tags::-webkit-scrollbar-thumb {
+    background: var(--neon-cyan);
+    border-radius: 2px;
+  }
+}
+
+/* =============================================================================
+   Bottom Sheet Pattern (for mobile controls)
+   ============================================================================= */
+
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-color);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: var(--z-modal);
+  max-height: 80vh;
+  max-height: 80dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bottom-sheet--open {
+  transform: translateY(0);
+}
+
+.bottom-sheet__handle {
+  width: 40px;
+  height: 4px;
+  background: var(--text-muted);
+  border-radius: 2px;
+  margin: var(--space-sm) auto var(--space-md);
+}
+
+.bottom-sheet__content {
+  padding: 0 var(--space-md) var(--space-lg);
+}
+
+/* Bottom sheet backdrop */
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  z-index: calc(var(--z-modal) - 1);
+}
+
+.bottom-sheet-backdrop--visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* =============================================================================
+   iOS Safari Specific Fixes
+   ============================================================================= */
+
+/* Fix position:fixed with virtual keyboard */
+@supports (-webkit-touch-callout: none) {
+  .header {
+    position: sticky;
+    top: 0;
+  }
+
+  /* Fix for Safari flexbox gap bug */
+  .status-bar {
+    gap: 0;
+  }
+
+  .status-bar__item + .status-bar__item {
+    margin-left: var(--space-md);
+  }
+
+  @media screen and (max-width: 768px) {
+    .status-bar__item + .status-bar__item {
+      margin-left: 0;
+      margin-top: var(--space-xs);
+    }
+  }
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .footer {
+    padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
+  }
+
+  .bottom-sheet {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .toast-container {
+    bottom: calc(var(--space-md) + env(safe-area-inset-bottom));
+  }
+}
+
+/* =============================================================================
+   Landscape Orientation
+   ============================================================================= */
+
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  /* Reduce vertical spacing in landscape */
+  .hero {
+    padding: var(--space-md);
+  }
+
+  .hero__title {
+    font-size: var(--font-size-xl);
+  }
+
+  .section {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  /* Side-by-side layout in landscape */
+  .layout {
+    grid-template-columns: 300px 1fr;
+  }
+
+  .sidebar {
+    order: 1;
+    max-height: calc(100vh - 120px);
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+  }
+
+  .content {
+    order: 2;
+  }
+
+  /* Memory gauge smaller */
+  .memory-gauge {
+    max-width: 150px;
+  }
+}
+
+/* =============================================================================
+   Touch-specific Interactions
+   ============================================================================= */
+
+/* Active states for touch */
+@media (hover: none) and (pointer: coarse) {
+  .btn:active,
+  .filter-tag:active,
+  .result-card:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+  }
+
+  /* Remove hover effects that don't work on touch */
+  .btn:hover,
+  .filter-tag:hover,
+  .result-card:hover {
+    transform: none;
+    box-shadow: inherit;
+  }
+
+  /* Ensure focus states work */
+  .btn:focus-visible,
+  .filter-tag:focus-visible,
+  .result-card:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+  }
+}
+
+/* =============================================================================
+   Reduced Data Mode
+   ============================================================================= */
+
+@media (prefers-reduced-data: reduce) {
+  /* Disable background effects */
+  .noise-overlay,
+  .scanline-overlay {
+    display: none;
+  }
+
+  /* Disable web fonts (use system fonts) */
+  :root {
+    --font-display: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+}
+
+/* =============================================================================
+   Print Styles (for completeness)
+   ============================================================================= */
+
+@media print {
+  /* Hide interactive elements */
+  .header__nav,
+  .header__actions,
+  .theme-toggle,
+  .btn,
+  .bottom-sheet,
+  .toast-container,
+  .noise-overlay,
+  .scanline-overlay {
+    display: none !important;
+  }
+
+  /* Reset colors for print */
+  * {
+    color: black !important;
+    background: white !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Show links */
+  a[href]::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.8em;
+  }
+}
+
+/* =============================================================================
+   Dark Mode Forced Colors (High Contrast)
+   ============================================================================= */
+
+@media (forced-colors: active) {
+  .btn,
+  .filter-tag,
+  .result-card,
+  .terminal {
+    border: 2px solid CanvasText;
+  }
+
+  .neon-text,
+  .glitch {
+    color: CanvasText;
+    text-shadow: none;
+  }
+
+  .gauge__progress {
+    stroke: Highlight;
+  }
+}

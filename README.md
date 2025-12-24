@@ -31,6 +31,19 @@ EdgeVec is an embedded vector database built in Rust with first-class WebAssembl
 
 ---
 
+## Try It Now
+
+Build filters visually, see live results, copy-paste ready code:
+
+**[Filter Playground](https://matte1782.github.io/edgevec/demo/)** - Interactive filter builder with live sandbox
+
+- Visual filter construction
+- 10 ready-to-use examples
+- Live WASM execution
+- Copy-paste code snippets (JS/TS/React)
+
+---
+
 ## Quick Start
 
 ```bash
@@ -55,7 +68,7 @@ const id = db.insertWithMetadata(vector, {
 
 // Search with filter expression (v0.6.0)
 const query = new Float32Array(768).map(() => Math.random());
-const results = db.searchFiltered(query, 'category = "books" AND price < 50', 10);
+const results = db.searchWithFilter(query, 'category = "books" AND price < 50', 10);
 
 // Fast BQ search with rescoring — 32x less memory, 95% recall (v0.6.0)
 const fastResults = db.searchBQ(query, 10);
@@ -75,9 +88,10 @@ Try EdgeVec directly in your browser:
 
 | Demo | Description |
 |:-----|:------------|
+| [**Filter Playground v0.7.0**](https://matte1782.github.io/edgevec/demo/) | Visual filter builder with live sandbox (NEW!) |
 | [**Cyberpunk Demo**](wasm/examples/v060_cyberpunk_demo.html) | Full-featured v0.6.0 showcase with cyberpunk UI |
+| [**SIMD Benchmark**](wasm/examples/simd_benchmark.html) | Browser SIMD performance validation |
 | [**v0.6.0 Demo**](wasm/examples/v060_demo.html) | BQ vs F32 comparison, metadata filtering, memory pressure |
-| [**Filter Playground**](wasm/examples/filter-playground.html) | Interactive filter syntax explorer with live parsing |
 | [**Benchmark Dashboard**](wasm/examples/benchmark-dashboard.html) | Performance comparison vs competitors |
 | [**Soft Delete Demo**](wasm/examples/soft_delete.html) | Tombstone-based deletion with compaction |
 | [**Main Demo**](wasm/examples/index.html) | Complete feature showcase |
