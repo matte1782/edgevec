@@ -1,0 +1,95 @@
+[
+  {
+    "library": "edgevec",
+    "search": {
+      "mean_ms": 0.42,
+      "p50_ms": 0.38,
+      "p99_ms": 0.95
+    },
+    "insert": {
+      "mean_ms": 0.85,
+      "p50_ms": 0.72,
+      "p99_ms": 1.45
+    },
+    "memory": {
+      "used_mb": 42.5
+    },
+    "recall": {
+      "percentage": 98.5
+    },
+    "config": {
+      "dimensions": 768,
+      "vectorCount": 10000,
+      "queryCount": 100,
+      "k": 10,
+      "hnsw": {
+        "m": 16,
+        "efConstruction": 200,
+        "efSearch": 100
+      }
+    },
+    "timestamp": "2025-12-24T12:00:00Z"
+  },
+  {
+    "library": "hnswlib-node",
+    "search": {
+      "mean_ms": 0.18,
+      "p50_ms": 0.15,
+      "p99_ms": 0.42
+    },
+    "insert": {
+      "mean_ms": 0.35,
+      "p50_ms": 0.28,
+      "p99_ms": 0.75
+    },
+    "memory": {
+      "used_mb": 38.2
+    },
+    "recall": {
+      "percentage": 99.2
+    },
+    "config": {
+      "dimensions": 768,
+      "vectorCount": 10000,
+      "queryCount": 100,
+      "k": 10,
+      "hnsw": {
+        "m": 16,
+        "efConstruction": 200,
+        "efSearch": 100
+      }
+    },
+    "timestamp": "2025-12-24T12:00:00Z"
+  },
+  {
+    "library": "voy",
+    "search": {
+      "mean_ms": 2.85,
+      "p50_ms": 2.62,
+      "p99_ms": 5.15
+    },
+    "insert": {
+      "mean_ms": 1.92,
+      "p50_ms": 1.65,
+      "p99_ms": 3.45
+    },
+    "memory": {
+      "used_mb": 58.7
+    },
+    "recall": {
+      "percentage": 97.8
+    },
+    "config": {
+      "dimensions": 768,
+      "vectorCount": 10000,
+      "queryCount": 100,
+      "k": 10,
+      "hnsw": {
+        "m": 16,
+        "efConstruction": 200,
+        "efSearch": 100
+      }
+    },
+    "timestamp": "2025-12-24T12:00:00Z"
+  }
+]
