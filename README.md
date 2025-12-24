@@ -192,11 +192,11 @@ db.insertWithMetadata(vector, {
 });
 
 // Search with filter
-db.searchFiltered(query, 'category = "electronics" AND price < 500', 10);
-db.searchFiltered(query, 'tags ANY ["featured"]', 10);  // Array membership
+db.searchWithFilter(query, 'category = "electronics" AND price < 500', 10);
+db.searchWithFilter(query, 'tags ANY ["featured"]', 10);  // Array membership
 
 // Complex expressions
-db.searchFiltered(query,
+db.searchWithFilter(query,
     '(category = "electronics" OR category = "books") AND price < 100',
     10
 );
