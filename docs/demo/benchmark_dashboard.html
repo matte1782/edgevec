@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeVec | Performance Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a0f' width='100' height='100'/><polygon fill='%2300ffff' points='50,10 90,30 90,70 50,90 10,70 10,30'/><polygon fill='%230a0a0f' points='50,25 75,37 75,63 50,75 25,63 25,37'/><circle fill='%23ff00ff' cx='50' cy='50' r='8'/></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════════════
+           EDGEVEC PERFORMANCE DASHBOARD - NVIDIA-GRADE UI/UX
+           Version: 2.0.0 | Cyberpunk Theme with Spectacular Animations
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+        :root {
+            /* Core Colors */
+            --bg-void: #050508;
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #0f0f18;
+            --bg-tertiary: #151520;
+            --bg-card: #12121c;
+
+            /* Neon Palette */
+            --cyan: #00ffff;
+            --cyan-bright: #40ffff;
+            --cyan-dim: #00aaaa;
+            --cyan-dark: #004444;
+            --magenta: #ff00ff;
+            --magenta-bright: #ff40ff;
+            --magenta-dim: #aa00aa;
+            --purple: #9945ff;
+            --purple-bright: #b370ff;
+            --yellow: #ffff00;
+            --yellow-dim: #aaaa00;
+            --green: #00ff88;
+            --green-bright: #40ffa0;
+            --red: #ff3366;
+            --orange: #ff6600;
+
+            /* Neutrals */
+            --white: #e8e8f0;
+            --gray-100: #b0b0c0;
+            --gray-200: #8080a0;
+            --gray-300: #606080;
+            --gray-400: #404060;
+            --border: #252535;
+            --border-glow: #303045;
+
+            /* Glows */
+            --glow-cyan: 0 0 30px rgba(0, 255, 255, 0.4), 0 0 60px rgba(0, 255, 255, 0.2);
+            --glow-magenta: 0 0 30px rgba(255, 0, 255, 0.4), 0 0 60px rgba(255, 0, 255, 0.2);
+            --glow-green: 0 0 30px rgba(0, 255, 136, 0.4), 0 0 60px rgba(0, 255, 136, 0.2);
+            --glow-purple: 0 0 30px rgba(153, 69, 255, 0.4);
+            --glow-yellow: 0 0 30px rgba(255, 255, 0, 0.3);
+
+            /* Text Shadows */
+            --text-glow-cyan: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.4);
+            --text-glow-green: 0 0 10px rgba(0, 255, 136, 0.8), 0 0 20px rgba(0, 255, 136, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            /* C4 FIX: Prevent iOS Safari horizontal scroll */
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: var(--bg-void);
+            color: var(--white);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           ANIMATED PARTICLE BACKGROUND
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        #particles-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.6;
+        }
+
+        /* Animated Grid */
+        .grid-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(90deg, rgba(0, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(rgba(0, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+            animation: gridPulse 4s ease-in-out infinite;
+        }
+
+        @keyframes gridPulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Scan Line Effect */
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent);
+            animation: scanDown 8s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.3;
+        }
+
+        @keyframes scanDown {
+            0% { top: -4px; }
+            100% { top: 100vh; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           HEADER - NAVIGATION BAR
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: linear-gradient(180deg, rgba(10, 10, 15, 0.98) 0%, rgba(10, 10, 15, 0.95) 100%);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent);
+            opacity: 0.5;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            animation: logoFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .logo-icon svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(var(--glow-cyan));
+        }
+
+        .logo-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--magenta) 50%, var(--cyan) 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 3px;
+            animation: gradientShift 3s ease-in-out infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .logo-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .version-tag {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--cyan);
+            background: rgba(0, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--green);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }
+            50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(0, 255, 136, 0); }
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: var(--gray-200);
+            text-decoration: none;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-link:hover {
+            color: var(--cyan);
+            text-shadow: var(--text-glow-cyan);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--cyan);
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           HERO SECTION - KEY METRICS
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .hero {
+            position: relative;
+            padding: 60px 40px 80px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(0, 255, 255, 0.08) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .hero-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--white) 0%, var(--cyan) 50%, var(--magenta) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .hero-subtitle {
+            font-size: 16px;
+            color: var(--gray-200);
+            max-width: 600px;
+            margin: 0 auto 50px;
+        }
+
+        /* Hero Stats Cards */
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(15, 15, 24, 0.9) 0%, rgba(18, 18, 28, 0.9) 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px 24px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-card.winner {
+            border-color: var(--green);
+        }
+
+        .stat-card.winner::before {
+            background: var(--green);
+            opacity: 1;
+        }
+
+        .stat-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-bright) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-card.winner .stat-value {
+            background: linear-gradient(135deg, var(--green) 0%, var(--green-bright) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            text-shadow: var(--text-glow-green);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--gray-200);
+        }
+
+        .stat-comparison {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--gray-300);
+        }
+
+        .stat-comparison .highlight {
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        /* Winner Badge */
+        .winner-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 100%);
+            color: var(--bg-primary);
+            font-size: 9px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           MAIN CONTENT
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        main {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 40px 60px;
+        }
+
+        .section-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(180deg, var(--cyan), var(--magenta));
+            border-radius: 2px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           CHARTS SECTION
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .charts-section {
+            margin-bottom: 60px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+            border-color: var(--border-glow);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chart-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--magenta);
+            font-weight: 600;
+        }
+
+        .chart-badge {
+            font-size: 10px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(0, 255, 255, 0.1);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 280px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           COMPARISON TABLE
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .table-section {
+            margin-bottom: 60px;
+        }
+
+        .table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 24px 28px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--magenta);
+            font-weight: 600;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            background: rgba(21, 21, 32, 0.8);
+        }
+
+        th {
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-300);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 18px 20px;
+            border-top: 1px solid var(--border);
+            transition: background 0.2s ease;
+        }
+
+        tr:hover td {
+            background: rgba(0, 255, 255, 0.02);
+        }
+
+        .lib-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .lib-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .lib-icon.edgevec {
+            background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(255, 0, 255, 0.2));
+            color: var(--cyan);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        .lib-icon.hnswlib {
+            background: rgba(153, 69, 255, 0.2);
+            color: var(--purple);
+            border: 1px solid rgba(153, 69, 255, 0.3);
+        }
+
+        .lib-icon.voy {
+            background: rgba(255, 255, 0, 0.2);
+            color: var(--yellow);
+            border: 1px solid rgba(255, 255, 0, 0.3);
+        }
+
+        .lib-name {
+            font-weight: 600;
+        }
+
+        .lib-platform {
+            font-size: 10px;
+            color: var(--gray-300);
+        }
+
+        .metric-cell {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 600;
+        }
+
+        .metric-cell.best {
+            color: var(--green);
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+        }
+
+        .metric-cell.worst {
+            color: var(--red);
+            opacity: 0.8;
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+
+        .rank-badge.gold {
+            background: linear-gradient(135deg, #ffd700, #ffb700);
+            color: var(--bg-primary);
+        }
+
+        .rank-badge.silver {
+            background: linear-gradient(135deg, #c0c0c0, #a0a0a0);
+            color: var(--bg-primary);
+        }
+
+        .rank-badge.bronze {
+            background: linear-gradient(135deg, #cd7f32, #b87333);
+            color: var(--bg-primary);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           CONFIG SECTION
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .config-section {
+            margin-bottom: 60px;
+        }
+
+        .config-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 20px;
+        }
+
+        .config-item {
+            padding: 16px;
+            background: rgba(21, 21, 32, 0.5);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .config-item:hover {
+            border-color: var(--cyan);
+            background: rgba(0, 255, 255, 0.02);
+        }
+
+        .config-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-300);
+            margin-bottom: 8px;
+        }
+
+        .config-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--cyan);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           FILTER BENCHMARK SECTION
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .filter-bench-section {
+            margin-bottom: 60px;
+        }
+
+        .filter-bench-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .filter-bench-header {
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .filter-bench-title {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--magenta);
+            font-weight: 600;
+        }
+
+        .filter-bench-badge {
+            font-size: 10px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .filter-bench-controls {
+            padding: 24px 28px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .filter-bench-control {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-bench-control label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-300);
+        }
+
+        .filter-bench-control select,
+        .filter-bench-control input {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--white);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            min-width: 150px;
+        }
+
+        .filter-bench-control input {
+            min-width: 300px;
+        }
+
+        .filter-bench-control select:focus,
+        .filter-bench-control input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
+        }
+
+        .filter-bench-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            border-radius: 8px;
+            padding: 10px 24px;
+            color: var(--green);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-bench-btn:hover:not(:disabled) {
+            background: var(--green);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-green);
+        }
+
+        .filter-bench-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .filter-bench-btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .filter-bench-btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .filter-bench-results {
+            padding: 20px 28px;
+            min-height: 60px;
+        }
+
+        .filter-bench-empty {
+            text-align: center;
+            color: var(--gray-300);
+            font-size: 13px;
+            padding: 20px;
+        }
+
+        .filter-bench-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 24px 28px;
+            background: rgba(0, 255, 255, 0.02);
+            border-top: 1px solid var(--border);
+        }
+
+        .filter-metric {
+            text-align: center;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .filter-metric.highlight {
+            border-color: var(--green);
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .filter-metric-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--cyan);
+            margin-bottom: 4px;
+        }
+
+        .filter-metric.highlight .filter-metric-value {
+            color: var(--green);
+        }
+
+        .filter-metric-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--gray-300);
+        }
+
+        @media (max-width: 900px) {
+            .filter-bench-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-bench-control input {
+                min-width: 100%;
+            }
+
+            .filter-bench-metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .filter-bench-metrics {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           LOADING & ERROR STATES
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-void);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+            animation: logoFloat 2s ease-in-out infinite;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--cyan);
+            border-right-color: var(--magenta);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: var(--gray-200);
+            animation: loadingPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes loadingPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .error-container {
+            background: rgba(255, 51, 102, 0.05);
+            border: 1px solid var(--red);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            max-width: 600px;
+            margin: 60px auto;
+        }
+
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .error-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 20px;
+            color: var(--red);
+            margin-bottom: 12px;
+        }
+
+        .error-message {
+            color: var(--gray-200);
+            margin-bottom: 20px;
+        }
+
+        .error-code {
+            background: var(--bg-primary);
+            padding: 16px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--cyan);
+            text-align: left;
+            overflow-x: auto;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 32px 40px;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-bottom: 16px;
+        }
+
+        .footer-link {
+            color: var(--gray-200);
+            text-decoration: none;
+            font-size: 12px;
+            transition: color 0.3s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--cyan);
+        }
+
+        .footer-copy {
+            font-size: 11px;
+            color: var(--gray-400);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           RESPONSIVE DESIGN
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 1200px) {
+            .hero-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            header {
+                padding: 12px 20px;
+            }
+
+            .hero {
+                padding: 40px 20px 60px;
+            }
+
+            .hero-title {
+                font-size: 28px;
+                letter-spacing: 2px;
+            }
+
+            .hero-stats {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .stat-card {
+                padding: 20px;
+            }
+
+            .stat-value {
+                font-size: 28px;
+            }
+
+            main {
+                padding: 0 20px 40px;
+            }
+
+            .chart-card, .config-card, .table-container {
+                border-radius: 12px;
+            }
+
+            .section-title {
+                font-size: 16px;
+            }
+
+            .config-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-text {
+                font-size: 20px;
+            }
+
+            .hero-title {
+                font-size: 22px;
+            }
+
+            .hero-subtitle {
+                font-size: 14px;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+
+            th, td {
+                padding: 12px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="grid-overlay"></div>
+    <div class="scanline"></div>
+    <canvas id="particles-bg"></canvas>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-logo">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                <polygon fill="#00ffff" points="50,10 90,30 90,70 50,90 10,70 10,30"/>
+                <polygon fill="#0a0a0f" points="50,25 75,37 75,63 50,75 25,63 25,37"/>
+                <circle fill="#ff00ff" cx="50" cy="50" r="8"/>
+            </svg>
+        </div>
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading benchmark data...</div>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <a href="index.html" class="logo" style="text-decoration: none;">
+            <div class="logo-icon">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <polygon fill="#00ffff" points="50,10 90,30 90,70 50,90 10,70 10,30"/>
+                    <polygon fill="#0a0a0f" points="50,25 75,37 75,63 50,75 25,63 25,37"/>
+                    <circle fill="#ff00ff" cx="50" cy="50" r="8"/>
+                </svg>
+            </div>
+            <span class="logo-text">EDGEVEC</span>
+            <div class="logo-badge">
+                <span class="version-tag">v0.3.0</span>
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span>Live</span>
+                </div>
+            </div>
+        </a>
+        <nav class="nav-links">
+            <a href="index.html" class="nav-link" style="color: var(--magenta);">← Examples</a>
+            <a href="#charts" class="nav-link">Charts</a>
+            <a href="#comparison" class="nav-link">Comparison</a>
+            <a href="#config" class="nav-link">Config</a>
+            <a href="https://github.com/matte1782/edgevec" target="_blank" class="nav-link">GitHub</a>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1 class="hero-title">Performance Dashboard</h1>
+        <p class="hero-subtitle">
+            Real-time competitive benchmarks comparing EdgeVec against hnswlib-node and voy.
+            See how our WASM-first vector database performs in the browser.
+        </p>
+
+        <div class="hero-stats" id="heroStats">
+            <!-- Populated by JavaScript -->
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Error State (hidden by default) -->
+        <div id="errorContainer" class="error-container" style="display: none;">
+            <div class="error-icon">⚠</div>
+            <h2 class="error-title">Failed to Load Benchmark Data</h2>
+            <p class="error-message">Could not load benchmark results. Try one of these solutions:</p>
+            <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                <p style="color: var(--cyan); margin: 16px 0 8px 0;"><strong>Option 1: Serve via HTTP (recommended)</strong></p>
+                <pre class="error-code">cd wasm/examples && python -m http.server 8080</pre>
+                <p style="color: var(--gray); font-size: 12px;">Then open http://localhost:8080/benchmark-dashboard.html</p>
+
+                <p style="color: var(--cyan); margin: 16px 0 8px 0;"><strong>Option 2: Generate benchmark data</strong></p>
+                <pre class="error-code">cd benches/competitive && npm install && node harness.js --all</pre>
+                <p style="color: var(--gray); font-size: 12px;">Note: Use --all flag to benchmark all 3 libraries</p>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <section id="charts" class="charts-section" style="display: none;">
+            <h2 class="section-title">Performance Metrics</h2>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Search Latency (P50)</h3>
+                        <span class="chart-badge">Lower is better</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="searchP50Chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Insert Latency (P50)</h3>
+                        <span class="chart-badge">Lower is better</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="insertP50Chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Search Latency (P99)</h3>
+                        <span class="chart-badge">Tail latency</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="searchP99Chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Memory Usage</h3>
+                        <span class="chart-badge">MB</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Comparison Table -->
+        <section id="comparison" class="table-section" style="display: none;">
+            <h2 class="section-title">Detailed Comparison</h2>
+            <div class="table-container">
+                <div class="table-header">
+                    <span class="table-title">Library Benchmarks</span>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Library</th>
+                                <th>Search P50</th>
+                                <th>Search P99</th>
+                                <th>Insert P50</th>
+                                <th>Insert P99</th>
+                                <th>Memory</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration -->
+        <section id="config" class="config-section" style="display: none;">
+            <h2 class="section-title">Benchmark Configuration</h2>
+            <div class="config-card">
+                <div class="config-grid" id="configGrid">
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter Performance Section -->
+        <section id="filter-bench" class="filter-bench-section">
+            <h2 class="section-title">Filter Performance (Live)</h2>
+            <div class="filter-bench-container">
+                <div class="filter-bench-header">
+                    <span class="filter-bench-title">EdgeVec Filter Benchmarks</span>
+                    <span class="filter-bench-badge">Interactive</span>
+                </div>
+                <div class="filter-bench-controls">
+                    <div class="filter-bench-control">
+                        <label>Vectors</label>
+                        <select id="filterBenchVectors">
+                            <option value="1000">1,000</option>
+                            <option value="5000" selected>5,000</option>
+                            <option value="10000">10,000</option>
+                        </select>
+                    </div>
+                    <div class="filter-bench-control">
+                        <label>Filter</label>
+                        <input type="text" id="filterBenchExpr" placeholder='category = "tech" AND price < 200' value='price < 100'>
+                    </div>
+                    <button id="runFilterBenchBtn" class="filter-bench-btn">Run Benchmark</button>
+                </div>
+                <div class="filter-bench-results" id="filterBenchResults">
+                    <div class="filter-bench-empty">
+                        Click "Run Benchmark" to measure filter performance
+                    </div>
+                </div>
+                <div class="filter-bench-metrics" id="filterBenchMetrics" style="display: none;">
+                    <div class="filter-metric">
+                        <div class="filter-metric-value" id="filterParseTime">-</div>
+                        <div class="filter-metric-label">Parse Time</div>
+                    </div>
+                    <div class="filter-metric">
+                        <div class="filter-metric-value" id="filterUnfilteredTime">-</div>
+                        <div class="filter-metric-label">Unfiltered Search</div>
+                    </div>
+                    <div class="filter-metric">
+                        <div class="filter-metric-value" id="filterFilteredTime">-</div>
+                        <div class="filter-metric-label">Filtered Search</div>
+                    </div>
+                    <div class="filter-metric highlight">
+                        <div class="filter-metric-value" id="filterOverhead">-</div>
+                        <div class="filter-metric-label">Filter Overhead</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">EDGEVEC</div>
+            <div class="footer-links">
+                <a href="https://github.com/matte1782/edgevec" class="footer-link">GitHub</a>
+                <a href="../../docs/benchmarks/competitive_analysis.md" class="footer-link">Full Analysis</a>
+                <a href="../../docs/API_REFERENCE.md" class="footer-link">API Docs</a>
+                <a href="../../README.md" class="footer-link">Documentation</a>
+            </div>
+            <p class="footer-copy">© 2025 EdgeVec. High-Performance WASM Vector Database. MIT OR Apache-2.0 License.</p>
+        </div>
+    </footer>
+
+    <script src="benchmark-dashboard.js"></script>
+
+    <!-- Filter Benchmark Interactive Demo -->
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════════════════
+        // FILTER BENCHMARK - Live WASM Performance Testing
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        // Cache buster to force fresh load after rebuild
+        const cacheBuster = `?v=${Date.now()}`;
+        const WASM_PATHS = [
+            './pkg/edgevec.js' + cacheBuster,
+            '/pkg/edgevec.js' + cacheBuster,
+        ];
+
+        let wasmModule = null;
+        const dimension = 64;
+
+        // Sample data
+        const categories = ['tech', 'books', 'music', 'games', 'home', 'sports'];
+
+        async function loadWasm() {
+            for (const path of WASM_PATHS) {
+                try {
+                    wasmModule = await import(path);
+                    await wasmModule.default();
+                    console.log('[FilterBench] WASM loaded from:', path);
+                    document.getElementById('runFilterBenchBtn').disabled = false;
+                    return true;
+                } catch (e) {
+                    console.warn('[FilterBench] Failed to load from:', path);
+                }
+            }
+            document.getElementById('filterBenchResults').innerHTML = `
+                <div class="filter-bench-empty" style="color: var(--red);">
+                    WASM not available. Start server from project root.
+                </div>
+            `;
+            return false;
+        }
+
+        function generateVector() {
+            const vec = new Float32Array(dimension);
+            for (let i = 0; i < dimension; i++) {
+                vec[i] = Math.random() * 2 - 1;
+            }
+            return vec;
+        }
+
+        function generateMetadata(id) {
+            return {
+                id,
+                category: categories[Math.floor(Math.random() * categories.length)],
+                price: Math.floor(Math.random() * 500) + 10,
+                rating: (Math.random() * 4 + 1).toFixed(1)
+            };
+        }
+
+        // XSS escape utility
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function parseFilter(filterStr) {
+            if (!filterStr || filterStr.trim() === '') return null;
+
+            return (metadata) => {
+                try {
+                    let expr = filterStr.trim();
+
+                    if (expr.toLowerCase().includes(' and ')) {
+                        const parts = expr.split(/\s+and\s+/i);
+                        return parts.every(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    if (expr.toLowerCase().includes(' or ')) {
+                        const parts = expr.split(/\s+or\s+/i);
+                        return parts.some(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    const match = expr.match(/^(\w+)\s*(=|!=|>=|<=|>|<)\s*(.+)$/);
+                    if (!match) return true;
+
+                    const [, field, op, rawValue] = match;
+                    let fieldValue = metadata[field.toLowerCase()] ?? metadata[field];
+                    if (fieldValue === undefined) return false;
+
+                    let compareValue = rawValue.trim();
+                    if (compareValue.startsWith('"') && compareValue.endsWith('"')) {
+                        compareValue = compareValue.slice(1, -1);
+                    } else if (!isNaN(parseFloat(compareValue))) {
+                        compareValue = parseFloat(compareValue);
+                    }
+
+                    switch (op) {
+                        case '=': return String(fieldValue).toLowerCase() === String(compareValue).toLowerCase();
+                        case '!=': return String(fieldValue).toLowerCase() !== String(compareValue).toLowerCase();
+                        case '>': return parseFloat(fieldValue) > compareValue;
+                        case '<': return parseFloat(fieldValue) < compareValue;
+                        case '>=': return parseFloat(fieldValue) >= compareValue;
+                        case '<=': return parseFloat(fieldValue) <= compareValue;
+                        default: return true;
+                    }
+                } catch (e) {
+                    return true;
+                }
+            };
+        }
+
+        async function runFilterBenchmark() {
+            const btn = document.getElementById('runFilterBenchBtn');
+            const resultsDiv = document.getElementById('filterBenchResults');
+            const metricsDiv = document.getElementById('filterBenchMetrics');
+
+            btn.classList.add('loading');
+            btn.disabled = true;
+
+            try {
+                const vectorCount = parseInt(document.getElementById('filterBenchVectors').value);
+                const filterExpr = document.getElementById('filterBenchExpr').value.trim();
+
+                resultsDiv.innerHTML = `<div class="filter-bench-empty">Creating index with ${vectorCount.toLocaleString()} vectors...</div>`;
+
+                // Create index and metadata
+                const config = new wasmModule.EdgeVecConfig(dimension);
+                const index = new wasmModule.EdgeVec(config);
+                const metadataStore = {};
+
+                for (let i = 0; i < vectorCount; i++) {
+                    const vector = generateVector();
+                    const id = index.insert(vector);
+                    metadataStore[id] = generateMetadata(id);
+                }
+
+                resultsDiv.innerHTML = `<div class="filter-bench-empty">Running benchmarks...</div>`;
+
+                // iOS Safari has 1ms timer resolution for security.
+                // Use batch timing: run N iterations, divide total time by N
+                const ITERATIONS = 50; // More iterations for better precision on iOS
+
+                // Parse filter and measure time (run 10x for iOS precision)
+                const parseStart = performance.now();
+                let filterFn;
+                for (let i = 0; i < 10; i++) {
+                    filterFn = parseFilter(filterExpr);
+                }
+                const parseTime = (performance.now() - parseStart) / 10;
+
+                // Benchmark unfiltered search - batch timing for iOS precision
+                const query = generateVector();
+                const unfilteredStart = performance.now();
+                for (let i = 0; i < ITERATIONS; i++) {
+                    index.search(query, 10);
+                }
+                const unfilteredTotal = performance.now() - unfilteredStart;
+                const unfilteredP50 = unfilteredTotal / ITERATIONS;
+
+                // Benchmark filtered search - batch timing for iOS precision
+                let matchedCount = 0;
+                const filteredStart = performance.now();
+                for (let i = 0; i < ITERATIONS; i++) {
+                    const results = index.search(query, 50);
+                    const filtered = results.map(r => ({
+                        ...r,
+                        metadata: metadataStore[r.id] || {}
+                    })).filter(r => filterFn ? filterFn(r.metadata) : true);
+                    if (i === 0) matchedCount = filtered.length;
+                }
+                const filteredTotal = performance.now() - filteredStart;
+                const filteredP50 = filteredTotal / ITERATIONS;
+
+                // Calculate overhead (C3 FIX: prevent NaN/Infinity when unfilteredP50 is 0)
+                const overhead = unfilteredP50 > 0
+                    ? ((filteredP50 - unfilteredP50) / unfilteredP50 * 100).toFixed(1)
+                    : '0.0';
+
+                // Update results
+                resultsDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--green);">✓ Benchmark complete for ${vectorCount.toLocaleString()} vectors</span>
+                        <span style="color: var(--gray-300); font-size: 11px;">Filter: "${escapeHtml(filterExpr)}" (${matchedCount}/50 matched)</span>
+                    </div>
+                `;
+
+                // Update metrics
+                metricsDiv.style.display = 'grid';
+                document.getElementById('filterParseTime').textContent = `${parseTime.toFixed(3)}ms`;
+                document.getElementById('filterUnfilteredTime').textContent = `${unfilteredP50.toFixed(2)}ms`;
+                document.getElementById('filterFilteredTime').textContent = `${filteredP50.toFixed(2)}ms`;
+                document.getElementById('filterOverhead').textContent = `+${overhead}%`;
+
+                // Color code overhead
+                const overheadEl = document.getElementById('filterOverhead');
+                if (parseFloat(overhead) < 10) {
+                    overheadEl.style.color = 'var(--green)';
+                } else if (parseFloat(overhead) < 30) {
+                    overheadEl.style.color = 'var(--yellow)';
+                } else {
+                    overheadEl.style.color = 'var(--red)';
+                }
+
+            } catch (e) {
+                console.error('[FilterBench] Error:', e);
+                resultsDiv.innerHTML = `<div class="filter-bench-empty" style="color: var(--red);">Error: ${escapeHtml(e.message)}</div>`;
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+
+        // Initialize
+        document.getElementById('runFilterBenchBtn').disabled = true;
+        document.getElementById('runFilterBenchBtn').addEventListener('click', runFilterBenchmark);
+        loadWasm();
+    </script>
+</body>
+</html>

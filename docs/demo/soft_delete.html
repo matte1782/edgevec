@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeVec | Soft Delete & Compaction Demo</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0a0f' width='100' height='100'/><polygon fill='%2300ffff' points='50,10 90,30 90,70 50,90 10,70 10,30'/><polygon fill='%230a0a0f' points='50,25 75,37 75,63 50,75 25,63 25,37'/><circle fill='%23ff00ff' cx='50' cy='50' r='8'/></svg>">
+    <style>
+        /* ═══════════════════════════════════════════════════════════════════════════
+           EDGEVEC SOFT DELETE DEMO - CYBERPUNK THEME v2.0
+           Featuring: Particle effects, Glitch animations, Neon aesthetics
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        :root {
+            --bg-void: #050508;
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a24;
+            --bg-card: #0d0d14;
+            --cyan: #00ffff;
+            --cyan-dim: #00aaaa;
+            --cyan-glow: rgba(0, 255, 255, 0.6);
+            --magenta: #ff00ff;
+            --magenta-dim: #aa00aa;
+            --magenta-glow: rgba(255, 0, 255, 0.6);
+            --purple: #9945ff;
+            --purple-glow: rgba(153, 69, 255, 0.6);
+            --yellow: #ffff00;
+            --yellow-dim: #cccc00;
+            --green: #00ff88;
+            --green-dim: #00cc6a;
+            --red: #ff3366;
+            --red-dim: #cc2952;
+            --orange: #ff8800;
+            --white: #e8e8f0;
+            --gray: #666680;
+            --gray-light: #888899;
+            --border: #2a2a3a;
+            --border-glow: #3a3a4a;
+            --glow-cyan: 0 0 30px var(--cyan-glow), 0 0 60px rgba(0, 255, 255, 0.2);
+            --glow-magenta: 0 0 30px var(--magenta-glow), 0 0 60px rgba(255, 0, 255, 0.2);
+            --glow-green: 0 0 30px rgba(0, 255, 136, 0.4);
+            --glow-red: 0 0 30px rgba(255, 51, 102, 0.4);
+            --glow-purple: 0 0 30px var(--purple-glow);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+
+        @keyframes glitch {
+            0%, 90%, 100% { transform: translate(0); filter: none; }
+            91% { transform: translate(-2px, 1px); filter: hue-rotate(90deg); }
+            92% { transform: translate(2px, -1px); filter: hue-rotate(-90deg); }
+            93% { transform: translate(-1px, 2px); filter: hue-rotate(45deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes neonPulse {
+            0%, 100% {
+                text-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan), 0 0 30px var(--cyan);
+            }
+            50% {
+                text-shadow: 0 0 5px var(--cyan), 0 0 10px var(--cyan), 0 0 15px var(--cyan);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes borderGlow {
+            0%, 100% { border-color: var(--cyan); box-shadow: var(--glow-cyan); }
+            50% { border-color: var(--magenta); box-shadow: var(--glow-magenta); }
+        }
+
+        @keyframes dataStream {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 0% 100%; }
+        }
+
+        @keyframes tombstoneAppear {
+            0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+            50% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        @keyframes compactionShrink {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); filter: brightness(1.5); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes particleFloat {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Consolas', monospace;
+            background: var(--bg-void);
+            color: var(--white);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated Background Grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: -2;
+            animation: dataStream 60s linear infinite;
+        }
+
+        /* Scanline Effect */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(180deg, transparent, var(--cyan-glow), transparent);
+            pointer-events: none;
+            z-index: 9999;
+            animation: scanline 8s linear infinite;
+            opacity: 0.3;
+        }
+
+        /* Particle Canvas */
+        #particleCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           HEADER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, transparent 100%);
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            position: relative;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .logo-icon svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(var(--glow-cyan));
+        }
+
+        .logo-text {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--magenta) 50%, var(--purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 3px;
+            animation: neonPulse 2s ease-in-out infinite;
+        }
+
+        .logo-badge {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .version-tag {
+            font-size: 10px;
+            color: var(--green);
+            background: rgba(0, 255, 136, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--green);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .feature-tag {
+            font-size: 9px;
+            color: var(--magenta);
+            background: rgba(255, 0, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--magenta);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-info {
+            display: flex;
+            gap: 24px;
+            font-size: 11px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .info-label {
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-value {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .info-value.live { color: var(--green); }
+        .info-value.warning { color: var(--yellow); }
+        .info-value.danger { color: var(--red); }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           HERO SECTION
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .hero {
+            text-align: center;
+            padding: 40px 40px 20px;
+            position: relative;
+        }
+
+        .hero-title {
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            color: var(--gray-light);
+            margin-bottom: 8px;
+        }
+
+        .hero-subtitle {
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+        }
+
+        .hero-desc {
+            font-size: 13px;
+            color: var(--gray);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .hero-desc code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: var(--cyan);
+            font-size: 12px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           MAIN LAYOUT
+           ═══════════════════════════════════════════════════════════════════ */
+
+        main {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px 40px 40px;
+            display: grid;
+            grid-template-columns: 300px 1fr 320px;
+            gap: 24px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           CONTROL PANEL (LEFT)
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .control-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--magenta);
+        }
+
+        .panel-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--magenta);
+        }
+
+        .section-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--gray);
+            margin: 20px 0 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::before,
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* Action Buttons */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid;
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .btn-count {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .btn-insert {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .btn-insert:hover:not(:disabled) {
+            background: var(--green);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-green);
+        }
+
+        .btn-delete {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .btn-delete:hover:not(:disabled) {
+            background: var(--red);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-red);
+        }
+
+        .btn-search {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            grid-column: 1 / -1;
+        }
+
+        .btn-search:hover:not(:disabled) {
+            background: var(--cyan);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .btn-compact {
+            border-color: var(--magenta);
+            color: var(--magenta);
+            grid-column: 1 / -1;
+            padding: 16px;
+        }
+
+        .btn-compact:hover:not(:disabled) {
+            background: var(--magenta);
+            color: var(--bg-primary);
+            box-shadow: var(--glow-magenta);
+            animation: borderGlow 1s ease-in-out infinite;
+        }
+
+        .btn-compact.needs-compact {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .btn-reset {
+            border-color: var(--gray);
+            color: var(--gray);
+            grid-column: 1 / -1;
+        }
+
+        .btn-reset:hover:not(:disabled) {
+            border-color: var(--white);
+            color: var(--white);
+        }
+
+        /* Filter Input Styles */
+        .filter-input {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: var(--white);
+            font-family: inherit;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+        }
+
+        .filter-input::placeholder {
+            color: var(--gray);
+            font-size: 10px;
+        }
+
+        .filter-input.valid {
+            border-color: var(--green);
+        }
+
+        .filter-input.invalid {
+            border-color: var(--red);
+        }
+
+        .btn-delete-filter {
+            border-color: var(--orange);
+            color: var(--orange);
+        }
+
+        .btn-delete-filter:hover:not(:disabled) {
+            background: var(--orange);
+            color: var(--bg-primary);
+            box-shadow: 0 0 20px rgba(255, 136, 0, 0.4);
+        }
+
+        /* Filter badge in results */
+        .filter-badge {
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: rgba(0, 255, 255, 0.15);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            margin-left: 8px;
+        }
+
+        .filter-badge.active {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           VISUALIZATION AREA (CENTER)
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .viz-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Stats Dashboard */
+        .stats-dashboard {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--magenta));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--cyan);
+        }
+
+        .stat-card.live::before { background: var(--green); }
+        .stat-card.deleted::before { background: var(--red); }
+        .stat-card.ratio::before { background: var(--yellow); }
+        .stat-card.compact::before { background: var(--magenta); }
+
+        .stat-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--cyan), var(--white));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+        }
+
+        .stat-card.live .stat-value {
+            background: linear-gradient(135deg, var(--green), var(--cyan));
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .stat-card.deleted .stat-value {
+            background: linear-gradient(135deg, var(--red), var(--orange));
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .stat-card.ratio .stat-value {
+            background: linear-gradient(135deg, var(--yellow), var(--orange));
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .stat-card.compact .stat-value {
+            background: linear-gradient(135deg, var(--magenta), var(--purple));
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--gray);
+            margin-top: 8px;
+        }
+
+        /* Vector Grid Visualization */
+        .vector-viz {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            min-height: 300px;
+        }
+
+        .viz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .viz-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--cyan);
+        }
+
+        .viz-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        .legend-dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .legend-dot.deleted { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+        .vector-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(12px, 1fr));
+            gap: 4px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .vector-grid::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .vector-grid::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+            border-radius: 3px;
+        }
+
+        .vector-grid::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .vector-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            background: var(--green);
+            box-shadow: 0 0 4px rgba(0, 255, 136, 0.5);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .vector-dot:hover {
+            transform: scale(1.5);
+            z-index: 10;
+        }
+
+        .vector-dot.deleted {
+            background: var(--red);
+            box-shadow: 0 0 4px rgba(255, 51, 102, 0.5);
+            animation: tombstoneAppear 0.3s ease-out;
+        }
+
+        .vector-dot.compacting {
+            animation: compactionShrink 0.5s ease-in-out;
+        }
+
+        /* Warning Banner */
+        .warning-banner {
+            background: linear-gradient(135deg, rgba(255, 255, 0, 0.1), rgba(255, 136, 0, 0.1));
+            border: 1px solid var(--yellow);
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .warning-banner.visible {
+            display: flex;
+        }
+
+        .warning-icon {
+            font-size: 24px;
+            color: var(--yellow);
+        }
+
+        .warning-text {
+            flex: 1;
+            font-size: 12px;
+            color: var(--yellow);
+        }
+
+        .warning-action {
+            font-size: 11px;
+            color: var(--yellow);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        /* Search Results */
+        .search-results {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .results-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--purple);
+        }
+
+        .results-time {
+            font-size: 11px;
+            color: var(--cyan);
+            padding: 4px 10px;
+            background: rgba(0, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            border-left: 3px solid var(--cyan);
+            transition: all 0.2s ease;
+        }
+
+        .result-item:hover {
+            background: var(--bg-secondary);
+            border-left-color: var(--magenta);
+        }
+
+        .result-rank {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--cyan);
+            width: 30px;
+        }
+
+        .result-id {
+            font-size: 12px;
+            color: var(--white);
+        }
+
+        .result-distance {
+            font-size: 11px;
+            color: var(--gray);
+            font-family: monospace;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           ACTIVITY LOG (RIGHT)
+           ═══════════════════════════════════════════════════════════════════ */
+
+        .activity-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 200px);
+            position: sticky;
+            top: 20px;
+        }
+
+        .activity-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .activity-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--cyan);
+        }
+
+        .activity-count {
+            font-size: 10px;
+            color: var(--gray);
+            background: var(--bg-tertiary);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .activity-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .log-entry {
+            display: flex;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 11px;
+            border-left: 3px solid var(--border);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .log-entry.success { border-left-color: var(--green); }
+        .log-entry.error { border-left-color: var(--red); }
+        .log-entry.warning { border-left-color: var(--yellow); }
+        .log-entry.info { border-left-color: var(--cyan); }
+        .log-entry.compact { border-left-color: var(--magenta); }
+
+        .log-time {
+            color: var(--gray);
+            flex-shrink: 0;
+            font-family: monospace;
+        }
+
+        .log-message {
+            color: var(--white);
+            flex: 1;
+        }
+
+        .log-entry.success .log-message { color: var(--green); }
+        .log-entry.error .log-message { color: var(--red); }
+        .log-entry.warning .log-message { color: var(--yellow); }
+        .log-entry.compact .log-message { color: var(--magenta); }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           FOOTER
+           ═══════════════════════════════════════════════════════════════════ */
+
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 20px 40px;
+            text-align: center;
+            font-size: 11px;
+            color: var(--gray);
+            background: linear-gradient(180deg, transparent, var(--bg-secondary));
+        }
+
+        footer a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        footer a:hover {
+            color: var(--magenta);
+            text-shadow: 0 0 10px var(--magenta);
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           RESPONSIVE
+           ═══════════════════════════════════════════════════════════════════ */
+
+        @media (max-width: 1400px) {
+            main {
+                grid-template-columns: 280px 1fr;
+            }
+            .activity-panel {
+                display: none;
+            }
+        }
+
+        @media (max-width: 900px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+            .control-panel {
+                position: static;
+            }
+            .stats-dashboard {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            header {
+                flex-direction: column;
+                gap: 16px;
+                padding: 16px 20px;
+            }
+            .header-info {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            main {
+                padding: 20px;
+            }
+            .hero {
+                padding: 20px;
+            }
+            .hero-subtitle {
+                font-size: 24px;
+            }
+        }
+
+        /* Glitch effect on error */
+        .glitch {
+            animation: glitch 0.3s ease-in-out;
+        }
+
+        /* CRIT-1 FIX: Accessibility - Focus indicators for keyboard navigation */
+        .btn:focus {
+            outline: 2px solid var(--cyan);
+            outline-offset: 2px;
+            box-shadow: 0 0 20px var(--cyan-glow);
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid var(--cyan);
+            outline-offset: 2px;
+        }
+
+        .vector-dot:focus {
+            outline: 2px solid var(--white);
+            outline-offset: 1px;
+            z-index: 100;
+        }
+
+        /* Skip link for screen readers */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--cyan);
+            color: var(--bg-primary);
+            padding: 8px 16px;
+            z-index: 10000;
+            transition: top 0.3s;
+        }
+
+        .skip-link:focus {
+            top: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- CRIT-1 FIX: Skip link for keyboard/screen reader users -->
+    <a href="#main-controls" class="skip-link">Skip to main controls</a>
+
+    <canvas id="particleCanvas"></canvas>
+
+    <header>
+        <a href="index.html" class="logo" style="text-decoration: none;">
+            <div class="logo-icon">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#00ffff"/>
+                            <stop offset="100%" style="stop-color:#ff00ff"/>
+                        </linearGradient>
+                    </defs>
+                    <polygon fill="url(#hexGrad)" points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5"/>
+                    <polygon fill="#0a0a0f" points="50,20 80,35 80,65 50,80 20,65 20,35"/>
+                    <circle fill="#ff00ff" cx="50" cy="50" r="10">
+                        <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+                </svg>
+            </div>
+            <span class="logo-text">EDGEVEC</span>
+            <div class="logo-badge">
+                <span class="version-tag">v0.3.0</span>
+                <span class="feature-tag">Soft Delete</span>
+            </div>
+        </a>
+        <div class="header-info">
+            <div class="info-item">
+                <span class="info-label">WASM:</span>
+                <span class="info-value live" id="wasmStatus">Loading...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Memory:</span>
+                <span class="info-value" id="memoryUsage">0 KB</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Dimension:</span>
+                <span class="info-value">128</span>
+            </div>
+            <a href="index.html" style="color: var(--magenta); text-decoration: none; font-weight: 600; font-size: 12px; margin-left: auto; padding: 8px 16px; border: 1px solid var(--magenta); border-radius: 6px; transition: all 0.3s ease;">← Examples</a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="hero-title">RFC-001 Implementation Demo</div>
+        <h1 class="hero-subtitle">Soft Delete & Compaction</h1>
+        <p class="hero-desc">
+            Experience O(1) tombstone-based deletion with automatic compaction recommendations.
+            Delete vectors without rebuilding the index. Reclaim space with <code>compact()</code> when ready.
+        </p>
+    </section>
+
+    <main>
+        <aside class="control-panel" id="main-controls" role="region" aria-label="Index Operations">
+            <div class="panel-header">
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M12 3v18M3 12h18M8 8l8 8M16 8l-8 8"/>
+                </svg>
+                <h2 class="panel-title">Operations</h2>
+            </div>
+
+            <div class="section-title">Insert Vectors</div>
+            <div class="btn-grid" role="group" aria-label="Insert vector buttons">
+                <button class="btn btn-insert" onclick="insertVectors(100)" aria-label="Insert 100 vectors">
+                    <span class="btn-count">+100</span>
+                    <span>Vectors</span>
+                </button>
+                <button class="btn btn-insert" onclick="insertVectors(500)" aria-label="Insert 500 vectors">
+                    <span class="btn-count">+500</span>
+                    <span>Vectors</span>
+                </button>
+                <button class="btn btn-insert" onclick="insertVectors(1000)" aria-label="Insert 1000 vectors">
+                    <span class="btn-count">+1K</span>
+                    <span>Vectors</span>
+                </button>
+                <button class="btn btn-insert" onclick="insertVectors(5000)" aria-label="Insert 5000 vectors">
+                    <span class="btn-count">+5K</span>
+                    <span>Vectors</span>
+                </button>
+            </div>
+
+            <div class="section-title">Soft Delete</div>
+            <div class="btn-grid" role="group" aria-label="Delete vector buttons">
+                <button class="btn btn-delete" onclick="deleteRandom(0.1)" aria-label="Delete 10 percent of vectors">
+                    <span class="btn-count">10%</span>
+                    <span>Delete</span>
+                </button>
+                <button class="btn btn-delete" onclick="deleteRandom(0.2)" aria-label="Delete 20 percent of vectors">
+                    <span class="btn-count">20%</span>
+                    <span>Delete</span>
+                </button>
+                <button class="btn btn-delete" onclick="deleteRandom(0.3)" aria-label="Delete 30 percent of vectors">
+                    <span class="btn-count">30%</span>
+                    <span>Delete</span>
+                </button>
+                <button class="btn btn-delete" onclick="deleteRandom(0.5)" aria-label="Delete 50 percent of vectors">
+                    <span class="btn-count">50%</span>
+                    <span>Delete</span>
+                </button>
+            </div>
+
+            <div class="section-title">Filter-Based Delete</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="deleteFilterInput" class="filter-input" placeholder='e.g., category = "tech"' aria-label="Filter expression for deletion">
+                <button class="btn btn-delete-filter" onclick="deleteByFilter()" aria-label="Delete vectors matching filter">
+                    <span>Delete Matching Filter</span>
+                </button>
+            </div>
+
+            <div class="section-title">Filtered Search</div>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+                <input type="text" id="searchFilterInput" class="filter-input" placeholder='e.g., price < 100 AND category = "tech"' aria-label="Filter expression for search">
+            </div>
+            <div class="btn-grid" role="group" aria-label="Search and maintenance buttons">
+                <button class="btn btn-search" onclick="searchVectors()" aria-label="Search for top 10 nearest neighbors">
+                    <span>Search Top 10</span>
+                </button>
+                <button class="btn btn-compact" id="compactBtn" onclick="runCompaction()" aria-label="Run index compaction to reclaim space">
+                    <span>Run Compaction</span>
+                </button>
+                <button class="btn btn-reset" onclick="resetIndex()" aria-label="Reset index and clear all vectors">
+                    <span>Reset Index</span>
+                </button>
+            </div>
+        </aside>
+
+        <section class="viz-area">
+            <div class="stats-dashboard">
+                <div class="stat-card">
+                    <div class="stat-icon">&#128202;</div>
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-label">Total Vectors</div>
+                </div>
+                <div class="stat-card live">
+                    <div class="stat-icon">&#9989;</div>
+                    <div class="stat-value" id="liveCount">0</div>
+                    <div class="stat-label">Live Vectors</div>
+                </div>
+                <div class="stat-card deleted">
+                    <div class="stat-icon">&#128163;</div>
+                    <div class="stat-value" id="deletedCount">0</div>
+                    <div class="stat-label">Tombstones</div>
+                </div>
+                <div class="stat-card ratio">
+                    <div class="stat-icon">&#128200;</div>
+                    <div class="stat-value" id="tombstoneRatio">0%</div>
+                    <div class="stat-label">Delete Ratio</div>
+                </div>
+            </div>
+
+            <div class="warning-banner" id="warningBanner">
+                <span class="warning-icon">&#9888;</span>
+                <span class="warning-text" id="warningText">Compaction recommended: High tombstone ratio detected</span>
+                <span class="warning-action" onclick="runCompaction()">Run Compaction</span>
+            </div>
+
+            <div class="vector-viz">
+                <div class="viz-header">
+                    <span class="viz-title">Vector Index Visualization</span>
+                    <div class="viz-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot live"></span>
+                            <span>Live</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot deleted"></span>
+                            <span>Deleted</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="vector-grid" id="vectorGrid">
+                    <div style="color: var(--gray); font-size: 12px; grid-column: 1/-1; text-align: center; padding: 40px;">
+                        Click "Insert Vectors" to begin
+                    </div>
+                </div>
+            </div>
+
+            <div class="search-results">
+                <div class="results-header">
+                    <span class="results-title">Search Results</span>
+                    <span class="results-time" id="searchTime">-</span>
+                </div>
+                <div class="results-list" id="resultsList">
+                    <div style="color: var(--gray); font-size: 12px; text-align: center; padding: 20px;">
+                        Click "Search Top 10" to find nearest neighbors
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="activity-panel">
+            <div class="activity-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+                <span class="activity-title">Activity Log</span>
+                <span class="activity-count" id="logCount">0</span>
+            </div>
+            <div class="activity-body" id="activityLog">
+                <!-- Log entries will be inserted here -->
+            </div>
+        </aside>
+    </main>
+
+    <footer>
+        EdgeVec v0.3.0 &copy; 2025 | High-Performance WASM Vector Database with Soft Delete |
+        <a href="https://github.com/matte1782/edgevec" target="_blank">GitHub</a> |
+        <a href="batch_insert.html">Batch Demo</a>
+    </footer>
+
+    <script type="module">
+        // WASM module paths - works when serving from PROJECT ROOT
+        // IMPORTANT: Start server from edgevec/ root, NOT from wasm/examples/
+        // Example: cd edgevec && python -m http.server 8080
+        //          Then open: http://localhost:8080/wasm/examples/soft_delete.html
+        const WASM_PATHS = [
+            './pkg/edgevec.js',      // From /wasm/examples/ → /pkg/
+            '/pkg/edgevec.js',           // Absolute from root
+            '../pkg/edgevec.js',         // From /wasm/ → /pkg/
+            './pkg/edgevec.js'           // Fallback
+        ];
+
+        let wasmModule = null;
+
+        // ═══════════════════════════════════════════════════════════════════
+        // STATE
+        // ═══════════════════════════════════════════════════════════════════
+
+        let index = null;
+        const dimension = 128;
+        let insertedIds = [];
+        let metadataStore = {}; // Maps vector ID to metadata
+        let logCount = 0;
+
+        // Sample data for metadata generation
+        const categories = ['tech', 'books', 'music', 'games', 'home', 'sports'];
+        const brands = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'];
+
+        // ═══════════════════════════════════════════════════════════════════
+        // METADATA GENERATION
+        // ═══════════════════════════════════════════════════════════════════
+
+        function generateMetadata(id) {
+            return {
+                id,
+                category: categories[Math.floor(Math.random() * categories.length)],
+                brand: brands[Math.floor(Math.random() * brands.length)],
+                price: Math.floor(Math.random() * 500) + 10,
+                rating: (Math.random() * 4 + 1).toFixed(1),
+                inStock: Math.random() > 0.3
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // XSS ESCAPE UTILITY
+        // ═══════════════════════════════════════════════════════════════════
+
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // FILTER PARSING
+        // ═══════════════════════════════════════════════════════════════════
+
+        function parseFilter(filterStr) {
+            if (!filterStr || filterStr.trim() === '') return null;
+
+            return (metadata) => {
+                try {
+                    let expr = filterStr.trim();
+
+                    // Handle AND
+                    if (expr.toLowerCase().includes(' and ')) {
+                        const parts = expr.split(/\s+and\s+/i);
+                        return parts.every(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    // Handle OR
+                    if (expr.toLowerCase().includes(' or ')) {
+                        const parts = expr.split(/\s+or\s+/i);
+                        return parts.some(part => parseFilter(part.trim())(metadata));
+                    }
+
+                    // Handle comparison operators
+                    const match = expr.match(/^(\w+)\s*(=|!=|>=|<=|>|<)\s*(.+)$/);
+                    if (!match) return true;
+
+                    const [, field, op, rawValue] = match;
+                    const fieldLower = field.toLowerCase();
+
+                    let fieldValue = metadata[fieldLower] ?? metadata[field];
+                    if (fieldValue === undefined) return false;
+
+                    let compareValue = rawValue.trim();
+                    if (compareValue.startsWith('"') && compareValue.endsWith('"')) {
+                        compareValue = compareValue.slice(1, -1);
+                    } else if (compareValue === 'true') {
+                        compareValue = true;
+                    } else if (compareValue === 'false') {
+                        compareValue = false;
+                    } else if (!isNaN(parseFloat(compareValue))) {
+                        compareValue = parseFloat(compareValue);
+                    }
+
+                    switch (op) {
+                        case '=': return String(fieldValue).toLowerCase() === String(compareValue).toLowerCase();
+                        case '!=': return String(fieldValue).toLowerCase() !== String(compareValue).toLowerCase();
+                        case '>': return parseFloat(fieldValue) > compareValue;
+                        case '<': return parseFloat(fieldValue) < compareValue;
+                        case '>=': return parseFloat(fieldValue) >= compareValue;
+                        case '<=': return parseFloat(fieldValue) <= compareValue;
+                        default: return true;
+                    }
+                } catch (e) {
+                    console.warn('[Filter] Parse error:', e);
+                    return true;
+                }
+            };
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PARTICLE SYSTEM
+        // ═══════════════════════════════════════════════════════════════════
+
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2 - 1;
+                this.life = 1;
+                this.decay = 0.02 + Math.random() * 0.02;
+                this.size = 2 + Math.random() * 3;
+                this.color = color;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+                this.size *= 0.98;
+            }
+
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // CRIT-2 FIX: Cap particle array to prevent memory leak
+        const MAX_PARTICLES = 200;
+
+        function spawnParticles(x, y, color, count = 10) {
+            // Prevent unbounded growth - remove oldest particles if at capacity
+            const overflow = (particles.length + count) - MAX_PARTICLES;
+            if (overflow > 0) {
+                particles.splice(0, overflow);
+            }
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles = particles.filter(p => p.life > 0);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            ctx.globalAlpha = 1;
+            requestAnimationFrame(animateParticles);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        animateParticles();
+
+        // ═══════════════════════════════════════════════════════════════════
+        // LOGGING
+        // ═══════════════════════════════════════════════════════════════════
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('activityLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-message">${escapeHtml(message)}</span>
+            `;
+
+            logDiv.insertBefore(entry, logDiv.firstChild);
+            logCount++;
+            document.getElementById('logCount').textContent = logCount;
+
+            // Keep only last 50 entries
+            while (logDiv.children.length > 50) {
+                logDiv.removeChild(logDiv.lastChild);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // UI UPDATES
+        // ═══════════════════════════════════════════════════════════════════
+
+        function updateStats() {
+            if (!index) return;
+
+            const live = index.liveCount();
+            const deleted = index.deletedCount();
+            const total = live + deleted;
+            const ratio = index.tombstoneRatio();
+            const needsCompact = index.needsCompaction();
+
+            document.getElementById('totalCount').textContent = total.toLocaleString();
+            document.getElementById('liveCount').textContent = live.toLocaleString();
+            document.getElementById('deletedCount').textContent = deleted.toLocaleString();
+            document.getElementById('tombstoneRatio').textContent = (ratio * 100).toFixed(1) + '%';
+
+            // Memory estimate (rough: 128 dimensions * 4 bytes * vector count)
+            const memKB = Math.round(total * dimension * 4 / 1024);
+            document.getElementById('memoryUsage').textContent = memKB > 1024
+                ? (memKB / 1024).toFixed(1) + ' MB'
+                : memKB + ' KB';
+
+            // Warning banner
+            const warningBanner = document.getElementById('warningBanner');
+            const warning = index.compactionWarning();
+            if (warning) {
+                document.getElementById('warningText').textContent = warning;
+                warningBanner.classList.add('visible');
+                document.getElementById('compactBtn').classList.add('needs-compact');
+            } else {
+                warningBanner.classList.remove('visible');
+                document.getElementById('compactBtn').classList.remove('needs-compact');
+            }
+        }
+
+        function updateVectorGrid() {
+            const grid = document.getElementById('vectorGrid');
+            grid.innerHTML = '';
+
+            if (insertedIds.length === 0) {
+                grid.innerHTML = `
+                    <div style="color: var(--gray); font-size: 12px; grid-column: 1/-1; text-align: center; padding: 40px;">
+                        Click "Insert Vectors" to begin
+                    </div>
+                `;
+                return;
+            }
+
+            // Show up to 500 dots for performance
+            const displayIds = insertedIds.slice(-500);
+
+            displayIds.forEach(id => {
+                const dot = document.createElement('div');
+                dot.className = 'vector-dot';
+                dot.dataset.id = id;
+                dot.title = `Vector #${id}`;
+                dot.tabIndex = 0; // CRIT-1: Make focusable for keyboard navigation
+                dot.setAttribute('role', 'button');
+                dot.setAttribute('aria-label', `Vector ${id}, click to toggle delete`);
+
+                try {
+                    if (index.isDeleted(id)) {
+                        dot.classList.add('deleted');
+                        dot.setAttribute('aria-label', `Vector ${id} (deleted), click to view`);
+                    }
+                } catch (e) {
+                    // CRIT-3 FIX: Log errors instead of silently swallowing
+                    console.warn(`[EdgeVec] Could not check delete status for vector ${id}:`, e.message || e);
+                }
+
+                dot.addEventListener('click', () => toggleDelete(id, dot));
+                dot.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleDelete(id, dot);
+                    }
+                });
+                grid.appendChild(dot);
+            });
+        }
+
+        function toggleDelete(id, dot) {
+            try {
+                if (!index.isDeleted(id)) {
+                    if (index.softDelete(id)) {
+                        dot.classList.add('deleted');
+                        log(`Deleted vector #${id}`, 'warning');
+                        spawnParticles(
+                            dot.getBoundingClientRect().left + 6,
+                            dot.getBoundingClientRect().top + 6,
+                            '#ff3366',
+                            8
+                        );
+                        updateStats();
+                    }
+                }
+            } catch (e) {
+                log(`Error: ${e}`, 'error');
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // OPERATIONS
+        // ═══════════════════════════════════════════════════════════════════
+
+        window.insertVectors = async function(count) {
+            const start = performance.now();
+
+            for (let i = 0; i < count; i++) {
+                const vector = new Float32Array(dimension);
+                for (let j = 0; j < dimension; j++) {
+                    vector[j] = Math.random() * 2 - 1;
+                }
+                const id = index.insert(vector);
+                insertedIds.push(id);
+                // Store metadata for filtering
+                metadataStore[id] = generateMetadata(id);
+            }
+
+            const elapsed = (performance.now() - start).toFixed(1);
+            log(`Inserted ${count.toLocaleString()} vectors with metadata in ${elapsed}ms`, 'success');
+
+            // Spawn green particles
+            const btn = document.querySelector('.btn-insert');
+            const rect = btn.getBoundingClientRect();
+            spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#00ff88', 20);
+
+            updateStats();
+            updateVectorGrid();
+        };
+
+        window.deleteRandom = function(ratio) {
+            const liveIds = insertedIds.filter(id => {
+                try {
+                    return !index.isDeleted(id);
+                } catch (e) {
+                    // CRIT-3 FIX: Log errors instead of silently swallowing
+                    console.warn(`[EdgeVec] Could not check delete status for vector ${id}:`, e.message || e);
+                    return false;
+                }
+            });
+
+            const toDelete = Math.floor(liveIds.length * ratio);
+            if (toDelete === 0) {
+                log('No live vectors to delete', 'warning');
+                return;
+            }
+
+            const shuffled = [...liveIds].sort(() => Math.random() - 0.5);
+            const targets = shuffled.slice(0, toDelete);
+
+            const start = performance.now();
+            let deleted = 0;
+
+            for (const id of targets) {
+                try {
+                    if (index.softDelete(id)) {
+                        deleted++;
+                    }
+                } catch (e) {
+                    // CRIT-3 FIX: Log errors instead of silently swallowing
+                    console.warn(`[EdgeVec] Failed to delete vector ${id}:`, e.message || e);
+                }
+            }
+
+            const elapsed = (performance.now() - start).toFixed(1);
+            log(`Soft-deleted ${deleted.toLocaleString()} vectors (${(ratio*100).toFixed(0)}%) in ${elapsed}ms`, 'warning');
+
+            // Spawn red particles
+            const btn = document.querySelector('.btn-delete');
+            const rect = btn.getBoundingClientRect();
+            spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#ff3366', 15);
+
+            updateStats();
+            updateVectorGrid();
+        };
+
+        window.searchVectors = function() {
+            const filterStr = document.getElementById('searchFilterInput').value.trim();
+            const filterFn = parseFilter(filterStr);
+            const hasFilter = filterStr.length > 0;
+
+            const query = new Float32Array(dimension);
+            for (let i = 0; i < dimension; i++) {
+                query[i] = Math.random() * 2 - 1;
+            }
+
+            const start = performance.now();
+            // Get more results if filtering, so we can apply filter and still have 10
+            const rawResults = index.search(query, hasFilter ? 50 : 10);
+            const searchTime = performance.now() - start;
+
+            // Apply metadata filter
+            let results = rawResults.map(r => ({
+                ...r,
+                metadata: metadataStore[r.id] || { id: r.id }
+            }));
+
+            if (filterFn) {
+                results = results.filter(r => filterFn(r.metadata));
+            }
+
+            // Limit to top 10
+            results = results.slice(0, 10);
+
+            const elapsed = searchTime.toFixed(2);
+            document.getElementById('searchTime').textContent = `${elapsed}ms ${hasFilter ? `(${results.length}/${rawResults.length} matched)` : ''}`;
+
+            const resultsList = document.getElementById('resultsList');
+            resultsList.innerHTML = '';
+
+            // Update filter input styling
+            const filterInput = document.getElementById('searchFilterInput');
+            if (hasFilter && results.length > 0) {
+                filterInput.classList.remove('invalid');
+                filterInput.classList.add('valid');
+            } else if (hasFilter && results.length === 0) {
+                filterInput.classList.remove('valid');
+                filterInput.classList.add('invalid');
+            } else {
+                filterInput.classList.remove('valid', 'invalid');
+            }
+
+            if (results.length === 0) {
+                resultsList.innerHTML = `
+                    <div style="color: var(--gray); font-size: 12px; text-align: center; padding: 20px;">
+                        ${hasFilter ? 'No vectors match filter criteria' : 'No results found (all vectors deleted?)'}
+                    </div>
+                `;
+            } else {
+                results.forEach((r, i) => {
+                    const meta = r.metadata;
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <span class="result-rank">#${i + 1}</span>
+                        <span class="result-id" style="flex: 1;">
+                            ID: ${r.id}
+                            <span style="color: var(--gray); font-size: 10px; margin-left: 8px;">
+                                ${escapeHtml(meta.category) || ''} · $${escapeHtml(meta.price) || '-'} · ★${escapeHtml(meta.rating) || '-'}
+                            </span>
+                        </span>
+                        <span class="result-distance">${r.score.toFixed(6)}</span>
+                    `;
+                    resultsList.appendChild(item);
+                });
+            }
+
+            log(`Search${hasFilter ? ' (filtered)' : ''}: ${results.length} results in ${elapsed}ms`, 'info');
+
+            // Spawn cyan particles
+            const btn = document.querySelector('.btn-search');
+            const rect = btn.getBoundingClientRect();
+            spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#00ffff', 12);
+        };
+
+        window.deleteByFilter = function() {
+            const filterStr = document.getElementById('deleteFilterInput').value.trim();
+            if (!filterStr) {
+                log('Enter a filter expression to delete matching vectors', 'warning');
+                return;
+            }
+
+            const filterFn = parseFilter(filterStr);
+            if (!filterFn) {
+                log('Invalid filter expression', 'error');
+                return;
+            }
+
+            // Find live vectors matching the filter
+            const liveIds = insertedIds.filter(id => {
+                try {
+                    if (index.isDeleted(id)) return false;
+                    const meta = metadataStore[id];
+                    return meta && filterFn(meta);
+                } catch (e) {
+                    return false;
+                }
+            });
+
+            if (liveIds.length === 0) {
+                log(`No live vectors match filter: ${filterStr}`, 'warning');
+                document.getElementById('deleteFilterInput').classList.add('invalid');
+                return;
+            }
+
+            // Confirm deletion
+            if (!confirm(`Delete ${liveIds.length} vectors matching "${filterStr}"?`)) {
+                return;
+            }
+
+            const start = performance.now();
+            let deleted = 0;
+
+            for (const id of liveIds) {
+                try {
+                    if (index.softDelete(id)) {
+                        deleted++;
+                    }
+                } catch (e) {
+                    console.warn(`[EdgeVec] Failed to delete vector ${id}:`, e.message || e);
+                }
+            }
+
+            const elapsed = (performance.now() - start).toFixed(1);
+            log(`Filter delete: ${deleted.toLocaleString()} vectors matching "${filterStr}" in ${elapsed}ms`, 'warning');
+
+            // Update UI
+            document.getElementById('deleteFilterInput').classList.remove('invalid');
+            document.getElementById('deleteFilterInput').classList.add('valid');
+
+            // Spawn orange particles
+            const btn = document.querySelector('.btn-delete-filter');
+            const rect = btn.getBoundingClientRect();
+            spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#ff8800', 20);
+
+            updateStats();
+            updateVectorGrid();
+        };
+
+        window.runCompaction = async function() {
+            const total = index.liveCount() + index.deletedCount();
+
+            if (total > 10000) {
+                const estMB = Math.round(total * dimension * 4 / 1024 / 1024);
+                if (!confirm(`Compaction on ${total.toLocaleString()} vectors may use significant memory (~${estMB}MB). Continue?`)) {
+                    log('Compaction cancelled by user', 'info');
+                    return;
+                }
+            }
+
+            log('Starting compaction...', 'compact');
+
+            // Add visual effect
+            document.querySelectorAll('.vector-dot').forEach(dot => {
+                dot.classList.add('compacting');
+            });
+
+            const start = performance.now();
+
+            try {
+                const result = index.compact();
+                const elapsed = (performance.now() - start).toFixed(1);
+
+                log(`Compaction complete: removed ${result.tombstones_removed} tombstones, new size: ${result.new_size}, took ${result.duration_ms.toFixed(0)}ms`, 'compact');
+
+                // Update insertedIds to reflect compaction
+                insertedIds = insertedIds.filter(id => {
+                    try {
+                        return !index.isDeleted(id);
+                    } catch (e) {
+                        // CRIT-3 FIX: Log errors - ID likely no longer exists after compaction
+                        console.debug(`[EdgeVec] Vector ${id} no longer exists (expected after compaction)`);
+                        return false;
+                    }
+                });
+
+                // Spawn magenta particles
+                const btn = document.getElementById('compactBtn');
+                const rect = btn.getBoundingClientRect();
+                spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, '#ff00ff', 30);
+
+                updateStats();
+                updateVectorGrid();
+
+            } catch (e) {
+                log(`Compaction failed: ${e}`, 'error');
+                document.body.classList.add('glitch');
+                setTimeout(() => document.body.classList.remove('glitch'), 300);
+            }
+        };
+
+        window.resetIndex = async function() {
+            if (insertedIds.length > 0 && !confirm('This will clear all vectors. Continue?')) {
+                return;
+            }
+
+            insertedIds = [];
+            metadataStore = {}; // Clear metadata
+            const config = new wasmModule.EdgeVecConfig(dimension);
+            index = new wasmModule.EdgeVec(config);
+
+            // Clear filter inputs
+            document.getElementById('searchFilterInput').value = '';
+            document.getElementById('searchFilterInput').classList.remove('valid', 'invalid');
+            document.getElementById('deleteFilterInput').value = '';
+            document.getElementById('deleteFilterInput').classList.remove('valid', 'invalid');
+
+            log('Index reset (metadata cleared)', 'info');
+            updateStats();
+            updateVectorGrid();
+        };
+
+        // ═══════════════════════════════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════════
+
+        async function main() {
+            try {
+                // Load WASM module dynamically
+                for (const path of WASM_PATHS) {
+                    try {
+                        console.log(`[SoftDelete] Trying: ${path}`);
+                        wasmModule = await import(path);
+                        console.log(`[SoftDelete] Loaded from: ${path}`);
+                        break;
+                    } catch (e) {
+                        console.warn(`[SoftDelete] Failed: ${e.message}`);
+                    }
+                }
+
+                if (!wasmModule) {
+                    throw new Error('Could not load WASM module from any path');
+                }
+
+                await wasmModule.default();
+                const config = new wasmModule.EdgeVecConfig(dimension);
+                index = new wasmModule.EdgeVec(config);
+
+                document.getElementById('wasmStatus').textContent = 'Ready';
+                document.getElementById('wasmStatus').classList.add('live');
+
+                log('EdgeVec v0.3.0 initialized (dimension: 128, M: 16, ef: 200)', 'success');
+                log('Soft Delete API ready - RFC-001 compliant', 'info');
+
+                updateStats();
+
+            } catch (e) {
+                document.getElementById('wasmStatus').textContent = 'Error';
+                document.getElementById('wasmStatus').classList.remove('live');
+                document.getElementById('wasmStatus').classList.add('danger');
+                log(`Initialization failed: ${e}`, 'error');
+                log('', 'error');
+                log('═══════════════════════════════════════════════════', 'error');
+                log('  HOW TO FIX: Start server from PROJECT ROOT', 'error');
+                log('═══════════════════════════════════════════════════', 'error');
+                log('', 'error');
+                log('1. Open terminal in the edgevec project root folder', 'info');
+                log('2. Run: python -m http.server 8080', 'info');
+                log('3. Open: http://localhost:8080/wasm/examples/index.html', 'info');
+                log('', 'error');
+                log('DO NOT start server from wasm/examples/ folder!', 'warn');
+                log('The WASM module is at /pkg/ which requires root access.', 'warn');
+                console.error(e);
+            }
+        }
+
+        main();
+    </script>
+</body>
+</html>

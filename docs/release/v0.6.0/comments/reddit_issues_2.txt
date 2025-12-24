@@ -1,0 +1,9 @@
+https://matte1782.github.io/edgevec/demo/v060_cyberpunk_demo.html
+
+seems to be down!
+
+PS — I'm a bit confused how to best use the demo! + out of curiosity - is BM25 support on roadmap here? I would love to build pretty simple hybrid search, I have been working mostly with pgvector but it's a bit large for my use! Curious if you've thought about this.
+
+In any case: love your project / this is so cool! Want to dig in more / thanks for building.
+
+Lucas

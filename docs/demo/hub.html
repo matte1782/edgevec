@@ -599,26 +599,25 @@
           </div>
         </a>
 
-        <a href="../../wasm/examples/index.html" class="card card--local">
+        <a href="soft_delete.html" class="card">
           <div class="card__header">
             <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.5.x</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
+              <span class="card__badge card__badge--version">v0.3.0</span>
             </div>
             <div class="card__arrow">
               <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </div>
           </div>
           <div class="card__icon">
-            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </div>
-          <h2 class="card__title">MAIN_DEMO</h2>
-          <p class="card__desc">Original demo. Insert, search, persistence.</p>
-          <p class="card__meta">Metadata Filtering // Persistence</p>
+          <h2 class="card__title">SOFT_DELETE</h2>
+          <p class="card__desc">O(1) delete with tombstones. Compaction.</p>
+          <p class="card__meta">Tombstones // Compaction</p>
           <div class="card__features">
-            <span class="card__feature">Insert</span>
-            <span class="card__feature">Search</span>
-            <span class="card__feature">Save/Load</span>
+            <span class="card__feature">O(1) Delete</span>
+            <span class="card__feature">Compaction</span>
+            <span class="card__feature">Restore</span>
           </div>
         </a>
       </div>
@@ -633,11 +632,11 @@
         <span class="category__title">Performance</span>
       </div>
       <div class="grid grid--2">
-        <a href="../../wasm/examples/simd_benchmark.html" class="card card--local">
+        <a href="simd_benchmark.html" class="card">
           <div class="card__header">
             <div class="card__badges">
               <span class="card__badge card__badge--version">v0.7.0</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
+              <span class="card__badge card__badge--new">NEW</span>
             </div>
             <div class="card__arrow">
               <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -655,11 +654,10 @@
           </div>
         </a>
 
-        <a href="../../wasm/examples/benchmark-dashboard.html" class="card card--local">
+        <a href="benchmark_dashboard.html" class="card">
           <div class="card__header">
             <div class="card__badges">
               <span class="card__badge card__badge--version">v0.4.0</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
             </div>
             <div class="card__arrow">
               <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -674,133 +672,6 @@
           <div class="card__features">
             <span class="card__feature">Charts</span>
             <span class="card__feature">Reports</span>
-          </div>
-        </a>
-      </div>
-    </div>
-
-    <!-- Operations -->
-    <div class="category">
-      <div class="category__header">
-        <div class="category__icon">
-          <svg viewBox="0 0 24 24"><path d="M12 3v18M5 10l7-7 7 7M5 14l7 7 7-7"/></svg>
-        </div>
-        <span class="category__title">Operations</span>
-      </div>
-      <div class="grid grid--2 grid--3">
-        <a href="../../wasm/examples/soft_delete.html" class="card card--local">
-          <div class="card__header">
-            <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.3.0</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
-            </div>
-            <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </div>
-          <div class="card__icon">
-            <svg viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          </div>
-          <h2 class="card__title">SOFT_DELETE</h2>
-          <p class="card__desc">O(1) delete. Tombstones. Compaction.</p>
-          <div class="card__features">
-            <span class="card__feature">Tombstones</span>
-            <span class="card__feature">Compaction</span>
-          </div>
-        </a>
-
-        <a href="../../wasm/examples/batch_insert.html" class="card card--local">
-          <div class="card__header">
-            <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.2.0</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
-            </div>
-            <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </div>
-          <div class="card__icon">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          </div>
-          <h2 class="card__title">BATCH_INSERT</h2>
-          <p class="card__desc">Bulk insert with progress.</p>
-          <div class="card__features">
-            <span class="card__feature">Bulk Ops</span>
-            <span class="card__feature">Progress</span>
-          </div>
-        </a>
-
-        <a href="../../wasm/examples/batch_delete.html" class="card card--local">
-          <div class="card__header">
-            <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.2.0</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
-            </div>
-            <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </div>
-          <div class="card__icon">
-            <svg viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
-          </div>
-          <h2 class="card__title">BATCH_DELETE</h2>
-          <p class="card__desc">Bulk delete with progress.</p>
-          <div class="card__features">
-            <span class="card__feature">Bulk Delete</span>
-            <span class="card__feature">Progress</span>
-          </div>
-        </a>
-      </div>
-    </div>
-
-    <!-- Testing -->
-    <div class="category">
-      <div class="category__header">
-        <div class="category__icon">
-          <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-        </div>
-        <span class="category__title">Testing</span>
-      </div>
-      <div class="grid grid--2">
-        <a href="../../wasm/examples/stress-test.html" class="card card--local">
-          <div class="card__header">
-            <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.4.0</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
-            </div>
-            <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </div>
-          <div class="card__icon">
-            <svg viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          </div>
-          <h2 class="card__title">STRESS_TEST</h2>
-          <p class="card__desc">Continuous ops. Memory under load.</p>
-          <div class="card__features">
-            <span class="card__feature">Load Test</span>
-            <span class="card__feature">Memory</span>
-          </div>
-        </a>
-
-        <a href="../../wasm/examples/simd_test.html" class="card card--local">
-          <div class="card__header">
-            <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.7.0</span>
-              <span class="card__badge card__badge--local">LOCAL</span>
-            </div>
-            <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </div>
-          <div class="card__icon">
-            <svg viewBox="0 0 24 24"><path d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
-          </div>
-          <h2 class="card__title">SIMD_TEST</h2>
-          <p class="card__desc">Verify SIMD128 support. Correctness.</p>
-          <div class="card__features">
-            <span class="card__feature">Verification</span>
-            <span class="card__feature">Correctness</span>
           </div>
         </a>
       </div>
