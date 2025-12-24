@@ -7,23 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned (v0.8.0)
+- Soft-delete BQ tracking optimization
+- Incremental persistence for large indices
+- Vector compression enhancements
+- Bundle size optimization (tree-shaking analysis)
+- Code consolidation (Metric trait refactor)
+
+---
+
+## [0.7.0] - 2025-12-24 — SIMD Acceleration + Filter Playground
+
+**Focus:** Performance optimization and developer experience — 2x+ faster WASM operations via SIMD, interactive filter playground for learning.
+
 ### Added
-- **`enableBQ()`** — WASM method to enable binary quantization after index creation
+
+#### WASM SIMD Acceleration
+- **SIMD128 enabled by default** — 2x+ faster vector operations on modern browsers
+  - Dot product, L2 distance, cosine similarity accelerated
+  - Automatic scalar fallback for iOS Safari (no SIMD support)
+  - Enabled via `-C target-feature=+simd128` build flag
+
+- **Performance improvements:**
+  | Dimension | Speedup | Notes |
+  |:----------|:--------|:------|
+  | 128D | 2.3x | 55ns dot product |
+  | 768D | 2.1x | 374ns dot product |
+  | 1536D | 2.0x | 761ns dot product |
+
+- **Browser compatibility:**
+  | Browser | SIMD | Status |
+  |:--------|:-----|:-------|
+  | Chrome 91+ | ✅ | Full speed |
+  | Firefox 89+ | ✅ | Full speed |
+  | Safari 16.4+ (macOS) | ✅ | Full speed |
+  | Edge 91+ | ✅ | Full speed |
+  | iOS Safari | ❌ | Scalar fallback (~2x slower) |
+
+#### Interactive Filter Playground
+- **[Filter Playground](https://matte1782.github.io/edgevec/demo/)** — Interactive filter expression builder
+  - Visual filter construction with AND/OR/clause controls
+  - 10 ready-to-use examples (e-commerce, documents, users, etc.)
+  - Live WASM execution sandbox
+  - Copy-paste code snippets (JavaScript, TypeScript, React)
+  - Operator reference panel
+
+#### API Additions
+- **`enableBQ()`** — Enable binary quantization after index creation
   - Required for BQ search methods (`searchBQ`, `searchBQRescored`)
   - Dimensions must be divisible by 8
   - Automatically encodes existing vectors on enable
 
 ### Changed
+
 - **WASM Bundle Optimized** — Applied wasm-opt `-Oz` with `--strip-debug` and `--strip-producers`
   - **524 KB → 477 KB** (9.2% reduction, 47 KB saved)
-  - Now **well under 500 KB target**
   - Gzipped: 217 KB (unchanged — gzip already compresses efficiently)
   - Optimization flags: `--enable-bulk-memory --enable-nontrapping-float-to-int`
 
-### Planned (v0.7.0)
-- Soft-delete BQ tracking optimization
-- Incremental persistence for large indices
-- Vector compression enhancements
+- **Build configuration** — SIMD enabled by default in `.cargo/config.toml`
+
+### Fixed
+
+- **AVX2 popcount optimization** — Native `popcnt` instruction replaces lookup table
+  - Feedback from Reddit user chillfish8: extract 4×u64, use hardware popcnt
+  - ~15% faster Hamming distance on x86_64
+
+- **Code cleanup** — Removed internal monologue comments from chunking.rs
+  - Professional comment style throughout codebase
+
+- **Safety documentation** — Moved SAFETY docs to function-level per Rust conventions
+  - `# Safety` sections on `#[target_feature]` functions
+
+### Documentation
+
+- **README.md** — Added "Try It Now" section with playground link
+- **docs/api/FILTER_SYNTAX.md** — Added interactive playground link
+- **docs/benchmarks/2025-12-24_simd_benchmark.md** — Full SIMD benchmark report
+
+### Performance (v0.7.0 Targets)
+
+| Metric | Result | Target | Status |
+|:-------|:-------|:-------|:-------|
+| SIMD speedup | 2x+ | 2x | ✅ Achieved |
+| Search 10k (768D) | 938 µs | <1 ms | ✅ Achieved |
+| Bundle size | 477 KB | <500 KB | ✅ Achieved |
+| iOS fallback | Works | Functional | ✅ Achieved |
 
 ---
 
@@ -101,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Browser Demo
 
-- **`wasm/examples/v060_demo.html`** — Interactive v0.6.0 showcase
+- **`wasm/examples/v060_cyberpunk_demo.html`** — Interactive v0.6.0 showcase
   - Cyberpunk-themed UI matching previous demos
   - BQ vs F32 performance comparison with visual bars
   - Metadata filter tags with preset expressions
@@ -681,6 +750,7 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
+| 0.7.0 | 2025-12-24 | **SIMD Acceleration** (2x+ speedup), Interactive Filter Playground |
 | 0.6.0 | 2025-12-22 | **RFC-002:** Binary Quantization (32x memory), Metadata Storage, Memory Pressure |
 | 0.5.4 | 2025-12-20 | iOS Safari compatibility fixes |
 | 0.5.3 | 2025-12-19 | **FIX:** crates.io publishing (package size reduction) |
@@ -706,7 +776,8 @@ This version was internal only, not published to crates.io or npm.
 
 ---
 
-[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/matte1782/edgevec/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/matte1782/edgevec/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/matte1782/edgevec/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/matte1782/edgevec/compare/v0.5.2...v0.5.3

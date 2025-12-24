@@ -89,12 +89,16 @@ Try EdgeVec directly in your browser:
 | Demo | Description |
 |:-----|:------------|
 | [**Filter Playground v0.7.0**](https://matte1782.github.io/edgevec/demo/) | Visual filter builder with live sandbox (NEW!) |
-| [**Cyberpunk Demo**](wasm/examples/v060_cyberpunk_demo.html) | Full-featured v0.6.0 showcase with cyberpunk UI |
-| [**SIMD Benchmark**](wasm/examples/simd_benchmark.html) | Browser SIMD performance validation |
-| [**v0.6.0 Demo**](wasm/examples/v060_demo.html) | BQ vs F32 comparison, metadata filtering, memory pressure |
-| [**Benchmark Dashboard**](wasm/examples/benchmark-dashboard.html) | Performance comparison vs competitors |
-| [**Soft Delete Demo**](wasm/examples/soft_delete.html) | Tombstone-based deletion with compaction |
-| [**Main Demo**](wasm/examples/index.html) | Complete feature showcase |
+| [**v0.6.0 Cyberpunk Demo**](https://matte1782.github.io/edgevec/demo/cyberpunk.html) | BQ vs F32 comparison, metadata filtering, memory pressure |
+| [**Demo Hub**](https://matte1782.github.io/edgevec/demo/hub.html) | All demos in one place |
+
+**Run locally:**
+| Demo | Path |
+|:-----|:-----|
+| SIMD Benchmark | `wasm/examples/simd_benchmark.html` |
+| Benchmark Dashboard | `wasm/examples/benchmark-dashboard.html` |
+| Soft Delete Demo | `wasm/examples/soft_delete.html` |
+| Main Demo | `wasm/examples/index.html` |
 
 ```bash
 # Run demos locally

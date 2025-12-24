@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EdgeVec Demo Hub - Interactive demos for the WASM-native vector database">
+  <title>EdgeVec Demo Hub</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/cyberpunk.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <style>
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+    .demo-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+    }
+    .demo-card:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+    .demo-card__title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      color: var(--neon-cyan);
+      margin-bottom: 0.5rem;
+    }
+    .demo-card__desc {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .demo-card__tag {
+      display: inline-block;
+      background: var(--bg-tertiary);
+      color: var(--neon-magenta);
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+    }
+    .demo-card__tag--new {
+      background: var(--neon-green);
+      color: var(--bg-primary);
+    }
+    .hero-hub {
+      text-align: center;
+      padding: 3rem 0;
+    }
+    .hero-hub__title {
+      font-family: var(--font-display);
+      font-size: 2.5rem;
+      color: var(--neon-cyan);
+      text-shadow: var(--text-glow-cyan);
+    }
+    .hero-hub__subtitle {
+      color: var(--text-secondary);
+      margin-top: 0.5rem;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--neon-cyan);
+      text-decoration: none;
+      margin-bottom: 1rem;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="noise-overlay" aria-hidden="true"></div>
+
+  <main class="container" style="padding: 2rem;">
+    <a href="https://github.com/matte1782/edgevec" class="back-link">
+      &larr; Back to GitHub
+    </a>
+
+    <section class="hero-hub">
+      <h1 class="hero-hub__title glitch" data-text="EDGEVEC_DEMOS">EDGEVEC_DEMOS</h1>
+      <p class="hero-hub__subtitle">Interactive demos for the WASM-native vector database</p>
+    </section>
+
+    <div class="demo-grid">
+      <!-- Filter Playground -->
+      <a href="index.html" class="demo-card">
+        <span class="demo-card__tag demo-card__tag--new">v0.7.0</span>
+        <span class="demo-card__tag">NEW</span>
+        <h2 class="demo-card__title">Filter Playground</h2>
+        <p class="demo-card__desc">
+          Visual filter builder with live sandbox. Build SQL-like queries, see live results, copy-paste code snippets.
+        </p>
+      </a>
+
+      <!-- Cyberpunk Demo -->
+      <a href="cyberpunk.html" class="demo-card">
+        <span class="demo-card__tag">v0.6.0</span>
+        <h2 class="demo-card__title">Cyberpunk Demo</h2>
+        <p class="demo-card__desc">
+          Full-featured demo with BQ vs F32 comparison, metadata filtering, memory pressure monitoring.
+        </p>
+      </a>
+
+      <!-- More demos can be added here -->
+    </div>
+
+    <footer style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+      <p>
+        <span class="neon-text">EDGEVEC</span> // MIT License //
+        <a href="https://crates.io/crates/edgevec" target="_blank" style="color: var(--neon-cyan);">crates.io</a> //
+        <a href="https://www.npmjs.com/package/edgevec" target="_blank" style="color: var(--neon-cyan);">npm</a>
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

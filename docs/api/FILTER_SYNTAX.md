@@ -1,7 +1,9 @@
 # Filter Syntax Reference
 
-**Version:** EdgeVec v0.6.0
-**Last Updated:** 2025-12-22
+**Version:** EdgeVec v0.7.0
+**Last Updated:** 2025-12-24
+
+> **Try it live:** [Filter Playground](https://matte1782.github.io/edgevec/demo/) — Build and test filters interactively in your browser
 
 ---
 

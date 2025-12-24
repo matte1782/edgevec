@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EdgeVec v0.6.0 Demo - Cyberpunk Vector Search with Binary Quantization and Metadata Filtering">
+  <title>EdgeVec v0.6.0 // NEURAL_SEARCH_INTERFACE</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/cyberpunk.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+  <!-- Background Effects Canvas (respects prefers-reduced-motion) -->
+  <canvas id="particleCanvas" class="effect-canvas" aria-hidden="true"></canvas>
+  <canvas id="matrixCanvas" class="effect-canvas effect-canvas--matrix" aria-hidden="true"></canvas>
+
+  <!-- Noise Overlay -->
+  <div class="noise-overlay" aria-hidden="true"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="container header__inner">
+      <div class="header__logo">
+        <span class="glitch neon-text" data-text="EDGEVEC">EDGEVEC</span>
+        <span class="header__version">v0.6.0</span>
+      </div>
+
+      <nav class="header__nav" role="navigation" aria-label="Main navigation">
+        <a href="#search" class="header__link">SEARCH</a>
+        <a href="#benchmark" class="header__link">BENCHMARK</a>
+        <a href="#memory" class="header__link">MEMORY</a>
+      </nav>
+
+      <div class="header__actions">
+        <button
+          class="theme-toggle"
+          id="themeToggle"
+          aria-label="Toggle dark/light mode"
+        >
+          <svg class="theme-toggle__icon theme-toggle__icon--dark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <svg class="theme-toggle__icon theme-toggle__icon--light" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+          </svg>
+        </button>
+
+        <a href="https://github.com/matte1782/edgevec" class="btn btn--small" target="_blank" rel="noopener">
+          GITHUB
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <h1 class="hero__title glitch neon-pulse" data-text="NEURAL_SEARCH_INTERFACE">
+        NEURAL_SEARCH_INTERFACE
+      </h1>
+      <p class="hero__subtitle">
+        Binary Quantization + Metadata Filtering // <span class="neon-text--green">32x MEMORY REDUCTION</span>
+      </p>
+
+      <!-- Status Bar -->
+      <div class="status-bar" id="statusBar" role="status" aria-live="polite">
+        <div class="status-bar__item">
+          <span class="status-bar__label">WASM</span>
+          <span class="status-bar__value status-bar__value--loading" id="wasmStatus">LOADING...</span>
+        </div>
+        <div class="status-bar__item">
+          <span class="status-bar__label">VECTORS</span>
+          <span class="status-bar__value" id="vectorCount">0</span>
+        </div>
+        <div class="status-bar__item">
+          <span class="status-bar__label">MEMORY</span>
+          <span class="status-bar__value" id="memoryUsage">0 MB</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="main">
+    <div class="container">
+      <div class="layout">
+        <!-- Sidebar: Controls -->
+        <aside class="sidebar" role="complementary">
+          <div class="terminal">
+            <div class="terminal__header">
+              <span class="terminal__dot"></span>
+              <span class="terminal__dot terminal__dot--yellow"></span>
+              <span class="terminal__dot terminal__dot--green"></span>
+              <span class="terminal__title">CONTROL_PANEL</span>
+            </div>
+            <div class="terminal__body">
+              <!-- Data Generation -->
+              <div class="control-group">
+                <label class="control-label" for="vectorSlider">VECTOR_COUNT</label>
+                <input
+                  type="range"
+                  id="vectorSlider"
+                  class="slider"
+                  min="100"
+                  max="10000"
+                  value="1000"
+                  step="100"
+                >
+                <output id="vectorSliderValue" class="control-output">1000</output>
+              </div>
+
+              <button class="btn btn--filled" id="generateBtn">
+                GENERATE_DATA
+              </button>
+
+              <hr class="divider">
+
+              <!-- Search Mode -->
+              <div class="control-group">
+                <label class="control-label">SEARCH_MODE</label>
+                <div class="radio-group" role="radiogroup" aria-label="Search mode">
+                  <label class="radio">
+                    <input type="radio" name="searchMode" value="f32" checked>
+                    <span class="radio__label">F32 (ACCURATE)</span>
+                  </label>
+                  <label class="radio">
+                    <input type="radio" name="searchMode" value="bq">
+                    <span class="radio__label">BQ (FAST)</span>
+                  </label>
+                  <label class="radio">
+                    <input type="radio" name="searchMode" value="hybrid">
+                    <span class="radio__label">HYBRID (BALANCED)</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Filter Expression -->
+              <div class="control-group">
+                <label class="control-label" for="filterInput">FILTER_EXPRESSION</label>
+                <input
+                  type="text"
+                  id="filterInput"
+                  class="input"
+                  placeholder='category = "tech"'
+                >
+                <div class="filter-tags" id="filterTags">
+                  <button class="filter-tag" data-filter='category = "tech"'>category: tech</button>
+                  <button class="filter-tag" data-filter='score > 0.5'>score > 0.5</button>
+                  <button class="filter-tag" data-filter='active = true'>active: true</button>
+                </div>
+              </div>
+
+              <!-- K Value -->
+              <div class="control-group">
+                <label class="control-label" for="kValue">TOP_K_RESULTS</label>
+                <input
+                  type="number"
+                  id="kValue"
+                  class="input"
+                  min="1"
+                  max="100"
+                  value="10"
+                >
+              </div>
+
+              <hr class="divider">
+
+              <!-- Rescore Factor (for hybrid mode) -->
+              <div class="control-group" id="rescoreGroup" style="display: none;">
+                <label class="control-label" for="rescoreFactor">RESCORE_FACTOR</label>
+                <input
+                  type="range"
+                  id="rescoreFactor"
+                  class="slider"
+                  min="1"
+                  max="10"
+                  value="5"
+                >
+                <output id="rescoreValue" class="control-output">5x</output>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main Panel: Results -->
+        <section class="content" aria-label="Search results" id="searchSection">
+          <!-- Search Input -->
+          <div class="search-box">
+            <div class="search-box__input-wrapper">
+              <input
+                type="text"
+                id="searchInput"
+                class="search-box__input"
+                placeholder="ENTER_SEARCH_QUERY..."
+                aria-label="Search query"
+              >
+              <button class="search-box__btn" id="searchBtn" aria-label="Execute search">
+                <svg viewBox="0 0 24 24" class="search-box__icon" aria-hidden="true">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Results Grid -->
+          <div class="results" id="resultsContainer">
+            <!-- Placeholder for skeleton loading -->
+            <div class="results__placeholder">
+              <p class="neon-text">AWAITING_INPUT...</p>
+              <p class="text-muted">Generate data and run a search to see results</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Benchmark Section -->
+  <section class="section" id="benchmark">
+    <div class="container">
+      <h2 class="section__title glitch" data-text="PERFORMANCE_METRICS">PERFORMANCE_METRICS</h2>
+
+      <div class="grid grid--3">
+        <div class="metric-card fade-in stagger-1">
+          <div class="metric-card__icon metric-card__icon--cyan">
+            <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div class="metric-card__value" id="f32Latency">--</div>
+          <div class="metric-card__label">F32 LATENCY (ms)</div>
+        </div>
+
+        <div class="metric-card fade-in stagger-2">
+          <div class="metric-card__icon metric-card__icon--magenta">
+            <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div class="metric-card__value" id="bqLatency">--</div>
+          <div class="metric-card__label">BQ LATENCY (ms)</div>
+        </div>
+
+        <div class="metric-card fade-in stagger-3">
+          <div class="metric-card__icon metric-card__icon--green">
+            <svg viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          </div>
+          <div class="metric-card__value" id="speedup">--x</div>
+          <div class="metric-card__label">SPEEDUP</div>
+        </div>
+      </div>
+
+      <!-- Benchmark Chart -->
+      <div class="chart-container" id="benchmarkChart" aria-label="Performance comparison chart">
+        <div class="results__placeholder">
+          <p class="neon-text">NO_DATA</p>
+          <p class="text-muted">Run benchmark to see performance comparison</p>
+        </div>
+      </div>
+
+      <div style="text-align: center;">
+        <button class="btn btn--magenta" id="runBenchmarkBtn">
+          RUN_BENCHMARK
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Memory Section -->
+  <section class="section section--dark" id="memory">
+    <div class="container">
+      <h2 class="section__title glitch" data-text="MEMORY_PRESSURE">MEMORY_PRESSURE</h2>
+
+      <div class="memory-gauge" id="memoryGauge" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <!-- SVG gauge: initial state rendered in HTML, updated by MemoryGauge.update() -->
+        <svg viewBox="0 0 200 200" class="gauge">
+          <circle
+            cx="100"
+            cy="100"
+            r="88"
+            fill="none"
+            stroke="var(--bg-elevated)"
+            stroke-width="12"
+          />
+          <circle
+            id="gaugeProgress"
+            cx="100"
+            cy="100"
+            r="88"
+            fill="none"
+            stroke="var(--neon-green)"
+            stroke-width="12"
+            stroke-linecap="round"
+            stroke-dasharray="553"
+            stroke-dashoffset="553"
+            transform="rotate(-90 100 100)"
+            class="gauge__progress"
+            style="filter: drop-shadow(0 0 10px var(--neon-green))"
+          />
+          <text
+            id="gaugeText"
+            x="100"
+            y="100"
+            text-anchor="middle"
+            dominant-baseline="middle"
+            fill="var(--neon-green)"
+            font-size="36"
+            font-weight="bold"
+            font-family="var(--font-mono)"
+          >0%</text>
+          <text
+            x="100"
+            y="130"
+            text-anchor="middle"
+            fill="var(--text-secondary)"
+            font-size="12"
+            font-family="var(--font-mono)"
+          >MEMORY_USAGE</text>
+        </svg>
+      </div>
+
+      <div class="memory-stats" id="memoryStats">
+        <div class="memory-stats__item">
+          <span class="memory-stats__label">USED</span>
+          <span class="memory-stats__value" id="memUsed">0 MB</span>
+        </div>
+        <div class="memory-stats__item">
+          <span class="memory-stats__label">TOTAL</span>
+          <span class="memory-stats__value" id="memTotal">0 MB</span>
+        </div>
+        <div class="memory-stats__item">
+          <span class="memory-stats__label">STATUS</span>
+          <span class="memory-stats__value memory-stats__value--status" id="memStatus">NORMAL</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <p class="footer__text">
+        <span class="neon-text">EDGEVEC</span> v0.6.0 // MIT License //
+        <a href="https://crates.io/crates/edgevec" target="_blank" rel="noopener">crates.io</a> //
+        <a href="https://www.npmjs.com/package/edgevec" target="_blank" rel="noopener">npm</a>
+      </p>
+      <p class="footer__subtext">
+        Built with Rust + WebAssembly // Binary Quantization + Metadata Filtering
+      </p>
+    </div>
+  </footer>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- Scripts -->
+  <script type="module">
+    // Initialize effects and animations
+    import { ParticleSystem, MatrixRain, EffectManager } from './js/effects.js';
+    import { initScrollAnimations, initSmoothScroll } from './js/animations.js';
+    import { FPSMonitor, PerformanceMonitor } from './js/performance.js';
+
+    // Effect manager coordinates all background effects
+    const effectManager = new EffectManager();
+
+    // Initialize particle system (only if canvas exists)
+    const particleCanvas = document.getElementById('particleCanvas');
+    if (particleCanvas) {
+      const particles = new ParticleSystem('particleCanvas');
+      effectManager.add(particles);
+    }
+
+    // Matrix rain effect (subtle, behind content)
+    const matrixCanvas = document.getElementById('matrixCanvas');
+    if (matrixCanvas) {
+      const matrix = new MatrixRain('matrixCanvas');
+      effectManager.add(matrix);
+    }
+
+    // Initialize scroll-triggered animations
+    initScrollAnimations({
+      selector: '[data-scroll-animate]',
+      threshold: 0.1,
+      once: true
+    });
+
+    // Smooth scroll for anchor links
+    initSmoothScroll({
+      offset: 80,
+      selector: 'a[href^="#"]'
+    });
+
+    // Performance monitoring (dev mode only)
+    if (window.location.search.includes('debug=true')) {
+      const fps = new FPSMonitor({
+        onUpdate: (stats) => console.log(`FPS: ${stats.average}`)
+      });
+      fps.start();
+    }
+  </script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
