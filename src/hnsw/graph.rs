@@ -1783,8 +1783,14 @@ impl HnswIndex {
         &self,
         storage: &VectorStorage,
     ) -> Result<(HnswIndex, VectorStorage, CompactionResult), GraphError> {
-        use std::time::Instant;
-        let start = Instant::now();
+        // WASM-compatible timing
+        #[cfg(not(target_arch = "wasm32"))]
+        let start = std::time::Instant::now();
+        #[cfg(target_arch = "wasm32")]
+        let start_ms = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now())
+            .unwrap_or(0.0);
 
         let original_deleted = self.deleted_count;
         let original_total = self.node_count();
@@ -1840,7 +1846,14 @@ impl HnswIndex {
             new_index.insert(&vector, &mut new_storage)?;
         }
 
+        // Calculate duration based on target
+        #[cfg(not(target_arch = "wasm32"))]
         let duration_ms = start.elapsed().as_millis() as u64;
+        #[cfg(target_arch = "wasm32")]
+        let duration_ms = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| (p.now() - start_ms) as u64)
+            .unwrap_or(0);
 
         Ok((
             new_index,
