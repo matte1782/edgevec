@@ -5,6 +5,7 @@ use super::Metric;
 /// Hamming distance metric.
 ///
 /// Calculates the number of differing bits between two binary vectors.
+/// Uses SIMD acceleration (WASM SIMD128 or AVX2) when available.
 ///
 /// # Attribution
 ///
@@ -25,11 +26,9 @@ impl Metric<u8> for Hamming {
             b.len()
         );
 
-        let mut distance: u32 = 0;
-        for (x, y) in a.iter().zip(b.iter()) {
-            // SALVAGE: Adapted from binary_semantic_cache similarity.rs
-            distance += (x ^ y).count_ones();
-        }
+        // Use SIMD-accelerated Hamming distance when available
+        // Dispatcher in simd.rs selects WASM SIMD128, AVX2, or scalar fallback
+        let distance = super::simd::hamming_distance(a, b);
 
         // Precision loss is acceptable because max distance for expected vector sizes
         // (< 1MB) fits within f32 mantissa (2^24).

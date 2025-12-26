@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeVec v0.7.0 SIMD Compatibility Test</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00ff88;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+        .version {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+        .test-section {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .test-section h2 {
+            color: #00d4ff;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .result {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #222;
+        }
+        .result:last-child { border-bottom: none; }
+        .result-label { color: #aaa; }
+        .result-value { font-weight: bold; }
+        .pass { color: #00ff88; }
+        .fail { color: #ff4444; }
+        .warn { color: #ffaa00; }
+        .info { color: #00d4ff; }
+        .loading {
+            color: #666;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .control-group label {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+        .control-group select, .control-group input {
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-family: inherit;
+            min-width: 120px;
+        }
+        .control-group select:focus, .control-group input:focus {
+            border-color: #00ff88;
+            outline: none;
+        }
+        .btn {
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            color: #0a0a1a;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .benchmark-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .benchmark-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .benchmark-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00ff88;
+            margin: 0.5rem 0;
+        }
+        .benchmark-card .label {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+        .benchmark-card .sub {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .summary {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            border-radius: 8px;
+        }
+        .summary.error {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: #ff4444;
+        }
+        .browser-info {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 1rem;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .results-table th, .results-table td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        .results-table th {
+            color: #00d4ff;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+        .results-table td.num, .results-table th.num {
+            font-family: 'JetBrains Mono', monospace;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EdgeVec SIMD Hamming Benchmark</h1>
+        <p class="version">v0.7.0 | WASM SIMD128 Hamming Distance Test</p>
+
+        <div class="test-section">
+            <h2>Browser Capabilities</h2>
+            <div id="capabilities">
+                <div class="result">
+                    <span class="result-label">WebAssembly Support</span>
+                    <span class="result-value loading" id="wasm-support">Checking...</span>
+                </div>
+                <div class="result">
+                    <span class="result-label">WASM SIMD128 Support</span>
+                    <span class="result-value loading" id="simd-support">Checking...</span>
+                </div>
+                <div class="result">
+                    <span class="result-label">SIMD Backend (Compiled)</span>
+                    <span class="result-value loading" id="simd-backend">Checking...</span>
+                </div>
+                <div class="result">
+                    <span class="result-label">Browser</span>
+                    <span class="result-value info" id="browser-name">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Hamming Distance Benchmark Controls</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <label>Binary Vector Size</label>
+                    <select id="bytes-select">
+                        <option value="16">128-bit (16 bytes)</option>
+                        <option value="32">256-bit (32 bytes)</option>
+                        <option value="48">384-bit (48 bytes)</option>
+                        <option value="64">512-bit (64 bytes)</option>
+                        <option value="96" selected>768-bit (96 bytes)</option>
+                        <option value="128">1024-bit (128 bytes)</option>
+                        <option value="192">1536-bit (192 bytes)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Iterations</label>
+                    <select id="iterations-select">
+                        <option value="1000">1,000</option>
+                        <option value="10000" selected>10,000</option>
+                        <option value="100000">100,000</option>
+                        <option value="1000000">1,000,000</option>
+                    </select>
+                </div>
+                <div class="control-group" style="justify-content: flex-end;">
+                    <button class="btn" id="run-benchmark">Run Benchmark</button>
+                </div>
+            </div>
+
+            <div class="benchmark-grid" id="benchmark-results">
+                <div class="benchmark-card">
+                    <div class="label">New SIMD</div>
+                    <div class="value" id="new-time">--</div>
+                    <div class="sub" id="new-backend">waiting</div>
+                </div>
+                <div class="benchmark-card">
+                    <div class="label">Old Scalar</div>
+                    <div class="value" id="old-time">--</div>
+                    <div class="sub" id="old-backend">waiting</div>
+                </div>
+                <div class="benchmark-card">
+                    <div class="label">Speedup</div>
+                    <div class="value" id="speedup">--</div>
+                    <div class="sub">SIMD vs Scalar</div>
+                </div>
+                <div class="benchmark-card">
+                    <div class="label">Throughput</div>
+                    <div class="value" id="throughput">--</div>
+                    <div class="sub">ops/sec</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Multi-Size Comparison</h2>
+            <p style="color: #888; font-size: 0.85rem; margin-bottom: 1rem;">
+                Click "Run All Sizes" to benchmark across all binary vector dimensions.
+            </p>
+            <button class="btn" id="run-all-sizes" style="margin-bottom: 1rem;">Run All Sizes</button>
+            <table class="results-table" id="size-results">
+                <thead>
+                    <tr>
+                        <th>Size</th>
+                        <th class="num">Bits</th>
+                        <th class="num">SIMD (μs)</th>
+                        <th class="num">Scalar (μs)</th>
+                        <th class="num">Speedup</th>
+                    </tr>
+                </thead>
+                <tbody id="size-results-body">
+                    <tr><td colspan="5" style="color: #666; text-align: center;">No results yet</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="test-section">
+            <h2>EdgeVec Store Test</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <label>Dimensions</label>
+                    <select id="dims-select">
+                        <option value="128">128</option>
+                        <option value="256">256</option>
+                        <option value="384">384</option>
+                        <option value="512">512</option>
+                        <option value="768" selected>768</option>
+                        <option value="1024">1024</option>
+                        <option value="1536">1536</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Vector Count</label>
+                    <select id="count-select">
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000" selected>1,000</option>
+                        <option value="5000">5,000</option>
+                        <option value="10000">10,000</option>
+                    </select>
+                </div>
+                <div class="control-group" style="justify-content: flex-end;">
+                    <button class="btn" id="run-store-test">Run Store Test</button>
+                </div>
+            </div>
+            <div id="store-results">
+                <div class="result">
+                    <span class="result-label">Store Creation</span>
+                    <span class="result-value loading" id="store-create">Waiting...</span>
+                </div>
+                <div class="result">
+                    <span class="result-label">Insert Time</span>
+                    <span class="result-value loading" id="insert-time">Waiting...</span>
+                </div>
+                <div class="result">
+                    <span class="result-label">Search Time (100 queries, k=10)</span>
+                    <span class="result-value loading" id="search-time">Waiting...</span>
+                </div>
+                <div class="result">
+                    <span class="result-label">Avg Search Latency</span>
+                    <span class="result-value loading" id="avg-latency">Waiting...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary" id="summary" style="display: none;">
+            <div id="summary-text"></div>
+        </div>
+
+        <div class="browser-info" id="browser-info"></div>
+    </div>
+
+    <script type="module">
+        // State
+        let wasmModule = null;
+
+        // Helper functions
+        function setResult(id, text, status = 'info') {
+            const el = document.getElementById(id);
+            if (el) {
+                el.textContent = text;
+                el.className = `result-value ${status}`;
+            }
+        }
+
+        function detectBrowser() {
+            const ua = navigator.userAgent;
+            if (ua.includes('Firefox/')) return 'Firefox';
+            if (ua.includes('Edg/')) return 'Edge';
+            if (ua.includes('Chrome/')) return 'Chrome';
+            if (ua.includes('Safari/') && !ua.includes('Chrome')) return 'Safari';
+            return 'Unknown';
+        }
+
+        function checkSimdSupport() {
+            try {
+                // SIMD feature detection bytecode (from wasm-feature-detect)
+                return WebAssembly.validate(new Uint8Array([
+                    0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11
+                ]));
+            } catch {
+                return false;
+            }
+        }
+
+        function formatNumber(n) {
+            if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+            return n.toFixed(2);
+        }
+
+        // Initialize
+        async function init() {
+            const browser = detectBrowser();
+            setResult('browser-name', browser, 'info');
+
+            const wasmSupported = typeof WebAssembly !== 'undefined';
+            setResult('wasm-support', wasmSupported ? 'YES' : 'NO', wasmSupported ? 'pass' : 'fail');
+
+            if (!wasmSupported) {
+                showSummary('error', 'WebAssembly is not supported in this browser.');
+                return;
+            }
+
+            const simdSupported = checkSimdSupport();
+            setResult('simd-support', simdSupported ? 'YES' : 'NO', simdSupported ? 'pass' : 'warn');
+
+            try {
+                const module = await import('./pkg/edgevec.js');
+                await module.default();
+                wasmModule = module;
+
+                const backend = module.getSimdBackend();
+                setResult('simd-backend', backend.toUpperCase(), backend === 'wasm_simd128' ? 'pass' : 'warn');
+
+                // Auto-run initial benchmark
+                runHammingBenchmark();
+
+            } catch (e) {
+                console.error('WASM load error:', e);
+                setResult('simd-backend', 'LOAD ERROR', 'fail');
+            }
+
+            document.getElementById('browser-info').textContent = `User Agent: ${navigator.userAgent}`;
+        }
+
+        // Hamming benchmark
+        function runHammingBenchmark() {
+            if (!wasmModule) return;
+
+            const bytes = parseInt(document.getElementById('bytes-select').value);
+            const iterations = parseInt(document.getElementById('iterations-select').value);
+
+            try {
+                const resultJson = wasmModule.benchmarkHammingComparison(bytes, iterations);
+                const result = JSON.parse(resultJson);
+
+                document.getElementById('new-time').textContent = result.new_us.toFixed(3) + ' μs';
+                document.getElementById('new-backend').textContent = result.new_backend;
+                document.getElementById('old-time').textContent = result.current_us.toFixed(3) + ' μs';
+                document.getElementById('old-backend').textContent = result.current_backend;
+                document.getElementById('speedup').textContent = result.speedup.toFixed(1) + 'x';
+                document.getElementById('speedup').style.color = result.speedup >= 2 ? '#00ff88' : '#ffaa00';
+
+                const opsPerSec = 1000000 / result.new_us;
+                document.getElementById('throughput').textContent = formatNumber(opsPerSec);
+
+                console.log('Hamming benchmark:', result);
+            } catch (e) {
+                console.error('Benchmark error:', e);
+            }
+        }
+
+        // Run all sizes
+        async function runAllSizes() {
+            if (!wasmModule) return;
+
+            const btn = document.getElementById('run-all-sizes');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            const sizes = [16, 32, 48, 64, 96, 128, 192];
+            const iterations = 10000;
+            const results = [];
+
+            const tbody = document.getElementById('size-results-body');
+            tbody.innerHTML = '';
+
+            for (const bytes of sizes) {
+                try {
+                    const resultJson = wasmModule.benchmarkHammingComparison(bytes, iterations);
+                    const result = JSON.parse(resultJson);
+                    results.push({ bytes, ...result });
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${bytes} bytes</td>
+                        <td class="num">${bytes * 8}</td>
+                        <td class="num" style="color: #00ff88">${result.new_us.toFixed(3)}</td>
+                        <td class="num" style="color: #888">${result.current_us.toFixed(3)}</td>
+                        <td class="num" style="color: ${result.speedup >= 5 ? '#00ff88' : result.speedup >= 2 ? '#00d4ff' : '#ffaa00'}">${result.speedup.toFixed(1)}x</td>
+                    `;
+                    tbody.appendChild(row);
+
+                    await new Promise(r => setTimeout(r, 50)); // Small delay for UI
+                } catch (e) {
+                    console.error(`Error at ${bytes} bytes:`, e);
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Run All Sizes';
+
+            // Show average speedup
+            const avgSpeedup = results.reduce((sum, r) => sum + r.speedup, 0) / results.length;
+            showSummary('success', `Average speedup across all sizes: ${avgSpeedup.toFixed(1)}x faster with WASM SIMD128`);
+        }
+
+        // Store test
+        async function runStoreTest() {
+            if (!wasmModule) return;
+
+            const dims = parseInt(document.getElementById('dims-select').value);
+            const count = parseInt(document.getElementById('count-select').value);
+
+            const btn = document.getElementById('run-store-test');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            try {
+                const config = new wasmModule.EdgeVecConfig(dims);
+                const store = new wasmModule.EdgeVec(config);
+                setResult('store-create', `SUCCESS (dim=${dims})`, 'pass');
+
+                // Generate vectors
+                const vectors = [];
+                for (let i = 0; i < count; i++) {
+                    vectors.push(new Float32Array(dims).map(() => Math.random() * 2 - 1));
+                }
+
+                // Insert
+                const startInsert = performance.now();
+                for (const v of vectors) {
+                    store.insert(v);
+                }
+                const insertTime = performance.now() - startInsert;
+                setResult('insert-time', `${insertTime.toFixed(2)}ms (${(count / insertTime * 1000).toFixed(0)} vec/s)`, 'pass');
+
+                // Search
+                const query = new Float32Array(dims).map(() => Math.random() * 2 - 1);
+                const searchTimes = [];
+
+                for (let i = 0; i < 100; i++) {
+                    const start = performance.now();
+                    store.search(query, 10);
+                    searchTimes.push(performance.now() - start);
+                }
+
+                const totalSearchTime = searchTimes.reduce((a, b) => a + b, 0);
+                const avgLatency = totalSearchTime / searchTimes.length;
+                const sortedTimes = [...searchTimes].sort((a, b) => a - b);
+                const p99Latency = sortedTimes[Math.floor(searchTimes.length * 0.99)];
+
+                setResult('search-time', `${totalSearchTime.toFixed(2)}ms total`, 'pass');
+                setResult('avg-latency', `${avgLatency.toFixed(3)}ms (P99: ${p99Latency.toFixed(3)}ms)`, 'pass');
+
+                store.free();
+            } catch (e) {
+                console.error('Store test error:', e);
+                setResult('store-create', `FAILED: ${e.message}`, 'fail');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Run Store Test';
+        }
+
+        function showSummary(type, text) {
+            const summary = document.getElementById('summary');
+            const summaryText = document.getElementById('summary-text');
+            summary.style.display = 'block';
+            summary.className = type === 'error' ? 'summary error' : 'summary';
+            summaryText.textContent = text;
+            summaryText.style.whiteSpace = 'pre-line';
+        }
+
+        // Event listeners
+        document.getElementById('run-benchmark').addEventListener('click', runHammingBenchmark);
+        document.getElementById('run-all-sizes').addEventListener('click', runAllSizes);
+        document.getElementById('run-store-test').addEventListener('click', runStoreTest);
+        document.getElementById('bytes-select').addEventListener('change', runHammingBenchmark);
+        document.getElementById('iterations-select').addEventListener('change', runHammingBenchmark);
+
+        // Init on load
+        init();
+    </script>
+</body>
+</html>
