@@ -16,11 +16,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.7.0] - 2025-12-24 — SIMD Acceleration + Filter Playground
+## [0.7.0] - 2025-12-27 — SIMD Acceleration + First Community Contribution
 
-**Focus:** Performance optimization and developer experience — 2x+ faster WASM operations via SIMD, interactive filter playground for learning.
+**Focus:** Performance optimization via SIMD and celebrating our first external contributor!
 
 ### Added
+
+#### Community Contribution 🎉
+
+- **WASM SIMD128 Hamming Distance** — 8.75x faster binary distance calculations
+  - LUT-based popcount algorithm (Warren, "Hacker's Delight", 2nd ed.)
+  - Comprehensive test coverage (10 tests including edge cases)
+  - Thanks to **[@jsonMartin](https://github.com/jsonMartin)** for this excellent first contribution!
+
+- **AVX2 Native Hamming Distance** — Native popcount for x86_64
+  - 4-way ILP optimization with separate accumulators
+  - Also contributed by **@jsonMartin**
 
 #### WASM SIMD Acceleration
 - **SIMD128 enabled by default** — 2x+ faster vector operations on modern browsers
@@ -34,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | 128D | 2.3x | 55ns dot product |
   | 768D | 2.1x | 374ns dot product |
   | 1536D | 2.0x | 761ns dot product |
+  | Hamming | **8.75x** | 40ns (768-bit) — @jsonMartin |
 
 - **Browser compatibility:**
   | Browser | SIMD | Status |
@@ -750,7 +762,7 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
-| 0.7.0 | 2025-12-24 | **SIMD Acceleration** (2x+ speedup), Interactive Filter Playground |
+| 0.7.0 | 2025-12-27 | **SIMD Acceleration** (2x+), **First Community Contribution** (@jsonMartin — 8.75x Hamming) |
 | 0.6.0 | 2025-12-22 | **RFC-002:** Binary Quantization (32x memory), Metadata Storage, Memory Pressure |
 | 0.5.4 | 2025-12-20 | iOS Safari compatibility fixes |
 | 0.5.3 | 2025-12-19 | **FIX:** crates.io publishing (package size reduction) |

@@ -319,7 +319,7 @@ For these use cases, consider [Pinecone](https://pinecone.io), [Qdrant](https://
 
 ## Version History
 
-- **v0.7.0** — SIMD acceleration (2x+ speedup), WASM SIMD128 enabled for dim >= 16
+- **v0.7.0** — SIMD acceleration (2x+ speedup), **First Community Contribution** (@jsonMartin — 8.75x Hamming)
 - **v0.6.0** — Binary quantization (32x memory), metadata storage, memory pressure API
 - **v0.5.4** — iOS Safari compatibility fixes
 - **v0.5.3** — crates.io publishing fix (package size reduction)
@@ -329,6 +329,16 @@ For these use cases, consider [Pinecone](https://pinecone.io), [Qdrant](https://
 - **v0.3.0** — Soft delete API, compaction, persistence format v3
 - **v0.2.0** — Scalar quantization (SQ8), SIMD optimization
 - **v0.1.0** — Initial release with HNSW indexing
+
+---
+
+## Contributors
+
+Thank you to everyone who has contributed to EdgeVec!
+
+| Contributor | Contribution |
+|:------------|:-------------|
+| [@jsonMartin](https://github.com/jsonMartin) | SIMD Hamming distance (PR #4) — 8.75x speedup |
 
 ---
 

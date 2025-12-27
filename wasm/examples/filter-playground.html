@@ -16,7 +16,7 @@
     <style>
         /* ═══════════════════════════════════════════════════════════════════════════
            EDGEVEC FILTER PLAYGROUND - CYBERPUNK THEME
-           Version: 1.0.0 | Week 24 Day 4
+           Version: 2.0.0 | v0.7.0 — Live Sandbox + Performance Timing
            ═══════════════════════════════════════════════════════════════════════════ */
 
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -876,6 +876,119 @@
                 justify-content: center;
             }
         }
+
+        /* ═══════════════════════════════════════════════════════════════════════════
+           LIVE SANDBOX STYLES (v0.7.0)
+           ═══════════════════════════════════════════════════════════════════════════ */
+
+        .sandbox-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .sandbox-panel h3 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--cyan);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .sandbox-controls {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .sandbox-controls button {
+            font-family: 'JetBrains Mono', monospace;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--white);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .sandbox-controls button:hover:not(:disabled) {
+            border-color: var(--cyan);
+            box-shadow: var(--glow-cyan);
+        }
+
+        .sandbox-controls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .sandbox-controls button.btn-success {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .sandbox-status {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--gray-200);
+            padding: 0.75rem;
+            background: var(--bg-input);
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .sandbox-status.success {
+            border-left: 3px solid var(--green);
+            color: var(--green);
+        }
+
+        .sandbox-status.error {
+            border-left: 3px solid var(--red);
+            color: var(--red);
+        }
+
+        .sandbox-results {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .performance-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .perf-stat {
+            text-align: center;
+        }
+
+        .perf-stat .label {
+            font-size: 0.7rem;
+            color: var(--gray-200);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .perf-stat .value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--cyan);
+        }
+
+        .perf-stat .value.fast {
+            color: var(--green);
+        }
+
+        .perf-stat .value.slow {
+            color: var(--orange);
+        }
     </style>
 </head>
 <body>
@@ -992,12 +1105,51 @@
                     <div id="json-output" class="output-content"></div>
                 </div>
             </section>
+
+            <!-- Live Sandbox Panel (v0.7.0) -->
+            <section class="panel sandbox-panel" aria-labelledby="sandbox-title">
+                <h3 id="sandbox-title">🔬 Live Sandbox</h3>
+                <p style="color: var(--gray-200); font-size: 0.85rem; margin-bottom: 1rem;">
+                    Execute your filter against real EdgeVec data in WebAssembly
+                </p>
+
+                <div class="sandbox-controls">
+                    <button id="init-sandbox" aria-label="Initialize WASM sandbox">Initialize WASM</button>
+                    <button id="load-data" disabled aria-label="Load sample vectors">Load 1000 Vectors</button>
+                    <button id="run-filter" disabled aria-label="Execute current filter">Execute Filter</button>
+                </div>
+
+                <div id="sandbox-status" class="sandbox-status">
+                    Click "Initialize WASM" to start the live sandbox
+                </div>
+
+                <div class="performance-panel" id="perf-panel" style="display: none;">
+                    <div class="perf-stat">
+                        <div class="label">Parse Time</div>
+                        <div class="value" id="perf-parse">-</div>
+                    </div>
+                    <div class="perf-stat">
+                        <div class="label">Execute Time</div>
+                        <div class="value" id="perf-execute">-</div>
+                    </div>
+                    <div class="perf-stat">
+                        <div class="label">Results</div>
+                        <div class="value" id="perf-results">-</div>
+                    </div>
+                    <div class="perf-stat">
+                        <div class="label">Vectors</div>
+                        <div class="value" id="perf-vectors">-</div>
+                    </div>
+                </div>
+
+                <div id="sandbox-results" class="sandbox-results"></div>
+            </section>
         </main>
 
         <!-- Footer -->
         <footer class="footer">
             <p>
-                EdgeVec v0.5.0 |
+                EdgeVec v0.7.0 |
                 <a href="https://github.com/matte1782/edgevec" target="_blank" rel="noopener noreferrer">GitHub</a> |
                 <a href="../../docs/api/FILTER_SYNTAX.md" target="_blank">Filter Syntax Docs</a>
             </p>
@@ -1008,7 +1160,7 @@
     <script type="module">
         // ═══════════════════════════════════════════════════════════════════════════
         // EDGEVEC FILTER PLAYGROUND - JAVASCRIPT
-        // Version: 1.0.0 | Week 24 Day 4
+        // Version: 2.0.0 | v0.7.0 — Live Sandbox + Performance Timing
         // ═══════════════════════════════════════════════════════════════════════════
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -1691,6 +1843,215 @@
             if (charCount) {
                 charCount.textContent = filterInput.value.length;
             }
+        });
+
+        // ═══════════════════════════════════════════════════════════════════════════
+        // LIVE SANDBOX (v0.7.0)
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        class LiveSandbox {
+            constructor() {
+                this.db = null;
+                this.initialized = false;
+                this.vectorCount = 0;
+            }
+
+            async init() {
+                if (!wasmModule) {
+                    return { success: false, error: 'WASM module not loaded' };
+                }
+
+                try {
+                    const config = new wasmModule.EdgeVecConfig(128);
+                    this.db = new wasmModule.EdgeVec(config);
+                    this.initialized = true;
+                    return { success: true };
+                } catch (e) {
+                    console.error('LiveSandbox init failed:', e);
+                    return { success: false, error: e.message };
+                }
+            }
+
+            async loadSampleData(count = 1000) {
+                if (!this.initialized) {
+                    const result = await this.init();
+                    if (!result.success) return result;
+                }
+
+                const categories = ['electronics', 'clothing', 'books', 'home', 'sports'];
+                const tags = ['featured', 'sale', 'new', 'popular', 'limited'];
+
+                const startTime = performance.now();
+
+                for (let i = 0; i < count; i++) {
+                    // Generate random embedding
+                    const embedding = new Float32Array(128);
+                    for (let j = 0; j < 128; j++) {
+                        embedding[j] = Math.random() * 2 - 1;
+                    }
+
+                    // Generate sample metadata matching example filters
+                    const metadata = {
+                        category: categories[i % categories.length],
+                        price: Math.floor(Math.random() * 900) + 10,
+                        rating: Math.round((Math.random() * 2 + 3) * 10) / 10,
+                        in_stock: Math.random() > 0.2,
+                        status: ['active', 'pending', 'review', 'archived'][Math.floor(Math.random() * 4)],
+                        tags: [tags[Math.floor(Math.random() * tags.length)]]
+                    };
+
+                    this.db.insertWithMetadata(embedding, metadata);
+                    this.vectorCount++;
+                }
+
+                const elapsed = performance.now() - startTime;
+                return {
+                    success: true,
+                    count: this.vectorCount,
+                    elapsed: elapsed.toFixed(1)
+                };
+            }
+
+            async executeFilter(filterExpr, k = 10) {
+                if (!this.initialized || this.vectorCount === 0) {
+                    return { success: false, error: 'Load sample data first' };
+                }
+
+                // Generate random query vector
+                const query = new Float32Array(128);
+                for (let i = 0; i < 128; i++) {
+                    query[i] = Math.random() * 2 - 1;
+                }
+
+                // First, validate the filter syntax
+                const parseStart = performance.now();
+                try {
+                    wasmModule.parse_filter_js(filterExpr);
+                } catch (e) {
+                    return { success: false, error: `Parse error: ${e.message}` };
+                }
+                const parseTime = performance.now() - parseStart;
+
+                // Execute the filtered search using searchWithFilter API
+                // Signature: searchWithFilter(query: Float32Array, filter: string, k: number)
+                const executeStart = performance.now();
+                try {
+                    const results = this.db.searchWithFilter(query, filterExpr, k);
+                    const executeTime = performance.now() - executeStart;
+
+                    return {
+                        success: true,
+                        results: Array.isArray(results) ? results.length : 0,
+                        parseTime: parseTime.toFixed(2),
+                        executeTime: executeTime.toFixed(2),
+                        vectorCount: this.vectorCount
+                    };
+                } catch (e) {
+                    return { success: false, error: `Execute error: ${e.message}` };
+                }
+            }
+
+            getStats() {
+                return {
+                    initialized: this.initialized,
+                    vectorCount: this.vectorCount
+                };
+            }
+        }
+
+        // Global sandbox instance
+        const sandbox = new LiveSandbox();
+
+        // Sandbox UI handlers
+        const initSandboxBtn = document.getElementById('init-sandbox');
+        const loadDataBtn = document.getElementById('load-data');
+        const runFilterBtn = document.getElementById('run-filter');
+        const sandboxStatus = document.getElementById('sandbox-status');
+        const perfPanel = document.getElementById('perf-panel');
+        const sandboxResults = document.getElementById('sandbox-results');
+
+        function updateSandboxStatus(message, type = '') {
+            sandboxStatus.textContent = message;
+            sandboxStatus.className = 'sandbox-status' + (type ? ' ' + type : '');
+        }
+
+        function updatePerformance(parseMs, executeMs, resultCount, totalVectors) {
+            const perfParse = document.getElementById('perf-parse');
+            const perfExecute = document.getElementById('perf-execute');
+            const perfResults = document.getElementById('perf-results');
+            const perfVectors = document.getElementById('perf-vectors');
+
+            perfParse.textContent = parseMs + 'ms';
+            perfParse.className = 'value' + (parseFloat(parseMs) < 1 ? ' fast' : '');
+
+            perfExecute.textContent = executeMs + 'ms';
+            perfExecute.className = 'value' + (parseFloat(executeMs) < 10 ? ' fast' : parseFloat(executeMs) > 50 ? ' slow' : '');
+
+            perfResults.textContent = resultCount;
+            perfVectors.textContent = totalVectors;
+
+            perfPanel.style.display = 'grid';
+        }
+
+        initSandboxBtn.addEventListener('click', async () => {
+            initSandboxBtn.disabled = true;
+            updateSandboxStatus('Initializing WASM sandbox...');
+
+            const result = await sandbox.init();
+
+            if (result.success) {
+                updateSandboxStatus('✓ Sandbox initialized. Ready to load data.', 'success');
+                initSandboxBtn.textContent = '✓ Initialized';
+                initSandboxBtn.classList.add('btn-success');
+                loadDataBtn.disabled = false;
+            } else {
+                updateSandboxStatus('✗ ' + result.error, 'error');
+                initSandboxBtn.disabled = false;
+            }
+        });
+
+        loadDataBtn.addEventListener('click', async () => {
+            loadDataBtn.disabled = true;
+            updateSandboxStatus('Loading 1000 sample vectors...');
+
+            const result = await sandbox.loadSampleData(1000);
+
+            if (result.success) {
+                updateSandboxStatus(`✓ Loaded ${result.count} vectors in ${result.elapsed}ms. Ready to execute filters.`, 'success');
+                loadDataBtn.textContent = `✓ ${result.count} Loaded`;
+                loadDataBtn.classList.add('btn-success');
+                runFilterBtn.disabled = false;
+
+                // Update vectors count
+                document.getElementById('perf-vectors').textContent = result.count;
+                perfPanel.style.display = 'grid';
+            } else {
+                updateSandboxStatus('✗ ' + result.error, 'error');
+                loadDataBtn.disabled = false;
+            }
+        });
+
+        runFilterBtn.addEventListener('click', async () => {
+            const filterExpr = filterInput.value.trim();
+
+            if (!filterExpr) {
+                updateSandboxStatus('Enter a filter expression above first', 'error');
+                return;
+            }
+
+            runFilterBtn.disabled = true;
+            updateSandboxStatus('Executing filter...');
+
+            const result = await sandbox.executeFilter(filterExpr);
+
+            if (result.success) {
+                updateSandboxStatus(`✓ Filter executed: ${result.results} matches found`, 'success');
+                updatePerformance(result.parseTime, result.executeTime, result.results, result.vectorCount);
+            } else {
+                updateSandboxStatus('✗ ' + result.error, 'error');
+            }
+
+            runFilterBtn.disabled = false;
         });
 
         // ═══════════════════════════════════════════════════════════════════════════

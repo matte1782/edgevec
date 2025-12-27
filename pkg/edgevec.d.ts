@@ -1372,6 +1372,32 @@ export class WasmCompactionResult {
 }
 
 /**
+ * Microbenchmark: measure raw Hamming distance speed.
+ * Returns time in microseconds for `iterations` distance calculations.
+ */
+export function benchmarkHamming(bytes: number, iterations: number): number;
+
+/**
+ * Side-by-side benchmark: New WASM SIMD128 vs Current runtime dispatcher.
+ *
+ * Compares:
+ * 1. **New** (`metric::simd::hamming_distance`): Compile-time SIMD128 detection → uses WASM SIMD
+ * 2. **Current** (`simd::popcount::simd_popcount_xor`): Runtime detection → falls to scalar in WASM
+ *
+ * Returns a JSON string with timings:
+ * ```json
+ * {"new_us": 0.15, "current_us": 0.42, "speedup": 2.8, "new_backend": "wasm_simd128", "current_backend": "scalar"}
+ * ```
+ */
+export function benchmarkHammingComparison(bytes: number, iterations: number): string;
+
+/**
+ * Get the SIMD backend being used for distance calculations.
+ * Returns: "wasm_simd128", "avx2", or "scalar"
+ */
+export function getSimdBackend(): string;
+
+/**
  * Get filter information (complexity, fields, operators).
  *
  * # Arguments
@@ -1508,6 +1534,8 @@ export interface InitOutput {
   readonly batchinsertresult_ids: (a: number, b: number) => void;
   readonly batchinsertresult_inserted: (a: number) => number;
   readonly batchinsertresult_total: (a: number) => number;
+  readonly benchmarkHamming: (a: number, b: number) => number;
+  readonly benchmarkHammingComparison: (a: number, b: number, c: number) => void;
   readonly edgevec_canInsert: (a: number) => number;
   readonly edgevec_compact: (a: number, b: number) => void;
   readonly edgevec_compactionThreshold: (a: number) => number;
@@ -1557,6 +1585,7 @@ export interface InitOutput {
   readonly edgevecconfig_set_m: (a: number, b: number) => void;
   readonly edgevecconfig_set_m0: (a: number, b: number) => void;
   readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
+  readonly getSimdBackend: (a: number) => void;
   readonly get_filter_info_js: (a: number, b: number, c: number) => void;
   readonly init_logging: () => void;
   readonly jsmetadatavalue_asBoolean: (a: number) => number;
@@ -1588,9 +1617,9 @@ export interface InitOutput {
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
   readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
-  readonly __wasm_bindgen_func_elem_1731: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_1715: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_2243: (a: number, b: number, c: number, d: number) => void;
+  readonly __wasm_bindgen_func_elem_1747: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_1731: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_2259: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export3: (a: number) => void;
