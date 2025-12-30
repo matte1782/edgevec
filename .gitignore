@@ -70,3 +70,6 @@ NUL
 .cursor/
 .cursorrules
 CLAUDE.md
+
+# Playwright MCP test screenshots
+.playwright-mcp/
