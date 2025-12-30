@@ -289,12 +289,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_1731(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_1731(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_1747(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_1747(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_2243(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_2243(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_2259(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_2259(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -2653,6 +2653,72 @@ export class WasmCompactionResult {
 if (Symbol.dispose) WasmCompactionResult.prototype[Symbol.dispose] = WasmCompactionResult.prototype.free;
 
 /**
+ * Microbenchmark: measure raw Hamming distance speed.
+ * Returns time in microseconds for `iterations` distance calculations.
+ * @param {number} bytes
+ * @param {number} iterations
+ * @returns {number}
+ */
+export function benchmarkHamming(bytes, iterations) {
+    const ret = wasm.benchmarkHamming(bytes, iterations);
+    return ret;
+}
+
+/**
+ * Side-by-side benchmark: New WASM SIMD128 vs Current runtime dispatcher.
+ *
+ * Compares:
+ * 1. **New** (`metric::simd::hamming_distance`): Compile-time SIMD128 detection → uses WASM SIMD
+ * 2. **Current** (`simd::popcount::simd_popcount_xor`): Runtime detection → falls to scalar in WASM
+ *
+ * Returns a JSON string with timings:
+ * ```json
+ * {"new_us": 0.15, "current_us": 0.42, "speedup": 2.8, "new_backend": "wasm_simd128", "current_backend": "scalar"}
+ * ```
+ * @param {number} bytes
+ * @param {number} iterations
+ * @returns {string}
+ */
+export function benchmarkHammingComparison(bytes, iterations) {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        wasm.benchmarkHammingComparison(retptr, bytes, iterations);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        deferred1_0 = r0;
+        deferred1_1 = r1;
+        return getStringFromWasm0(r0, r1);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
+ * Get the SIMD backend being used for distance calculations.
+ * Returns: "wasm_simd128", "avx2", or "scalar"
+ * @returns {string}
+ */
+export function getSimdBackend() {
+    let deferred1_0;
+    let deferred1_1;
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        wasm.getSimdBackend(retptr);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        deferred1_0 = r0;
+        deferred1_1 = r1;
+        return getStringFromWasm0(r0, r1);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+        wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
+    }
+}
+
+/**
  * Get filter information (complexity, fields, operators).
  *
  * # Arguments
@@ -3114,7 +3180,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_2243(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_2259(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -3277,7 +3343,7 @@ function __wbg_get_imports() {
     };
     imports.wbg.__wbindgen_cast_f0471e20a57dc27a = function(arg0, arg1) {
         // Cast intrinsic for `Closure(Closure { dtor_idx: 127, function: Function { arguments: [Externref], shim_idx: 128, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_1715, __wasm_bindgen_func_elem_1731);
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_1731, __wasm_bindgen_func_elem_1747);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_object_clone_ref = function(arg0) {

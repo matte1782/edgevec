@@ -602,7 +602,7 @@
         <a href="soft_delete.html" class="card">
           <div class="card__header">
             <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.3.0</span>
+              <span class="card__badge card__badge--version">v0.7.0</span>
             </div>
             <div class="card__arrow">
               <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -646,18 +646,19 @@
             <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </div>
           <h2 class="card__title">SIMD_BENCHMARK</h2>
-          <p class="card__desc">Measure WASM SIMD128. Vectorized vs scalar.</p>
-          <p class="card__meta">SIMD128 // 2x+ Speedup</p>
+          <p class="card__desc">Measure WASM SIMD128 acceleration. Includes @jsonMartin's 8.75x faster Hamming distance.</p>
+          <p class="card__meta">SIMD128 // 2x+ Speedup // Contribution</p>
           <div class="card__features">
             <span class="card__feature">Throughput</span>
-            <span class="card__feature">Latency</span>
+            <span class="card__feature">Hamming</span>
+            <span class="card__feature">@jsonMartin</span>
           </div>
         </a>
 
         <a href="benchmark_dashboard.html" class="card">
           <div class="card__header">
             <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.4.0</span>
+              <span class="card__badge card__badge--version">v0.7.0</span>
             </div>
             <div class="card__arrow">
               <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -681,13 +682,14 @@
 
   <!-- Footer -->
   <footer class="footer">
-    <div class="footer__brand">EDGEVEC</div>
+    <div class="footer__brand">EDGEVEC v0.7.0</div>
     <div class="footer__links">
       <a href="https://github.com/matte1782/edgevec" class="footer__link">GitHub</a>
       <a href="https://www.npmjs.com/package/edgevec" class="footer__link">npm</a>
       <a href="https://crates.io/crates/edgevec" class="footer__link">crates.io</a>
     </div>
     <p class="footer__copy">Rust + WebAssembly // MIT License</p>
+    <p class="footer__copy" style="margin-top: 8px; opacity: 0.7; font-size: 11px;">Created by Matteo Panzeri // Student at University of Pavia // BSc in AI</p>
   </footer>
 
   <!-- Matrix Rain Script -->
