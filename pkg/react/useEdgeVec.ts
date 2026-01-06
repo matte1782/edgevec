@@ -142,17 +142,6 @@ export function useEdgeVec(options: UseEdgeVecOptions): UseEdgeVecResult {
     };
   }, [initialize]);
 
-  // Update stats when db changes (for external mutations)
-  const updateStats = useCallback(() => {
-    const db = dbRef.current;
-    if (db && mountedRef.current) {
-      setStats({
-        count: db.size,
-        dimensions: db.dimensions,
-      });
-    }
-  }, []);
-
   return {
     db: dbRef.current,
     isReady,
