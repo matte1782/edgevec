@@ -1,6 +1,3 @@
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_precision_loss)]
-
 //! Binary quantization search for HNSW (v0.7.0 - RFC-002 Phase 2).
 //!
 //! This module provides fast approximate search using Hamming distance
@@ -14,6 +11,19 @@
 //! 3. Return top-k candidates sorted by Hamming distance
 //! 4. Convert Hamming distance to approximate similarity
 //!
+//! # Lint Suppressions
+//!
+//! - **cast_possible_truncation**: Hamming distances are `u32` (max 768 bits = 96 bytes).
+//!   Node IDs are `u32` (max 4B vectors). Result set sizes are bounded by `ef` parameter.
+//!
+//! - **cast_precision_loss**: Distance-to-similarity conversion uses `f32` which is
+//!   sufficient precision for ranking results.
+
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_precision_loss)]
+// Note: Example section follows in the original module docs below.
+// The doc comments were split by the lint allows - this is intentional Rust style.
+
 //! # Example
 //!
 //! ```

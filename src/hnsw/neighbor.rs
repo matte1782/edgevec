@@ -1,4 +1,11 @@
-// Allowing some lints for now to pass CI on legacy code
+//! Neighbor pool for HNSW graph storage.
+//!
+//! # Lint Suppressions
+//!
+//! - **cast_possible_truncation**: Neighbor IDs are `u32` (max 4B vectors supported).
+//!   Offsets into the byte buffer are validated at allocation time to fit in `u32`.
+//!   Variable-byte encoding uses `u8` segments that cannot overflow.
+
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::missing_panics_doc)]

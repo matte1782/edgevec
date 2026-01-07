@@ -1,3 +1,20 @@
+//! HNSW graph implementation.
+//!
+//! # Lint Suppressions
+//!
+//! This module suppresses several numeric cast lints at the module level because:
+//!
+//! - **cast_possible_truncation**: The HNSW algorithm uses `u32` for node IDs and neighbor
+//!   indices. While `usize` is used for array indexing, all values are validated to fit in
+//!   `u32` at insertion time. Maximum supported index size is 4 billion vectors.
+//!
+//! - **cast_precision_loss**: Float calculations for level assignment use `f64` internally
+//!   and convert to `usize` for layer counts. Precision loss is acceptable as layers are
+//!   discrete integers (typically 0-16).
+//!
+//! - **cast_sign_loss**: Some internal calculations use signed intermediates that are
+//!   guaranteed non-negative by algorithm invariants.
+
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_sign_loss)]
