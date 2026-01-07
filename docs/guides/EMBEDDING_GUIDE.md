@@ -273,13 +273,13 @@ class EmbeddingService {
         return embeddings;
     }
 
-    insert(embedding, metadata = null) {
+    add(embedding, metadata = null) {
         return this.db.add(embedding, metadata);
     }
 
     search(queryEmbedding, k = 10, filter = null) {
         if (filter) {
-            return this.db.search_with_filter(queryEmbedding, k, filter);
+            return this.db.search(queryEmbedding, k, { filter });
         }
         return this.db.search(queryEmbedding, k);
     }
@@ -300,7 +300,7 @@ const vector = await service.embed("Your document text");
 const id = service.add(vector, { category: 'notes', date: '2025-01-15' });
 
 const queryVector = await service.embed("search query");
-const results = service.search(queryVector, 5);
+const results = await service.search(queryVector, 5);
 ```
 
 ---
@@ -373,7 +373,7 @@ class OpenAIEmbeddingService {
         return data.data.map(item => new Float32Array(item.embedding));
     }
 
-    insert(embedding, metadata = null) {
+    add(embedding, metadata = null) {
         return this.db.add(embedding, metadata);
     }
 
@@ -455,7 +455,7 @@ class CohereEmbeddingService {
         return this.embed(text, 'search_query');
     }
 
-    insert(embedding, metadata = null) {
+    add(embedding, metadata = null) {
         return this.db.add(embedding, metadata);
     }
 
@@ -473,7 +473,7 @@ const docVector = await service.embedForStorage("Document to store");
 const id = service.add(docVector);
 
 const queryVector = await service.embedForQuery("Search query");
-const results = service.search(queryVector, 5);
+const results = await service.search(queryVector, 5);
 ```
 
 ---
@@ -542,7 +542,7 @@ class HuggingFaceEmbeddingService {
         return new Float32Array(embedding);
     }
 
-    insert(embedding, metadata = null) {
+    add(embedding, metadata = null) {
         return this.db.add(embedding, metadata);
     }
 
@@ -706,7 +706,7 @@ class WorkerEmbeddingService {
         });
     }
 
-    insert(embedding, metadata = null) {
+    add(embedding, metadata = null) {
         return this.db.add(embedding, metadata);
     }
 
@@ -900,7 +900,7 @@ class SemanticNotes {
 
     async search(query, limit = 5) {
         const queryVector = await this.embed(query);
-        const results = this.db.search(queryVector, limit);
+        const results = await this.db.search(queryVector, limit);
 
         return results.map(r => ({
             id: r.id,
@@ -913,7 +913,7 @@ class SemanticNotes {
     async searchByDate(query, startDate, endDate, limit = 10) {
         const queryVector = await this.embed(query);
         const filter = `createdAt >= ${startDate} AND createdAt <= ${endDate}`;
-        const results = this.db.search_with_filter(queryVector, limit, filter);
+        const results = await this.db.search(queryVector, limit, { filter });
 
         return results.map(r => ({
             id: r.id,
@@ -985,7 +985,7 @@ class FAQBot {
 
     async answer(userQuestion, threshold = 0.5) {
         const queryVector = await this.embed(userQuestion);
-        const results = this.db.search(queryVector, 3);
+        const results = await this.db.search(queryVector, 3);
 
         if (results.length === 0 || results[0].score < threshold) {
             return {
@@ -1102,7 +1102,7 @@ class ImageSearch {
 
     async searchByText(query, limit = 10) {
         const queryVector = await this.embedText(query);
-        const results = this.db.search(queryVector, limit);
+        const results = await this.db.search(queryVector, limit);
 
         return results.map(r => ({
             id: r.id,
@@ -1113,7 +1113,7 @@ class ImageSearch {
 
     async searchByImage(imageUrl, limit = 10) {
         const queryVector = await this.embedImage(imageUrl);
-        const results = this.db.search(queryVector, limit);
+        const results = await this.db.search(queryVector, limit);
 
         return results.map(r => ({
             id: r.id,

@@ -81,6 +81,32 @@ None.
 
 ---
 
+## Iteration 2 Issues — RESOLVED
+
+### Critical (2) — RESOLVED
+
+**[C1] Non-existent API: `search_with_filter` — FIXED**
+- **Location:** `docs/guides/EMBEDDING_GUIDE.md` lines 282, 916
+- **Description:** Used `search_with_filter()` which doesn't exist
+- **Resolution:** Changed to `search(query, k, { filter })`
+- **Status:** ✅ RESOLVED
+
+**[C2] Method name mismatch — FIXED**
+- **Location:** `docs/guides/EMBEDDING_GUIDE.md` lines 276, 376, 458, 545, 709
+- **Description:** Classes defined `insert()` but usage called `add()`
+- **Resolution:** Changed all method definitions to `add()`
+- **Status:** ✅ RESOLVED
+
+### Major (1) — RESOLVED
+
+**[M1] Missing `await` on async operations — FIXED**
+- **Location:** `docs/guides/EMBEDDING_GUIDE.md` lines 303, 476, 903, 988, 1105, 1116
+- **Description:** `db.search()` and `service.search()` calls missing `await`
+- **Resolution:** Added `await` to all search calls
+- **Status:** ✅ RESOLVED
+
+---
+
 ## Acceptance Criteria Verification
 
 ### Week 34 Exit Criteria
