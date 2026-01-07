@@ -1447,8 +1447,8 @@ mod hamming_tests {
     #[test]
     fn test_hamming_single_bit_diff() {
         // Only one bit differs
-        let a = vec![0b00000000u8];
-        let b = vec![0b00000001u8];
+        let a = vec![0b0000_0000_u8];
+        let b = vec![0b0000_0001_u8];
         assert_eq!(hamming_distance(&a, &b), 1);
     }
 
@@ -1466,9 +1466,11 @@ mod hamming_tests {
     }
 
     #[test]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn test_hamming_matches_scalar() {
         // Test various sizes to exercise SIMD paths
         for size in [1, 15, 16, 17, 31, 32, 33, 63, 64, 65, 96, 128, 192] {
+            // Truncation is intentional: test data wraps at 256
             let a: Vec<u8> = (0..size).map(|i| i as u8).collect();
             let b: Vec<u8> = (0..size).map(|i| (i + 1) as u8).collect();
 
@@ -1477,8 +1479,7 @@ mod hamming_tests {
 
             assert_eq!(
                 simd_result, scalar_result,
-                "Mismatch at size {}: SIMD={}, scalar={}",
-                size, simd_result, scalar_result
+                "Mismatch at size {size}: SIMD={simd_result}, scalar={scalar_result}"
             );
         }
     }
@@ -1486,8 +1487,8 @@ mod hamming_tests {
     #[test]
     fn test_hamming_768bit_binary_vector() {
         // Common binary vector size: 768 bits = 96 bytes
-        let a = vec![0b11110000u8; 96];
-        let b = vec![0b00001111u8; 96];
+        let a = vec![0b1111_0000_u8; 96];
+        let b = vec![0b0000_1111_u8; 96];
         // Each byte has 8 bits different
         assert_eq!(hamming_distance(&a, &b), 96 * 8);
     }
@@ -1503,8 +1504,8 @@ mod hamming_tests {
     #[test]
     fn test_hamming_partial_bit_diffs() {
         // 0b10101010 XOR 0b10100000 = 0b00001010 (2 bits)
-        let a = vec![0b10101010u8; 50];
-        let b = vec![0b10100000u8; 50];
+        let a = vec![0b1010_1010_u8; 50];
+        let b = vec![0b1010_0000_u8; 50];
         assert_eq!(hamming_distance(&a, &b), 50 * 2);
     }
 
@@ -1582,8 +1583,10 @@ mod euclidean_tests {
     }
 
     #[test]
+    #[allow(clippy::cast_precision_loss)]
     fn test_euclidean_matches_scalar() {
         // Test various sizes to exercise SIMD paths
+        // Precision loss is intentional: test data only needs approximate values
         for size in [1, 4, 15, 16, 17, 31, 32, 33, 63, 64, 65, 128, 256, 768] {
             let a: Vec<f32> = (0..size).map(|i| i as f32).collect();
             let b: Vec<f32> = (0..size).map(|i| (i + 1) as f32).collect();
@@ -1593,10 +1596,7 @@ mod euclidean_tests {
 
             assert!(
                 (simd_result - scalar_result).abs() < 1e-3,
-                "Mismatch at size {}: SIMD={}, scalar={}",
-                size,
-                simd_result,
-                scalar_result
+                "Mismatch at size {size}: SIMD={simd_result}, scalar={scalar_result}"
             );
         }
     }

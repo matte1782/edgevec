@@ -542,8 +542,7 @@ mod tests {
         // Should have multiple chunks due to small chunk size
         assert!(
             chunk_count > 1,
-            "Expected multiple chunks, got {}",
-            chunk_count
+            "Expected multiple chunks, got {chunk_count}"
         );
 
         // Header (64) + 5 vectors * 4 dims * 4 bytes (80) + tombstones (1 byte for 5 bits) = 145 bytes
