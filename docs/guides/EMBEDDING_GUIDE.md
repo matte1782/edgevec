@@ -34,15 +34,14 @@ Here's a complete, copy-paste example using **Transformers.js** with the **all-M
 
 ```javascript
 import { pipeline } from '@xenova/transformers';
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 // Initialize embedding model (one-time, ~23MB download, cached in browser)
 const embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
 
 // Initialize EdgeVec (384D to match MiniLM output)
 await init();
-const config = new EdgeVecConfig(384);
-const db = new EdgeVec(config);
+const db = new EdgeVecIndex({ dimensions: 384 });
 
 // Helper: Convert text to embedding
 async function embed(text) {
@@ -60,13 +59,13 @@ const docs = [
 
 for (const doc of docs) {
     const vector = await embed(doc);
-    const id = db.insert(vector);
+    const id = db.add(vector, { text: doc });
     console.log(`Stored: "${doc.substring(0, 30)}..." with ID: ${id}`);
 }
 
 // Search for similar documents
 const queryVector = await embed("How does AI work?");
-const results = db.search(queryVector, 3);
+const results = await db.search(queryVector, 3);
 
 console.log('Top 3 results:', results);
 // Results will show the ML/neural network docs as most similar
@@ -132,7 +131,7 @@ ollama pull nomic-embed-text
 
 **Code Example:**
 ```javascript
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 class OllamaEmbeddingService {
     constructor(model = 'nomic-embed-text') {
@@ -159,8 +158,7 @@ class OllamaEmbeddingService {
         }
 
         await init();
-        const config = new EdgeVecConfig(this.dimension);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: this.dimension });
         console.log(`Ollama service ready with ${this.model} (${this.dimension}D)`);
     }
 
@@ -192,12 +190,12 @@ class OllamaEmbeddingService {
         return embeddings;
     }
 
-    insert(embedding, metadata = null) {
-        return this.db.insert(embedding, metadata);
+    add(embedding, metadata = null) {
+        return this.db.add(embedding, metadata);
     }
 
-    search(queryEmbedding, k = 10) {
-        return this.db.search(queryEmbedding, k);
+    async search(queryEmbedding, k = 10) {
+        return await this.db.search(queryEmbedding, k);
     }
 }
 
@@ -206,10 +204,10 @@ const service = new OllamaEmbeddingService('nomic-embed-text');
 await service.initialize();
 
 const vector = await service.embed("Your document text");
-const id = service.insert(vector, { category: 'notes' });
+const id = service.add(vector, { category: 'notes' });
 
 const queryVector = await service.embed("search query");
-const results = service.search(queryVector, 5);
+const results = await service.search(queryVector, 5);
 ```
 
 **Benefits:**
@@ -231,7 +229,7 @@ const results = service.search(queryVector, 5);
 
 ```javascript
 import { pipeline, env } from '@xenova/transformers';
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 // Optional: Show download progress
 env.allowLocalModels = false;
@@ -252,8 +250,7 @@ class EmbeddingService {
 
         // Initialize EdgeVec
         await init();
-        const config = new EdgeVecConfig(this.dimension);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: this.dimension });
 
         console.log(`Initialized with ${this.modelName} (${this.dimension}D)`);
     }
@@ -277,7 +274,7 @@ class EmbeddingService {
     }
 
     insert(embedding, metadata = null) {
-        return this.db.insert(embedding, metadata);
+        return this.db.add(embedding, metadata);
     }
 
     search(queryEmbedding, k = 10, filter = null) {
@@ -300,7 +297,7 @@ await service.initialize((progress) => {
 
 // Store and search
 const vector = await service.embed("Your document text");
-const id = service.insert(vector, { category: 'notes', date: '2025-01-15' });
+const id = service.add(vector, { category: 'notes', date: '2025-01-15' });
 
 const queryVector = await service.embed("search query");
 const results = service.search(queryVector, 5);
@@ -313,7 +310,7 @@ const results = service.search(queryVector, 5);
 **Best for:** Highest quality embeddings, existing OpenAI integration.
 
 ```javascript
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 // OpenAI Embedding Service
 class OpenAIEmbeddingService {
@@ -328,8 +325,7 @@ class OpenAIEmbeddingService {
 
     async initialize() {
         await init();
-        const config = new EdgeVecConfig(this.dimension);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: this.dimension });
     }
 
     async embed(text) {
@@ -378,7 +374,7 @@ class OpenAIEmbeddingService {
     }
 
     insert(embedding, metadata = null) {
-        return this.db.insert(embedding, metadata);
+        return this.db.add(embedding, metadata);
     }
 
     search(queryEmbedding, k = 10) {
@@ -394,7 +390,7 @@ const service = new OpenAIEmbeddingService(apiKey);
 await service.initialize();
 
 const vector = await service.embed("Your document");
-const id = service.insert(vector);
+const id = service.add(vector);
 
 // Cost estimation: ~$0.02 per 1 million tokens
 // Average document (500 words) ≈ 650 tokens
@@ -410,7 +406,7 @@ const id = service.insert(vector);
 **Best for:** Free tier available, good for experimentation.
 
 ```javascript
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 class CohereEmbeddingService {
     constructor(apiKey, model = 'embed-english-v3.0') {
@@ -424,8 +420,7 @@ class CohereEmbeddingService {
 
     async initialize() {
         await init();
-        const config = new EdgeVecConfig(this.dimension);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: this.dimension });
     }
 
     async embed(text, inputType = 'search_document') {
@@ -461,7 +456,7 @@ class CohereEmbeddingService {
     }
 
     insert(embedding, metadata = null) {
-        return this.db.insert(embedding, metadata);
+        return this.db.add(embedding, metadata);
     }
 
     search(queryEmbedding, k = 10) {
@@ -475,7 +470,7 @@ await service.initialize();
 
 // Use different input types for storage vs queries
 const docVector = await service.embedForStorage("Document to store");
-const id = service.insert(docVector);
+const id = service.add(docVector);
 
 const queryVector = await service.embedForQuery("Search query");
 const results = service.search(queryVector, 5);
@@ -488,7 +483,7 @@ const results = service.search(queryVector, 5);
 **Best for:** Free tier, access to many models.
 
 ```javascript
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 class HuggingFaceEmbeddingService {
     constructor(apiToken, model = 'sentence-transformers/all-MiniLM-L6-v2') {
@@ -501,8 +496,7 @@ class HuggingFaceEmbeddingService {
 
     async initialize() {
         await init();
-        const config = new EdgeVecConfig(this.dimension);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: this.dimension });
     }
 
     async embed(text) {
@@ -549,7 +543,7 @@ class HuggingFaceEmbeddingService {
     }
 
     insert(embedding, metadata = null) {
-        return this.db.insert(embedding, metadata);
+        return this.db.add(embedding, metadata);
     }
 
     search(queryEmbedding, k = 10) {
@@ -562,7 +556,7 @@ const service = new HuggingFaceEmbeddingService('hf_...');
 await service.initialize();
 
 const vector = await service.embed("Your text here");
-const id = service.insert(vector);
+const id = service.add(vector);
 ```
 
 ---
@@ -647,7 +641,7 @@ self.onmessage = async (e) => {
 
 **main.js:**
 ```javascript
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 class WorkerEmbeddingService {
     constructor(model = 'Xenova/all-MiniLM-L6-v2') {
@@ -690,8 +684,7 @@ class WorkerEmbeddingService {
         this.onProgress = onProgress;
 
         await init();
-        const config = new EdgeVecConfig(this.dimension);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: this.dimension });
 
         return new Promise((resolve) => {
             this.onReady = resolve;
@@ -714,7 +707,7 @@ class WorkerEmbeddingService {
     }
 
     insert(embedding, metadata = null) {
-        return this.db.insert(embedding, metadata);
+        return this.db.add(embedding, metadata);
     }
 
     search(queryEmbedding, k = 10) {
@@ -734,7 +727,7 @@ await service.initialize((progress) => {
 
 // This won't freeze the UI
 const vector = await service.embed("Long document text...");
-const id = service.insert(vector);
+const id = service.add(vector);
 ```
 
 ---
@@ -817,7 +810,7 @@ const texts = ["doc1", "doc2", "doc3", /* ... hundreds more ... */];
 const embeddings = await embedBatch(embedder, texts);
 
 for (let i = 0; i < embeddings.length; i++) {
-    db.insert(embeddings[i], { docIndex: i });
+    db.add(embeddings[i], { docIndex: i });
 }
 ```
 
@@ -829,17 +822,17 @@ for (let i = 0; i < embeddings.length; i++) {
 
 ```javascript
 // ❌ WRONG: Dimension mismatch will cause errors
-const config = new EdgeVecConfig(768);  // EdgeVec expects 768D
+const db = new EdgeVecIndex({ dimensions: 768 });  // EdgeVec expects 768D
 const embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
 // MiniLM outputs 384D — MISMATCH!
 
 // ✅ CORRECT: Dimensions match
-const config = new EdgeVecConfig(384);  // EdgeVec expects 384D
+const db = new EdgeVecIndex({ dimensions: 384 });  // EdgeVec expects 384D
 const embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
 // MiniLM outputs 384D — MATCH ✓
 
 // ✅ ALSO CORRECT: Higher dimension model
-const config = new EdgeVecConfig(768);  // EdgeVec expects 768D
+const db = new EdgeVecIndex({ dimensions: 768 });  // EdgeVec expects 768D
 const embedder = await pipeline('feature-extraction', 'Xenova/bge-base-en-v1.5');
 // BGE-base outputs 768D — MATCH ✓
 ```
@@ -864,7 +857,7 @@ A complete personal notes app with semantic search:
 
 ```javascript
 import { pipeline } from '@xenova/transformers';
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 class SemanticNotes {
     constructor() {
@@ -882,8 +875,7 @@ class SemanticNotes {
 
         // Initialize EdgeVec
         await init();
-        const config = new EdgeVecConfig(384);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: 384 });
 
         console.log('Semantic Notes ready!');
     }
@@ -898,7 +890,7 @@ class SemanticNotes {
 
     async addNote(text, metadata = {}) {
         const vector = await this.embed(text);
-        const id = this.db.insert(vector, {
+        const id = this.db.add(vector, {
             ...metadata,
             createdAt: Date.now()
         });
@@ -955,7 +947,7 @@ Match user questions to pre-defined FAQ answers:
 
 ```javascript
 import { pipeline } from '@xenova/transformers';
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 class FAQBot {
     constructor() {
@@ -971,13 +963,12 @@ class FAQBot {
         );
 
         await init();
-        const config = new EdgeVecConfig(384);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: 384 });
 
         // Index all FAQ questions
         for (const faq of faqData) {
             const vector = await this.embed(faq.question);
-            const id = this.db.insert(vector);
+            const id = this.db.add(vector);
             this.faqs.set(id, faq);
         }
 
@@ -1060,7 +1051,7 @@ Search images by text description using CLIP (multi-modal embeddings):
 
 ```javascript
 import { pipeline } from '@xenova/transformers';
-import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
+import init, { EdgeVecIndex } from 'edgevec';
 
 class ImageSearch {
     constructor() {
@@ -1084,8 +1075,7 @@ class ImageSearch {
         );
 
         await init();
-        const config = new EdgeVecConfig(512);
-        this.db = new EdgeVec(config);
+        this.db = new EdgeVecIndex({ dimensions: 512 });
 
         console.log('Image Search ready!');
     }
@@ -1105,7 +1095,7 @@ class ImageSearch {
 
     async indexImage(imageUrl, metadata = {}) {
         const vector = await this.embedImage(imageUrl);
-        const id = this.db.insert(vector, metadata);
+        const id = this.db.add(vector, metadata);
         this.images.set(id, imageUrl);
         return id;
     }
@@ -1227,7 +1217,7 @@ EdgeVec + Embeddings = Powerful semantic search in the browser.
 **Quick Start Path:**
 1. Install: `npm install edgevec @xenova/transformers`
 2. Use `Xenova/all-MiniLM-L6-v2` (fast, small, good quality)
-3. Match dimension: `new EdgeVecConfig(384)`
+3. Match dimension: `new EdgeVecIndex({ dimensions: 384 })`
 4. Embed → Insert → Search
 
 **Production Path:**

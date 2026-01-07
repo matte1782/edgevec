@@ -498,4 +498,32 @@ export class EdgeVecIndex {
 export { Filter, FilterExpression, MetadataValue } from './filter.js';
 export { FilterBuilder, FieldCondition } from './filter-builder.js';
 
+// Re-export standalone filter functions (v0.8.0)
+export {
+  eq,
+  ne,
+  gt,
+  lt,
+  ge,
+  le,
+  between,
+  contains,
+  startsWith,
+  endsWith,
+  like,
+  inArray,
+  notInArray,
+  any,
+  all,
+  none,
+  isNull,
+  isNotNull,
+  and,
+  or,
+  not,
+  matchAll,
+  matchNone,
+  filter,
+} from './filter.js';
+
 export default EdgeVecIndex;

@@ -628,3 +628,64 @@ export const Filter = {
 };
 
 export default Filter;
+
+// =============================================================================
+// Standalone Function Exports (v0.8.0)
+// =============================================================================
+
+/**
+ * Standalone filter functions for functional composition.
+ *
+ * These are convenience wrappers around Filter.* methods for cleaner imports:
+ * ```typescript
+ * import { eq, and, gt } from 'edgevec';
+ * const f = and(eq('category', 'books'), gt('price', 10));
+ * ```
+ */
+
+// Comparison operators
+export const eq = Filter.eq.bind(Filter);
+export const ne = Filter.ne.bind(Filter);
+export const gt = Filter.gt.bind(Filter);
+export const lt = Filter.lt.bind(Filter);
+export const ge = Filter.ge.bind(Filter);
+export const le = Filter.le.bind(Filter);
+export const between = Filter.between.bind(Filter);
+
+// String operators
+export const contains = Filter.contains.bind(Filter);
+export const startsWith = Filter.startsWith.bind(Filter);
+export const endsWith = Filter.endsWith.bind(Filter);
+export const like = Filter.like.bind(Filter);
+
+// Set/Array operators
+export const inArray = Filter.in.bind(Filter);
+export const notInArray = Filter.notIn.bind(Filter);
+export const any = Filter.any.bind(Filter);
+export const all = Filter.allOf.bind(Filter);
+export const none = Filter.none.bind(Filter);
+
+// Null operators
+export const isNull = Filter.isNull.bind(Filter);
+export const isNotNull = Filter.isNotNull.bind(Filter);
+
+// Logical operators
+export const and = Filter.and.bind(Filter);
+export const or = Filter.or.bind(Filter);
+export const not = Filter.not.bind(Filter);
+
+// Special filters
+export const matchAll = Filter.matchAll;
+export const matchNone = Filter.nothing;
+
+/**
+ * Wrapper to convert filter expression to string for search options.
+ * Useful when you want to be explicit about the conversion.
+ *
+ * @example
+ * const f = filter(and(eq('a', 1), gt('b', 2)));
+ * // f is now a FilterExpression that can be used directly in search
+ */
+export function filter(expr: FilterExpression): FilterExpression {
+  return expr;
+}
