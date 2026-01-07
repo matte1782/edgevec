@@ -5,7 +5,7 @@
  * @version 0.8.0
  */
 
-import type { EdgeVecIndex, SearchResult, SearchOptions } from '../edgevec-wrapper.js';
+import type { EdgeVecIndex, SearchResult } from '../edgevec-wrapper.js';
 import type { FilterExpression } from '../filter.js';
 
 // =============================================================================

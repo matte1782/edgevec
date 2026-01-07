@@ -110,6 +110,7 @@ export function useEdgeVec(options: UseEdgeVecOptions): UseEdgeVecResult {
     dbRef.current = null;
     setIsReady(false);
     setStats(null);
+    setError(null);
     await initialize();
   }, [initialize]);
 

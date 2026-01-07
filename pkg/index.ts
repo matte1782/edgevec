@@ -4,7 +4,7 @@
  * A WebAssembly-powered vector database for Browser, Node, and Edge environments.
  *
  * @module edgevec
- * @version 0.5.2
+ * @version 0.8.0
  *
  * @example
  * ```typescript

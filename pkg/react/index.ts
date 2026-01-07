@@ -8,6 +8,7 @@
  *
  * @example
  * ```tsx
+ * import { useState } from 'react';
  * import { useEdgeVec, useSearch } from 'edgevec/react';
  * import { eq, and, gt } from 'edgevec';
  *
@@ -17,11 +18,14 @@
  *     persistName: 'my-vectors'
  *   });
  *
+ *   // queryEmbedding: your embedding vector from an embedding model
+ *   const [queryEmbedding, setQueryEmbedding] = useState<number[] | null>(null);
+ *
  *   const { results, isSearching, searchTime } = useSearch(db, {
  *     vector: queryEmbedding,
  *     k: 10,
  *     filter: and(eq('category', 'docs'), gt('score', 0.5)),
- *     enabled: isReady,
+ *     enabled: isReady && queryEmbedding !== null,
  *     debounceMs: 300
  *   });
  *

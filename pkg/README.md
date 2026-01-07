@@ -372,6 +372,7 @@ function App() {
 Perform reactive searches that automatically update when the query changes:
 
 ```tsx
+import { useState } from 'react';
 import { useEdgeVec, useSearch } from 'edgevec/react';
 import { eq, and, gt } from 'edgevec';
 

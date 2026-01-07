@@ -122,7 +122,7 @@ export function useSearch(
         setIsSearching(false);
       }
     }
-  }, [db, vector, k, filter, enabled, includeVectors, includeMetadata]);
+  }, [db, vector, k, filterString, enabled, includeVectors, includeMetadata]);
 
   const refetch = useCallback(async () => {
     await executeSearch();
