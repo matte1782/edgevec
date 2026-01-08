@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned (v0.9.0)
-- Community features
+### Planned (v0.9.0) — Community Features
+
+**Flat Index** (RFC from @jsonMartin):
+- O(1) append time (vs HNSW's O(log n))
+- Brute-force exact search (100% recall)
+- Ideal for small-medium datasets
+- True binary vector storage (1-bit per dimension)
+
+**Other planned:**
+- Community features and contributions
 - Additional documentation improvements
 - Performance optimizations
 
