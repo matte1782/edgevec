@@ -1,478 +1,624 @@
-# EdgeVec Roadmap v5.1
+# EdgeVec Roadmap v6.1
 
-**Date:** 2025-12-23
+**Date:** 2026-01-08
 **Author:** PLANNER
-**Status:** [REVISED v2] — v0.6.0 Released, v0.7.0 Plan Optimized + Reddit Feedback Integrated
-**Current Version:** v0.6.0 (released 2025-12-23)
-**Next Version:** v0.7.0 (planned — Week 30, 25.5 hours)
+**Status:** [REVISED] — v0.8.0 Released, v0.9.0-v1.0 Strategic Plan
+**Current Version:** v0.8.0 (released 2026-01-08)
+**Next Version:** v0.9.0 (planned — Weeks 36-41)
 
 ---
 
 ## Executive Summary
 
-**Total Duration:** ~36 Weeks (Dec 2025 – Aug 2026)
-**Current Status:** Week 25 COMPLETE — v0.6.0 Planning Ready
-**Philosophy:** Test-First, WASM-Native, Memory-Constrained
-**Critical Path:** v0.6.0 (Metadata + BQ) → v0.7.0 (Ecosystem) → v1.0 (Production)
+**Total Duration:** ~52 Weeks (Dec 2025 – Dec 2026)
+**Current Status:** v0.8.0 RELEASED — Consolidation complete, developer experience enhanced
+**Philosophy:** Test-First, WASM-Native, Community-Driven
+**Critical Path:** v0.9.0 (Hybrid Search) → v0.10.0 (Advanced Features) → v1.0 (Production)
+
+### Strategic Priorities (2026)
+
+1. **Code Quality:** Consolidate SIMD, reduce technical debt
+2. **Community:** Integrate @jsonMartin's Flat Index, respond to feature requests
+3. **Competitive Edge:** Hybrid search, Product Quantization
+4. **Future-Proofing:** WebGPU exploration, WASM 3.0 relaxed SIMD
 
 ---
 
-## Phase 1: Foundation (Weeks 1-4) — COMPLETE
+## Version Summary
 
-### Milestone 1: Core Scaffolding & Test Harness
-**Status:** COMPLETE
-**Gate:** `.claude/GATE_2_COMPLETE.md`
-
-**Deliverables:**
-- Repo setup with CI pipeline
-- Test harness (proptest, cargo-fuzz, miri)
-- Core types (VectorId, NodeId, VectorStorage)
-
----
-
-## Phase 2: Persistence & Compression (Weeks 5-8) — COMPLETE
-
-### Milestone 2: Storage Engine, Persistence, & Quantization
-**Status:** COMPLETE
-**Gate:** `.claude/GATE_WEEK8_COMPLETE.md`
-
-**Deliverables:**
-- WriteAheadLog, SnapshotManager
-- Scalar Quantization (SQ8) — 4x memory reduction
-- Binary file format (.evec)
+| Version | Status | Focus | Target |
+|:--------|:-------|:------|:-------|
+| v0.7.0 | **RELEASED** | SIMD Acceleration, First Community PR | 2025-12-30 |
+| v0.8.0 | **RELEASED** | Consolidation + Developer Experience | 2026-01-08 |
+| v0.9.0 | PLANNED | Sparse Vectors + Hybrid Search + Flat Index | Week 36-41 |
+| v0.10.0 | PLANNED | WebGPU Research + PQ Research | Week 42-47 |
+| v1.0 | PLANNED | Production Release | Week 48-52 |
 
 ---
 
-## Phase 3: Intelligence (Weeks 9-15) — COMPLETE
+## Phase 1-7: COMPLETE (v0.1.0 - v0.7.0)
 
-### Milestone 3: HNSW Graph + SIMD + RFC-001
-**Status:** COMPLETE
-**Gates:**
-- `.claude/GATE_9_COMPLETE.md` through `.claude/GATE_15_COMPLETE.md`
+### Summary of Completed Work
 
-**Deliverables:**
-- HNSW graph algorithms (Insert, Search)
-- NeighborPool with VByte compression
-- Runtime SIMD detection
-- RFC-001 Soft Delete design (approved)
+| Phase | Weeks | Milestone | Key Deliverables |
+|:------|:------|:----------|:-----------------|
+| 1 | 1-4 | Foundation | Repo, CI, test harness, core types |
+| 2 | 5-8 | Persistence | WAL, Snapshots, SQ8 (4x compression) |
+| 3 | 9-15 | Intelligence | HNSW, NeighborPool, SIMD detection |
+| 4 | 16-18 | Features | Soft Delete, v0.3.0-v0.4.0 releases |
+| 5 | 19 | Polish | Documentation, Dashboard |
+| 6 | 20-25 | Filters | Filter Expression Language, iOS compat |
+| 7 | 26-31 | Scale-Up | Metadata, BQ (32x), SIMD (8.75x) |
 
----
+### v0.7.0 Achievements (Released 2025-12-30)
 
-## Phase 4: Feature Development (Weeks 16-18) — COMPLETE
+**Performance:**
+| Metric | v0.6.0 | v0.7.0 | Improvement |
+|:-------|:-------|:-------|:------------|
+| Hamming Distance | ~350ns | ~40ns | **8.75x** |
+| Dot Product (768D) | ~500ns | ~200ns | 2.5x |
+| L2 Distance (768D) | ~600ns | ~250ns | 2.4x |
+| Bundle Size | 524KB | 477KB | 9.2% smaller |
 
-### Milestone 4.1: Soft Delete (Week 16)
-**Status:** COMPLETE
-**Gate:** `.claude/GATE_16_COMPLETE.md`
-**Score:** 92/100
+**Community Milestone:**
+- First external contributor: **@jsonMartin** (PR #4)
+- 8.75x Hamming speedup with WASM SIMD128 + AVX2
+- Professional code quality, self-reviewed with HOSTILE_REVIEWER
+- Announced Flat Index RFC for future contribution
 
-**Deliverables:**
-- `soft_delete()`, `is_deleted()`, `deleted_count()`, `live_count()`
-- `compact()`, `needs_compaction()`, `compaction_warning()`
-- Persistence format v0.3 with tombstone support
-- Zero memory overhead (reuses padding byte)
-
-### Milestone 4.2: v0.3.0 Release (Week 17)
-**Status:** COMPLETE
-**Gate:** `.claude/GATE_17_COMPLETE.md`
-**Release:** v0.3.0 on crates.io and npm
-
-**Deliverables:**
-- WASM soft delete bindings
-- TypeScript definitions
-- Browser demo (`wasm/examples/soft_delete.html`)
-- Documentation update
-
-### Milestone 4.3: Process Hardening & Batch Delete (Week 18)
-**Status:** COMPLETE
-**Gate:** `.claude/GATE_18_COMPLETE.md`
-
-**Deliverables:**
-- CI hardening with `cargo xtask ci-check`
-- P99 latency tracking infrastructure
-- `soft_delete_batch()` API
-- WASM batch delete bindings with Safari fallback
-- Dual-license (MIT OR Apache-2.0)
+**Features:**
+- WASM SIMD128 enabled by default
+- Interactive Filter Playground demo
+- `enableBQ()` API for post-creation quantization
 
 ---
 
-## Phase 5: v0.4.0 Release (Week 19) — COMPLETE
+## Phase 8: v0.8.0 Consolidation + Developer Experience (Weeks 32-35)
 
-### Milestone 5: Documentation & Release Polish
-**Status:** COMPLETE
-**Gate:** `.claude/GATE_19_COMPLETE.md`
+### Strategic Context
 
-**Deliverables:**
-- v0.4.0 released to crates.io and npm
-- Documentation update
-- CI hardening complete
+v0.8.0 focuses on **code quality and developer experience** before adding major features. This creates a solid foundation for community contributions and positions EdgeVec as a professional-grade library.
 
----
+**Total Duration:** 4 weeks (~50 hours)
 
-## Phase 6: v0.5.x Filter Expression Language (Week 20-25) — COMPLETE
+### Milestone 8.1: SIMD Consolidation (Weeks 32-33, 12h)
 
-### Milestone 6: Filter System + RFC-002 Design
-**Status:** COMPLETE
-**Gate:** v0.5.3 released to crates.io + RFC-002 APPROVED
+**Status:** COMPLETE ✓
+**Source:** `docs/planning/V0.8.0_CONSOLIDATION_PLAN.md`
 
-**Week 20-24 Deliverables:**
-- Filter expression parser with AND/OR/NOT/comparison operators
-- Error messages with contextual suggestions
-- iOS Safari WASM compatibility research
-- v0.5.3 crates.io publish (size optimization: 28 MB → 358 KB)
+| Task | Hours | Deliverable |
+|:-----|:------|:------------|
+| W8.1: SIMD Euclidean Distance | 4h | x86/WASM euclidean with sqrt |
+| W8.2: `simd_dispatch!` Macro | 4h | Unified dispatch pattern |
+| W8.3: SIMD Architecture Docs | 4h | `SIMD_ARCHITECTURE.md` |
 
-**Week 25 Deliverables:**
-- RFC-002 Metadata Storage Design (4 documents) — APPROVED
-- RFC-002 Implementation Plan (182 hours) — APPROVED
-- Scale-Up Analysis with HOSTILE_REVIEWER verdict
-- v0.6.0 roadmap finalized
+**Acceptance Criteria:**
+- [ ] Euclidean SIMD on x86_64 and WASM (2x+ speedup)
+- [ ] Macro eliminates platform detection boilerplate
+- [ ] New contributors can add SIMD ops using guide
 
----
+### Milestone 8.2: TypeScript SDK Improvements (Week 33-34, 16h)
 
-## Phase 7: v0.6.0 Metadata Storage + Binary Quantization (Week 26-29) — PLANNED
-
-### Milestone 7: RFC-002 + Scale-Up Analysis Implementation
-**Status:** PLANNED (RFC-002 APPROVED)
-**Target:** v0.6.0
-**Estimated Duration:** 4.5 weeks (140 hours base + 30% contingency = ~182 hours)
-
-**Week 26: Core Metadata (32 hours)**
-- [ ] HnswIndex + insert_with_metadata()
-- [ ] soft_delete cleanup + compact metadata
-- [ ] search_filtered() with selectivity estimation
-- [ ] Persistence format v0.4 with MetadataSectionHeader
-- [ ] v0.3 → v0.4 migration
-
-**Week 27: Binary Quantization (48 hours)**
-- [ ] BinaryVector type + sign-based encoding
-- [ ] SIMD popcount (x86 SSE/AVX + ARM NEON)
-- [ ] Hamming distance + BinaryVectorStorage
-- [ ] BQ search + rescoring layer
-- [ ] Benchmarks (target: 3-5x speedup)
-
-**Week 28: WASM & Integration (40 hours)**
-- [ ] Metadata WASM bindings (insertWithMetadata, searchFiltered)
-- [ ] BQ WASM bindings (searchBQ, searchHybrid)
-- [ ] Memory pressure monitoring
-- [ ] Integration tests + browser demo
-- [ ] Documentation + CHANGELOG
-
-**Week 29: Buffer & Release (22 hours contingency)**
-- [ ] Performance tuning (7 hours)
-- [ ] Unforeseen integration issues (15 hours)
-- [ ] v0.6.0 release
-
-**Week 29: Pre-Release Cleanup (CRITICAL REMINDER)**
-
-> **INTERNAL FILES TO REMOVE BEFORE RELEASE:**
-> These files contain internal development prompts and agent configurations
-> that should NOT be public on GitHub.
-
-| File/Folder | Action | Reason |
-|:------------|:-------|:-------|
-| `.claude/` | DELETE from repo | Internal agent prompts, gate files |
-| `.cursor/` | DELETE from repo | Internal Cursor IDE commands |
-| `.cursorrules` | DELETE from repo | Internal development rules |
-| `CLAUDE.md` | DELETE from repo | Internal project instructions |
-
-**Git Commands for Cleanup:**
-```bash
-# Remove from git tracking (keeps local copies)
-git rm -r --cached .claude/
-git rm -r --cached .cursor/
-git rm --cached .cursorrules
-git rm --cached CLAUDE.md
-
-# Add to .gitignore
-echo ".claude/" >> .gitignore
-echo ".cursor/" >> .gitignore
-echo ".cursorrules" >> .gitignore
-echo "CLAUDE.md" >> .gitignore
-
-# Commit cleanup
-git commit -m "chore: remove internal development files before v0.6.0 release"
-```
-
-**Documentation Checklist for v0.6.0:**
-- [ ] README.md updated with v0.6.0 features
-- [ ] CHANGELOG.md complete
-- [ ] API documentation generated (`cargo doc`)
-- [ ] Browser demo deployed (GitHub Pages or similar)
-- [ ] TypeScript types published to npm
-- [ ] Internal files removed from public repo
-
-**Success Metrics:**
-| Metric | Target |
-|:-------|:-------|
-| BQ memory reduction | 32x vs F32 |
-| BQ search speedup | 3-5x |
-| BQ recall (with rescore) | >0.90 |
-| Filter evaluation | <1μs/vector |
-| Metadata overhead | <50 bytes (empty) |
-
----
-
-## Phase 8: v0.7.0 SIMD Enablement & Metadata Docs (Week 30)
-
-> **REVISED 2025-12-23:** Hostile review discovered SIMD is ALREADY IMPLEMENTED.
-> RFC-003 scope changed from "implement" to "enable" (22h → 4h).
-> Focus shifted to metadata filtering documentation per user request.
->
-> **REVISED v2 2025-12-23:** Reddit feedback from user "chillfish8" integrated.
-> Added Day 0 code quality fixes (7.5h): comment cleanup, AVX2 popcount optimization,
-> code consolidation audit, and safety doc placement fix.
-
-### Milestone 8.0: Code Quality Fixes (Reddit Feedback)
-**Status:** CRITICAL — Day 0 priority
-**Target:** v0.7.0
-**Duration:** 7.5 hours
-**Source:** Reddit user "chillfish8" code review
-
-**Issues Addressed:**
-| Issue | File | Fix | Hours |
-|:------|:-----|:----|:------|
-| Comment crisis | `src/persistence/chunking.rs` | Clean rambling comments | 1 |
-| AVX2 popcount | `src/quantization/simd/avx2.rs` | Use native popcnt | 2 |
-| Duplicate logic | Multiple | Audit + document | 2 |
-| Consolidation plan | N/A | Create v0.8.0 refactor plan | 2 |
-| Safety doc placement | `src/quantization/simd/*.rs` | Move docs to function level | 0.5 |
+**Status:** COMPLETE ✓
+**Source:** Community feedback, industry standards
 
 **Deliverables:**
-- [ ] No rambling comments in `chunking.rs`
-- [ ] AVX2 popcount uses native `popcnt` instruction
-- [ ] `docs/audits/CODE_CONSOLIDATION_AUDIT.md` created
-- [ ] Safety docs on function level for all SIMD functions
+| Feature | Hours | Priority | Rationale |
+|:--------|:------|:---------|:----------|
+| Typed Filter Builder | 6h | HIGH | Compile-time filter validation |
+| React Hooks (`useEdgeVec`, `useSearch`) | 6h | HIGH | Modern React patterns |
+| Vue Composables | 4h | MEDIUM | Vue 3 support |
 
-### Milestone 8.1: Enable WASM SIMD (REVISED)
-**Status:** READY — Code exists, needs build flag
-**Target:** v0.7.0
-**Duration:** 4 hours (was 22 hours)
+**API Design:**
+```typescript
+// Typed Filter Builder
+import { filter, and, eq, gt } from 'edgevec';
 
-**What Exists:**
-- `src/metric/simd.rs` — 854+ lines of WASM SIMD128 code (L2, dot, cosine)
-- x86 AVX2 implementations with FMA support
-- Auto-dispatchers via `cfg_if!`
+const query = filter(
+  and(
+    eq('category', 'electronics'),
+    gt('price', 100)
+  )
+);
 
-**What's Missing:**
-- RUSTFLAGS not set in wasm-pack build
-- Benchmark validation
+// React Hooks
+import { useEdgeVec, useSearch } from 'edgevec/react';
 
-**Deliverables:**
-- [ ] Add `RUSTFLAGS="-C target-feature=+simd128"` to build scripts
-- [ ] Verify with `wasm2wat` inspection
-- [ ] Benchmark 2-3x speedup
-- [ ] Update performance claims in README
-
-**Success Metrics:**
-| Metric | Scalar | SIMD Target |
-|:-------|:-------|:------------|
-| Dot Product (768-dim) | ~500ns | <200ns |
-| Search (100k, k=10) | ~5ms | ~2ms |
-
-### Milestone 8.2: Metadata Filtering GitHub Pages (USER REQUEST)
-**Status:** PLANNED — Priority from Reddit feedback
-**Target:** v0.7.0
-**Duration:** 10 hours
-
-**User Feedback:** `docs/release/v0.6.0/comments/add_more_snippet.txt`
-> "Add more code snippet for the meta data filtering part, everyone asking"
-
-**Deliverables:**
-- [ ] `wasm/examples/v070_filter_playground.html` (cyberpunk theme)
-- [ ] Interactive filter builder with live preview
-- [ ] 10+ copy-paste filter examples
-- [ ] Live sandbox with real EdgeVec WASM
-- [ ] Deploy to GitHub Pages
-
-**Demo Features:**
-- Drag-and-drop filter construction
-- Example gallery (e-commerce, documents, content)
-- Syntax validation with error messages
-- Copy button for code snippets
-
-### Milestone 8.3: README & Documentation Updates
-**Status:** PLANNED
-**Target:** v0.7.0
-**Duration:** 4 hours
-
-**Deliverables:**
-- [ ] Add "Metadata Filtering" section to README with examples
-- [ ] Add SIMD performance section with benchmarks
-- [ ] Link to interactive filter playground
-- [ ] Update CHANGELOG
-
-### Milestone 8.4: v0.7.0 Release
-**Status:** PLANNED
-**Target:** Week 30 (end)
-
-**Deliverables:**
-- [ ] v0.7.0 on crates.io
-- [ ] v0.7.0 on npm
-- [ ] Filter playground live on GitHub Pages
-- [ ] Performance blog post (optional)
-
-**Total v0.7.0 Hours:** 25.5 (18 base + 7.5 Reddit fixes)
-
----
-
-## Phase 9: v0.8.0 Advanced Features (Week 31+)
-
-### Milestone 9.1: RFC-004 Query Result Caching
-**Status:** CONDITIONAL — Needs Fixes Before Approval
-**Target:** v0.8.0
-**Estimated Duration:** 29 hours (after fixes)
-
-**Blocking Issues (must fix before implementation):**
-1. **Memory budget specification** — Define max cache size (e.g., 10MB default, configurable)
-2. **Mutation invalidation mechanism** — Clear cache on insert/delete/update operations
-3. **Cache overhead measurement** — Verify <100ns lookup overhead
-4. **Hash algorithm specification** — Use FxHash or similar for speed
-
-**Design Decisions:**
-```rust
-// Proposed cache config
-pub struct CacheConfig {
-    max_memory_bytes: usize,     // Default: 10MB
-    max_entries: usize,          // Default: 1000
-    ttl_seconds: Option<u64>,    // Default: None (no expiry)
-    invalidate_on_mutation: bool // Default: true
+function SearchComponent() {
+  const db = useEdgeVec('my-index');
+  const { results, loading, error } = useSearch(db, embedding, { k: 10 });
+  // ...
 }
 ```
 
-**Planned Features:**
-- In-memory LRU cache with configurable memory budget
-- Automatic cache invalidation on mutations
-- Cache statistics API (`cache_hits()`, `cache_misses()`, `cache_size()`)
-- Optional: Semantic similarity detection for near-hit queries
+### Milestone 8.3: Documentation & Examples (Week 34-35, 12h)
 
-**Success Metrics:**
-| Metric | Target |
-|:-------|:-------|
-| Cache lookup overhead | <100ns |
-| Cache hit rate (repeated queries) | >90% |
-| Memory overhead per entry | <1KB |
-
-### Milestone 9.2: Production Hardening
-**Status:** PLANNED
-**Target:** v0.8.0
-
-**Planned Features:**
-- ACORN in-algorithm filtering (if post-filter selectivity <10%)
-- Metadata B-tree indexing for large collections (>100k vectors)
-- iOS Safari testing suite with real device matrix
-- Memory pressure event handling improvements
-
-### Milestone 9.3: TypeScript SDK Improvements
-**Status:** PLANNED
-**Target:** v0.8.0
-
-**Planned Features:**
-- Typed filter builder (compile-time filter validation)
-- React hooks (`useEdgeVec`, `useSearch`, `useFilter`)
-- Vue composables
-- Better TypeScript generics for metadata types
-
-### Milestone 9.4: v0.8.0 Release
-**Status:** PLANNED
-**Target:** Week 33-34
+**Status:** COMPLETE ✓
+**Source:** Community request ("more metadata filtering examples")
 
 **Deliverables:**
-- [ ] RFC-004 query caching implemented
-- [ ] Production hardening complete
-- [ ] TypeScript SDK improvements
-- [ ] v0.8.0 on crates.io and npm
+| Document | Hours | Priority |
+|:---------|:------|:---------|
+| 20+ Filter Examples (copy-paste) | 4h | HIGH |
+| Embedding Integration Guide (Ollama, transformers.js) | 4h | HIGH |
+| "EdgeVec vs pgvector" Comparison | 2h | MEDIUM |
+| Video Tutorial (60s demo) | 2h | MEDIUM |
+
+### Milestone 8.4: Technical Debt Reduction (Week 35, 10h)
+
+**Status:** COMPLETE ✓
+**Source:** chillfish8 Reddit feedback, clippy audit
+
+| Task | Hours | Priority |
+|:-----|:------|:---------|
+| WAL chunk_size edge case fix | 2h | P1 |
+| Safety doc placement cleanup | 2h | P2 |
+| ~50 `cast_possible_truncation` fixes | 4h | P2 |
+| Test code clippy warnings | 2h | P3 |
+
+### v0.8.0 Success Metrics
+
+| Metric | Target |
+|:-------|:-------|
+| Euclidean SIMD speedup | 2x+ |
+| TypeScript SDK coverage | React + Vue |
+| Documentation examples | 20+ filters |
+| Clippy warnings | <20 (from 107) |
+
+### v0.8.0 Release Checklist
+
+- [x] All consolidation work complete
+- [x] TypeScript SDK published with React hooks
+- [x] Documentation updated with examples
+- [x] Technical debt reduced
+- [x] HOSTILE_REVIEWER approval
+- [x] crates.io + npm publish
+- [x] GitHub release
+
+**v0.8.0 Status:** RELEASED (2026-01-08)
 
 ---
 
-## Deferred Features (v1.0+)
+## Phase 9: v0.9.0 Hybrid Search + Community Features (Weeks 36-41)
 
-Per SCALE_UP_ANALYSIS_2025-12-20.md HOSTILE_REVIEWER verdict:
+### Strategic Context
 
-| Feature | Condition to Revisit |
-|:--------|:--------------------|
-| P2P Sync (WebRTC) | 10k+ users + 100+ issues requesting |
-| React Hooks | Community submits PR |
-| Distributed Architecture | Memory64 ships in all browsers |
+v0.9.0 focuses on **hybrid search capability** (the #1 community request) while integrating @jsonMartin's Flat Index contribution. The milestone order is optimized to eliminate external dependencies from the critical path.
 
-## Abandoned Features (Never)
+**Total Duration:** 6 weeks (~72 hours)
+**HOSTILE_REVIEWER:** Plan revised 2026-01-08 to address critical dependency issues
 
-| Feature | Reason |
-|:--------|:-------|
-| AT Protocol patterns | Mathematically incompatible (CRDT + HNSW unsolved) |
-| Custom embedding model | Bundle size impossible |
-| Own embedding system | Out of scope |
+### Dependency Graph (De-risked)
+
+```
+Week 36-37: Sparse Vectors (24h) ─────────────────────┐
+                                                       │
+Week 38-39: RRF Hybrid Search (16h) ◄─────────────────┘
+            [GATE: Sparse tests must pass before RRF starts]
+
+Week 40-41: Flat Index (32h) [CONDITIONAL]
+            [GATE: @jsonMartin RFC by Week 35 EOD, or defer to v0.10.0]
+```
+
+### Milestone 9.1: Sparse Vector Support (Weeks 36-37, 24h)
+
+**Status:** PLANNED — No external dependencies
+**Source:** Lucas (Reddit) asking for BM25/hybrid search
+**Priority:** P0 — Enables hybrid search, no blockers
+
+**Deliverables:**
+| Feature | Hours | Description |
+|:--------|:------|:------------|
+| SparseVector type | 6h | CSR format (indices + values) |
+| Sparse distance metrics | 6h | Sparse dot product, cosine |
+| Inverted index storage | 8h | Term-to-document mapping |
+| WASM bindings | 4h | JavaScript API |
+
+**Design:**
+```rust
+/// Compressed Sparse Row (CSR) format
+pub struct SparseVector {
+    indices: Vec<u32>,  // Non-zero dimension indices (sorted)
+    values: Vec<f32>,   // Non-zero values
+}
+
+impl SparseVector {
+    pub fn from_term_scores(scores: &[(u32, f32)]) -> Self;
+    pub fn dot(&self, other: &SparseVector) -> f32;
+    pub fn cosine(&self, other: &SparseVector) -> f32;
+    pub fn nnz(&self) -> usize;  // Number of non-zero elements
+}
+```
+
+**Exit Criteria:**
+- [ ] All 5+ property tests pass
+- [ ] Dot product: <1μs for 1000 non-zero elements
+- [ ] WASM bindings tested in browser
+- [ ] TypeScript types exported
+
+### Milestone 9.2: RRF Hybrid Search Helper (Weeks 38-39, 16h)
+
+**Status:** PLANNED — Depends on Milestone 9.1
+**Source:** Industry standard (Milvus, Weaviate, pgvector all use RRF)
+**Priority:** P0 — Core v0.9.0 feature
+
+**DEPENDENCY GATE:** RRF implementation CANNOT start until:
+- [ ] Milestone 9.1 Sparse Vectors: ALL tests pass
+- [ ] Sparse WASM bindings verified in browser
+
+**Deliverables:**
+| Feature | Hours | Description |
+|:--------|:------|:------------|
+| RRF fusion algorithm | 4h | Reciprocal Rank Fusion (k=60 default) |
+| `hybridSearch()` API | 6h | Combines dense + sparse results |
+| Linear combination mode | 4h | α-weighted score fusion |
+| TypeScript helpers | 2h | Easy integration |
+
+**API Design:**
+```typescript
+// JavaScript API
+const hybridResults = await db.hybridSearch({
+  dense: { vector: embedding, k: 20 },
+  sparse: { vector: bm25Scores, k: 20 },
+  fusion: 'rrf',  // or { type: 'linear', alpha: 0.7 }
+  k: 10
+});
+
+// RRF Algorithm (RFC_BM25_HYBRID_SEARCH.md)
+function rrf(dense: Id[], sparse: Id[], k = 60): Id[] {
+  const scores = new Map<Id, number>();
+  dense.forEach((id, rank) => {
+    scores.set(id, (scores.get(id) || 0) + 1 / (k + rank + 1));
+  });
+  sparse.forEach((id, rank) => {
+    scores.set(id, (scores.get(id) || 0) + 1 / (k + rank + 1));
+  });
+  return [...scores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, k)
+    .map(([id]) => id);
+}
+```
+
+**Exit Criteria:**
+- [ ] RRF recall >0.90 on standard benchmark
+- [ ] Linear fusion mode tested
+- [ ] Integration tests with real BM25 scores
+
+### Milestone 9.3: Flat Index Implementation (Weeks 40-41, 32h) [CONDITIONAL]
+
+**Status:** CONDITIONAL — Awaiting @jsonMartin RFC
+**Source:** PR #4 discussion, contributor announcement
+**Priority:** P1 — Community contribution, not on critical path
+
+**CONDITION GATE:** Flat Index is ONLY included in v0.9.0 if:
+- [ ] @jsonMartin RFC received by Week 35 EOD, OR
+- [ ] Internal RFC created by Week 35 EOD (Option A)
+- [ ] **Default:** Defer to v0.10.0 (Option B — preserve community relationship)
+
+**Proposed Features:**
+| Feature | Hours | Description |
+|:--------|:------|:------------|
+| FlatIndex type | 8h | O(1) append, brute-force search |
+| True Binary Vectors | 8h | 1-bit per dimension storage |
+| Hamming-based scoring | 4h | Uses v0.7.0 SIMD Hamming |
+| IndexedDB persistence | 4h | Same persistence layer as HNSW |
+| WASM bindings | 4h | JavaScript API |
+| Tests + benchmarks | 4h | Property tests, fuzzing |
+
+**Use Cases:**
+- Small datasets (<10k vectors) where HNSW overhead isn't worth it
+- Exact search (100% recall) requirements
+- Append-heavy workloads (real-time embeddings)
+
+**Value Proposition (vs exhaustive HNSW):**
+| Metric | HNSW Exhaustive | Flat Index |
+|:-------|:----------------|:-----------|
+| Memory overhead | Graph + vectors | Vectors only |
+| Insert time | O(log n) | O(1) |
+| Search accuracy | ~0.95 recall | 100% recall |
+| Best for | >10k vectors | <10k vectors |
+
+**Exit Criteria:**
+- [ ] Brute-force search <50ms for 10k vectors
+- [ ] Memory usage <50% of HNSW for same dataset
+- [ ] All property tests pass
+
+### Product Quantization Research — DEFERRED to v0.10.0
+
+**Rationale:** No exit criteria defined; premature before BQ validated at production scale.
+See Phase 10 (v0.10.0) for PQ research with proper RFC.
+
+### v0.9.0 Success Metrics
+
+| Metric | Target | Gate |
+|:-------|:-------|:-----|
+| Sparse vector ops | <1μs dot product | REQUIRED |
+| Hybrid search accuracy | >0.90 recall | REQUIRED |
+| Flat Index search (10k) | <50ms brute force | CONDITIONAL |
+| Community RFC turnaround | <1 week | REQUIRED |
+| Bundle size | <600KB gzipped | REQUIRED |
+
+### v0.9.0 Release Checklist
+
+**Core (REQUIRED):**
+- [ ] Sparse Vectors implemented and tested
+- [ ] RRF Hybrid Search implemented and tested
+- [ ] All quality gates pass (700+ tests)
+- [ ] Clippy clean
+- [ ] HOSTILE_REVIEWER approval
+- [ ] crates.io + npm publish
+
+**Conditional:**
+- [ ] Flat Index (if RFC received by Week 35)
 
 ---
 
-## Publication & Outreach Strategy
+## Phase 10: v0.10.0 Advanced Features (Weeks 42-47)
 
-### v0.6.0 Launch Documentation
+### Strategic Context
 
-| Document | Status | Priority |
-|:---------|:-------|:---------|
-| README.md (viral hook) | To update | HIGH |
-| CHANGELOG.md | To update | HIGH |
-| API Reference (rustdoc) | To generate | MEDIUM |
-| Browser Demo (GitHub Pages) | To deploy | HIGH |
-| Embedding Integration Guide | To write | MEDIUM |
+v0.10.0 explores next-generation browser capabilities (WebGPU, WASM 3.0) and integrates advanced features if research validates them.
 
-### Research Paper / Technical Write-up
+**Total Duration:** 6 weeks (~70 hours)
 
-**Objective:** Create a technical paper documenting EdgeVec's architecture and benchmarks for credibility and discoverability.
+### Milestone 10.1: WebGPU Acceleration Research (Weeks 42-44, 24h)
 
-**Paper Topics:**
-1. HNSW + Binary Quantization in WASM (novel combination)
-2. 32x memory reduction with >0.90 recall preservation
-3. Browser-native vector search without server dependencies
-4. SIMD optimization strategies for WASM (popcount, distance)
+**Status:** RESEARCH
+**Source:** Industry trend (3x faster than WebGL, browser ML support)
 
-**Target Venues (Research Before Posting):**
+**Browser Support (as of 2025):**
+| Browser | WebGPU Status |
+|:--------|:--------------|
+| Chrome 113+ | ✅ Stable |
+| Edge 113+ | ✅ Stable |
+| Firefox 139+ | ✅ Stable |
+| Safari 18+ | ✅ Stable |
 
-| Venue | Type | Audience | Timing |
-|:------|:-----|:---------|:-------|
-| **arXiv (cs.IR / cs.DB)** | Preprint | Academics, researchers | After v0.6.0 |
-| **Hacker News** | Show HN | Developers, early adopters | Launch day |
-| **Reddit r/rust** | Post | Rust community | Launch day |
-| **Reddit r/MachineLearning** | Post | ML practitioners | Launch week |
-| **Reddit r/LocalLLaMA** | Post | Local AI enthusiasts | Launch week |
-| **Dev.to** | Article | Web developers | Launch week |
-| **Lobste.rs** | Post | Technical audience | Launch day |
-| **X/Twitter** | Thread | General tech | Launch day |
-| **LinkedIn** | Article | Professional network | Launch week |
+**Research Deliverables:**
+| Task | Hours | Output |
+|:-----|:------|:-------|
+| WebGPU spike (matrix ops) | 8h | Proof of concept |
+| Benchmark vs WASM SIMD | 8h | Performance comparison |
+| Memory transfer overhead | 4h | GPU↔CPU cost analysis |
+| Integration design | 4h | Architecture proposal |
 
-### Launch Checklist (Week 29+)
+**Key Questions:**
+1. When does WebGPU beat WASM SIMD? (likely >100k vectors)
+2. What's the GPU memory transfer overhead?
+3. Can we make it optional without bloating bundle?
 
-**Pre-Launch (Week 29):**
-- [ ] Finalize v0.6.0 release
-- [ ] Deploy browser demo to GitHub Pages
-- [ ] Record 60-second demo video/GIF
-- [ ] Prepare Show HN post draft
-- [ ] Prepare Reddit posts draft
-- [ ] Remove internal files (.claude, .cursor, .cursorrules)
+### Milestone 10.2: WASM 3.0 Relaxed SIMD (Week 44-45, 12h)
 
-**Launch Day:**
-- [ ] Publish to crates.io
-- [ ] Publish to npm
-- [ ] Post to Hacker News (Show HN)
-- [ ] Post to Reddit r/rust
-- [ ] Tweet/post thread with demo GIF
+**Status:** PLANNED (pending browser adoption)
+**Source:** WASM 3.0 spec (Sept 2025)
 
-**Launch Week:**
-- [ ] Post to r/MachineLearning, r/LocalLLaMA
-- [ ] Publish Dev.to article
-- [ ] LinkedIn announcement
-- [ ] Monitor feedback, respond to issues
+**New Instructions:**
+| Instruction | Speedup | Use Case |
+|:------------|:--------|:---------|
+| Relaxed FMA | 1.5-2x | Dot product, L2 |
+| Relaxed dot product | 1.5-3x | Cosine similarity |
+| Half-precision (f16) | 2x memory | Large indexes |
 
-**Post-Launch (v0.6.1+):**
-- [ ] Write arXiv paper if traction warrants
-- [ ] Create YouTube tutorial
-- [ ] Prepare conference talk proposal (if applicable)
+**Deliverables:**
+- [ ] Feature detection for relaxed SIMD
+- [ ] Updated SIMD implementations
+- [ ] Benchmark validation
 
-### Key Messaging Points
+### Milestone 10.3: BM25 Integration (Weeks 45-46, 16h)
 
-1. **"Vector search in your browser, no server required"**
-2. **"32x memory reduction with Binary Quantization"**
-3. **"Sub-10ms search on 100k vectors in WASM"**
-4. **"MIT licensed, works offline, Safari/iOS compatible"**
+**Status:** CONDITIONAL (if demand warrants)
+**Trigger:** 3+ community requests or significant GitHub interest
+
+**Options:**
+1. **Bundle integration:** Add tokenizer + IDF tables (~+200KB bundle)
+2. **External pairing:** Document integration with `wink-bm25`
+3. **Hybrid:** Sparse vector ingestion of external BM25 scores
+
+**Recommendation:** Option 3 (sparse vectors) balances capability and bundle size.
+
+### Milestone 10.4: Product Quantization Research + Implementation (Weeks 46-47, 16h)
+
+**Status:** RESEARCH (moved from v0.9.0 with proper exit criteria)
+**Source:** Industry trends (64x compression, 97% memory reduction)
+
+**Phase 1: Research (8h, Week 46)**
+
+Research Questions (must answer ALL):
+1. Is 64x compression worth complexity vs BQ's 32x?
+2. Can we achieve <100ns lookup overhead in WASM?
+3. How does recall compare: PQ vs BQ at same memory budget?
+
+**Exit Criteria for Go Decision:**
+- [ ] Research document: `docs/research/PRODUCT_QUANTIZATION_ANALYSIS.md`
+- [ ] Benchmark data comparing PQ vs BQ
+- [ ] Clear recommendation: IMPLEMENT or DEFER
+
+**Phase 2: Implementation (8h, Week 47) — IF GO:**
+| Task | Hours |
+|:-----|:------|
+| Codebook training | 3h |
+| PQ distance computation | 3h |
+| Integration + tests | 2h |
+
+**Expected Results (if implemented):**
+- 64x compression (vs 32x BQ)
+- <100ns lookup overhead
+- >0.85 recall
+
+### Milestone 10.5: Flat Index (Weeks 40-41, 32h) [IF DEFERRED FROM v0.9.0]
+
+**Status:** CONDITIONAL — Only if @jsonMartin RFC not received for v0.9.0
+**Note:** This milestone moves here if Flat Index deferred from v0.9.0
+
+See Phase 9 Milestone 9.3 for full specification.
+
+### v0.10.0 Success Metrics
+
+| Metric | Target |
+|:-------|:-------|
+| WebGPU decision | Go/No-Go |
+| Relaxed SIMD speedup | 1.5x+ |
+| Bundle size | <600KB (with PQ) |
+
+---
+
+## Phase 11: v1.0 Production Release (Weeks 48-52)
+
+### Strategic Context
+
+v1.0 signals production readiness. Focus on stability, security, performance guarantees, and comprehensive documentation.
+
+**Total Duration:** 5 weeks (~60 hours)
+
+### Milestone 11.1: Security Audit (Week 48-49, 16h)
+
+**Deliverables:**
+- [ ] `unsafe` code audit with formal proofs
+- [ ] Fuzzing campaign (48h continuous)
+- [ ] Memory safety validation (Miri)
+- [ ] Third-party dependency audit
+
+### Milestone 11.2: Performance Guarantees (Week 49-50, 16h)
+
+**Deliverables:**
+| Guarantee | Specification |
+|:----------|:--------------|
+| Search latency (100k, k=10) | P99 < 10ms |
+| Insert latency | P99 < 5ms |
+| Memory per vector (768D) | < 100 bytes (BQ) |
+| Bundle size | < 500KB gzipped |
+
+- [ ] Benchmark suite with regression detection
+- [ ] CI performance gates
+
+### Milestone 11.3: API Stability (Week 50-51, 12h)
+
+**Deliverables:**
+- [ ] Semantic versioning commitment
+- [ ] Deprecation policy documented
+- [ ] TypeScript types frozen
+- [ ] WASM API frozen
+
+### Milestone 11.4: Documentation Polish (Week 51-52, 16h)
+
+**Deliverables:**
+- [ ] Complete API reference (rustdoc)
+- [ ] Migration guides (v0.x → v1.0)
+- [ ] Production deployment guide
+- [ ] Troubleshooting FAQ
+- [ ] arXiv paper (if warranted)
+
+### v1.0 Release Criteria
+
+| Category | Requirement | Status |
+|:---------|:------------|:-------|
+| **Quality** | 0 P0/P1 bugs | [ ] |
+| **Tests** | 100% public API coverage | [ ] |
+| **Fuzzing** | 48h+ with 0 crashes | [ ] |
+| **Performance** | All guarantees met | [ ] |
+| **Documentation** | Complete API docs | [ ] |
+| **Security** | Audit complete | [ ] |
+| **Community** | 10+ GitHub stars | [ ] |
+
+---
+
+## Deferred Features (Post v1.0)
+
+| Feature | Trigger Condition |
+|:--------|:------------------|
+| P2P Sync (WebRTC) | 10k+ users + 100+ requests |
+| Distributed Architecture | Memory64 in all browsers |
+| Custom Embedding Models | Never (out of scope) |
+| CRDT Conflict Resolution | Mathematically unsolved for HNSW |
+
+---
+
+## Community Engagement Strategy
+
+### Contributor Pipeline
+
+| Stage | Action | Timeline |
+|:------|:-------|:---------|
+| RFC Received | Acknowledge within 24h | Ongoing |
+| RFC Review | Feedback within 1 week | Ongoing |
+| PR Review | First response within 48h | Ongoing |
+| Merge | Within 1 week if approved | Ongoing |
+
+### @jsonMartin Flat Index RFC
+
+**Status:** Awaiting submission
+**Priority:** HIGH (first external contributor)
+**Integration Plan:**
+1. Fast-track RFC review (24h acknowledgment)
+2. Provide implementation guidance
+3. Offer co-development if needed
+4. Credit prominently in CHANGELOG
+
+### Feature Request Tracking
+
+| Request | Source | Priority | Target |
+|:--------|:-------|:---------|:-------|
+| BM25/Hybrid Search | Lucas (Reddit) | HIGH | v0.9.0 |
+| Sparse Vectors | Implied | HIGH | v0.9.0 |
+| More Filter Examples | Multiple | HIGH | v0.8.0 |
+| Embedding Generation | Italian user | LOW | Docs only |
+| Flat Index | @jsonMartin | HIGH | v0.9.0 |
+
+---
+
+## Industry Trends Integration
+
+### Incorporated (v0.8.0-v1.0)
+
+| Trend | Integration | Version |
+|:------|:------------|:--------|
+| RRF Hybrid Search | `hybrid_search()` API | v0.9.0 |
+| Product Quantization | Research → possible impl | v0.10.0 |
+| WebGPU Acceleration | Research spike | v0.10.0 |
+| WASM 3.0 Relaxed SIMD | SIMD updates | v0.10.0 |
+| TypeScript Ecosystem | React hooks, Vue composables | v0.8.0 |
+
+### Monitoring (Future)
+
+| Trend | Source | When to Act |
+|:------|:-------|:------------|
+| NVQ (non-uniform quantization) | Research (2025) | If recall gains proven |
+| GPU HNSW Indexing | Qdrant 1.13 | If browser WebGPU matures |
+| Delta Encoding | Qdrant | For memory optimization |
+
+---
+
+## Risk Register
+
+| ID | Risk | Likelihood | Impact | Mitigation | Owner | Status |
+|:---|:-----|:-----------|:-------|:-----------|:------|:-------|
+| R1 | WASM Memory Limits | LOW | HIGH | BQ + SQ8 compression | RUST_ENGINEER | MITIGATED |
+| R2 | Browser IDB Variability | LOW | MEDIUM | Tested Safari/Chrome/Firefox | WASM_SPECIALIST | TESTED |
+| R3 | Recall Degradation | LOW | HIGH | Rescore layer | TEST_ENGINEER | TESTED (>0.95) |
+| R4 | SIMD Portability | LOW | MEDIUM | Runtime detection | RUST_ENGINEER | RESOLVED |
+| R5 | WebGPU Adoption | MEDIUM | LOW | WASM SIMD fallback | WASM_SPECIALIST | MONITORING |
+| R6 | Community Burnout | MEDIUM | MEDIUM | Fast RFC response | PLANNER | ACTIVE |
+| R7 | Bundle Size Creep | MEDIUM | MEDIUM | Feature flags | WASM_SPECIALIST | MONITORING |
+| R8 | External RFC Delay | MEDIUM | MEDIUM | Internal fallback plan | PLANNER | MONITORING |
+
+---
+
+## Competitive Analysis
+
+### EdgeVec vs Alternatives (2025)
+
+| Feature | EdgeVec | EntityDB | Web Vector Storage | voy |
+|:--------|:--------|:---------|:-------------------|:----|
+| SIMD Acceleration | ✅ 8.75x | ❌ | ❌ | ❌ |
+| Binary Quantization | ✅ 32x | ❌ | ❌ | ❌ |
+| Hybrid Search | 🔜 v0.9.0 | ❌ | ✅ BM25 | ❌ |
+| Bundle Size | 477KB | ~300KB | ~200KB | ~100KB |
+| IndexedDB Persistence | ✅ | ✅ | ✅ | ❌ |
+| iOS Safari | ✅ (fallback) | ✅ | ✅ | ✅ |
+| TypeScript SDK | ✅ | ✅ | ✅ | ✅ |
+
+**Positioning:** EdgeVec is the only WASM vector database with SIMD acceleration AND binary quantization. Trade-off is larger bundle for better performance.
 
 ---
 
@@ -482,25 +628,15 @@ Per SCALE_UP_ANALYSIS_2025-12-20.md HOSTILE_REVIEWER verdict:
 |:--------|:-----|:-----------|
 | v0.1.0 | 2025-12-05 | Initial alpha (HNSW, SQ8) |
 | v0.2.0 | 2025-12-10 | Batch API, WASM bindings |
-| v0.2.1 | 2025-12-14 | Safety hardening (bytemuck) |
 | v0.3.0 | 2025-12-15 | Soft Delete API (RFC-001) |
-| v0.4.0 | 2025-12-17 | Documentation, Dashboard, CI |
+| v0.4.0 | 2025-12-17 | Documentation, Dashboard |
 | v0.5.0 | 2025-12-18 | Filter Expression Language |
-| v0.5.2 | 2025-12-19 | Error messages with suggestions |
-| v0.5.3 | 2025-12-19 | Crate size optimization (358 KB) |
-| v0.6.0 | TBD (W29) | Metadata Storage + Binary Quantization |
-
----
-
-## Risk Register Summary
-
-| ID | Risk | Status |
-|:---|:-----|:-------|
-| R1 | WASM Memory Limits (4GB) | MITIGATED |
-| R2 | Browser IDB Variability | TESTED |
-| R3 | Recall degradation | TESTED (>0.95) |
-| R4 | SIMD portability | RUNTIME DETECTION |
-| R5 | Memory usage >1GB | MITIGATED (SQ8) |
+| v0.6.0 | 2025-12-23 | Metadata Storage + Binary Quantization |
+| v0.7.0 | 2025-12-30 | SIMD Acceleration + First Community PR |
+| v0.8.0 | 2026-01-08 | Consolidation + Developer Experience |
+| v0.9.0 | TBD (W41) | Sparse Vectors + Hybrid Search + Flat Index (conditional) |
+| v0.10.0 | TBD (W47) | WebGPU Research + PQ Research + Advanced Features |
+| v1.0 | TBD (W52) | Production Release |
 
 ---
 
@@ -508,12 +644,7 @@ Per SCALE_UP_ANALYSIS_2025-12-20.md HOSTILE_REVIEWER verdict:
 
 | Reviewer | Verdict | Date |
 |:---------|:--------|:-----|
-| HOSTILE_REVIEWER | APPROVED | 2025-12-05 (v1.0) |
-| HOSTILE_REVIEWER | APPROVED | 2025-12-14 (Week 16) |
-| HOSTILE_REVIEWER | APPROVED | 2025-12-15 (Week 17) |
-| HOSTILE_REVIEWER | APPROVED | 2025-12-16 (Week 19 Plan) |
-| HOSTILE_REVIEWER | APPROVED | 2025-12-20 (RFC-002) |
-| HOSTILE_REVIEWER | APPROVED | 2025-12-20 (Week 25 Day 6) |
+| HOSTILE_REVIEWER | **APPROVED** | 2026-01-04 |
 
 ---
 
@@ -522,13 +653,9 @@ Per SCALE_UP_ANALYSIS_2025-12-20.md HOSTILE_REVIEWER verdict:
 | Version | Date | Change |
 |:--------|:-----|:-------|
 | v1.0 | 2025-12-05 | Initial roadmap |
-| v1.3 | 2025-12-11 | Week 7 update |
-| v2.0 | 2025-12-16 | Week 19 reconciliation — Weeks 16-18 complete |
-| v3.0 | 2025-12-20 | Week 25 update — RFC-002 APPROVED, v0.6.0 planning complete |
-| v3.1 | 2025-12-22 | Week 28 update — Added pre-release cleanup, publication strategy |
-| v4.0 | 2025-12-23 | Week 29 — v0.6.0 released, v0.7.0 initial planning |
-| v5.0 | 2025-12-23 | Week 30 REVISED — SIMD already implemented, v0.7.0 optimized (18h) |
-| v5.1 | 2025-12-23 | Reddit feedback integrated — v0.7.0 updated to 25.5h with code quality fixes |
+| v5.1 | 2025-12-23 | v0.7.0 planning with Reddit feedback |
+| v6.0 | 2026-01-04 | Post-v0.7.0 strategic plan with community/industry analysis |
+| v6.1 | 2026-01-08 | v0.8.0 RELEASED; v0.9.0 de-risked (HOSTILE_REVIEWER reorder) |
 
 ---
 
