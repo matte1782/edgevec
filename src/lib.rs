@@ -124,6 +124,10 @@ pub mod metadata;
 /// Filter expression parsing and evaluation.
 pub mod filter;
 
+/// Sparse vector support for hybrid search.
+#[cfg(feature = "sparse")]
+pub mod sparse;
+
 pub use batch::BatchInsertable;
 pub use error::BatchError;
 pub use hnsw::{BatchDeleteError, BatchDeleteResult, HnswConfig, HnswIndex, SearchResult};
@@ -134,6 +138,9 @@ pub use simd::{
     capabilities, detect_neon, select_backend, warn_if_suboptimal, SimdBackend, SimdCapabilities,
 };
 pub use storage::VectorStorage;
+
+#[cfg(feature = "sparse")]
+pub use sparse::{SparseError, SparseVector};
 
 /// The crate version string.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

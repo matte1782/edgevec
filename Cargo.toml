@@ -220,6 +220,14 @@ harness = false
 name = "simd_comparison"
 harness = false
 
+[[bench]]
+name = "sparse_bench"
+harness = false
+
+[[bench]]
+name = "sparse_storage_bench"
+harness = false
+
 [[example]]
 name = "batch_insert"
 
@@ -266,7 +274,8 @@ debug = true        # Include debug info for profiling
 # =============================================================================
 
 [features]
-default = []
+default = ["sparse"]
+sparse = []
 simd = []
 
 # =============================================================================
