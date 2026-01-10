@@ -169,10 +169,8 @@ proptest! {
         }
 
         for idx in delete_indices {
-            if idx < ids.len() {
-                if storage.delete(ids[idx]).unwrap_or(false) {
-                    deleted_set.insert(ids[idx]);
-                }
+            if idx < ids.len() && storage.delete(ids[idx]).unwrap_or(false) {
+                deleted_set.insert(ids[idx]);
             }
         }
 
@@ -223,7 +221,7 @@ proptest! {
         }
 
         let ratio = storage.deletion_ratio();
-        prop_assert!(ratio >= 0.0 && ratio <= 1.0,
+        prop_assert!((0.0..=1.0).contains(&ratio),
             "deletion_ratio must be in [0.0, 1.0], got {}", ratio);
     }
 

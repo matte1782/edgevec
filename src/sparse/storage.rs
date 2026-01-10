@@ -1641,6 +1641,16 @@ impl Iterator for SparseStorageIter<'_> {
 // =============================================================================
 
 #[cfg(test)]
+#[allow(
+    clippy::uninlined_format_args,
+    clippy::default_trait_access,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::redundant_closure_for_method_calls,
+    clippy::range_plus_one,
+    clippy::float_cmp
+)]
 mod tests {
     use super::*;
 
@@ -1675,7 +1685,7 @@ mod tests {
     fn test_sparse_id_copy_clone() {
         let id1 = SparseId::new(42);
         let id2 = id1; // Copy
-        let id3 = id1.clone(); // Clone
+        let id3 = id1; // Copy (same as clone for Copy types)
         assert_eq!(id1, id2);
         assert_eq!(id1, id3);
     }
@@ -2594,7 +2604,7 @@ mod tests {
         let path = dir.path().join("test.espv");
 
         let mut original = SparseStorage::new();
-        let vectors = vec![
+        let vectors = [
             SparseVector::new(vec![0, 5], vec![0.1, 0.2], 100).unwrap(),
             SparseVector::new(vec![1, 2, 3], vec![1.0, 2.0, 3.0], 50).unwrap(),
             SparseVector::singleton(99, 9.9, 100).unwrap(),
