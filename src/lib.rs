@@ -124,9 +124,16 @@ pub mod metadata;
 /// Filter expression parsing and evaluation.
 pub mod filter;
 
+/// Index implementations (FlatIndex, etc.).
+pub mod index;
+
 /// Sparse vector support for hybrid search.
 #[cfg(feature = "sparse")]
 pub mod sparse;
+
+/// Hybrid search combining dense and sparse retrieval.
+#[cfg(feature = "sparse")]
+pub mod hybrid;
 
 pub use batch::BatchInsertable;
 pub use error::BatchError;
@@ -138,6 +145,8 @@ pub use simd::{
     capabilities, detect_neon, select_backend, warn_if_suboptimal, SimdBackend, SimdCapabilities,
 };
 pub use storage::VectorStorage;
+
+pub use index::{DistanceMetric, FlatIndex, FlatIndexConfig, FlatIndexError, FlatSearchResult};
 
 #[cfg(feature = "sparse")]
 pub use sparse::{SparseError, SparseVector};
