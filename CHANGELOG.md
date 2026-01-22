@@ -7,18 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned (v0.9.0) — Community Features
+### Added (v0.9.0) — FlatIndex Implementation
 
-**Flat Index** (RFC from @jsonMartin):
-- O(1) append time (vs HNSW's O(log n))
-- Brute-force exact search (100% recall)
-- Ideal for small-medium datasets
-- True binary vector storage (1-bit per dimension)
+**FlatIndex** (RFC from @jsonMartin) — Week 40:
 
-**Other planned:**
-- Community features and contributions
-- Additional documentation improvements
-- Performance optimizations
+#### Core (Days 1-2)
+- **`FlatIndex`** — Brute-force exact nearest neighbor search
+  - O(1) insert, O(n·d) search with 100% recall guarantee
+  - Row-major vector storage for cache-friendly access
+  - 4 distance metrics: Cosine, DotProduct, L2, Hamming
+  - Configurable via `FlatIndexConfig` builder pattern
+
+```rust
+use edgevec::{FlatIndex, FlatIndexConfig, DistanceMetric};
+
+let config = FlatIndexConfig::new(768)
+    .with_metric(DistanceMetric::Cosine)
+    .with_capacity(10_000);
+let mut index = FlatIndex::new(config);
+
+let id = index.insert(&embedding)?;
+let results = index.search(&query, 10)?;
+```
+
+#### Deletion & Compaction (Day 3)
+- **Soft delete** with bitmap tracking
+- **Auto-compaction** when deletion ratio exceeds threshold
+- **`deletion_stats()`** for monitoring
+
+#### Binary Quantization (Day 3)
+- **32x memory reduction** (768D: 3072 → 96 bytes per vector)
+- **`enable_quantization()`** / **`disable_quantization()`**
+- **`search_quantized()`** with Hamming distance
+- Recall: ~40% on random data, 70-90% on real embeddings
+
+#### Persistence (Day 4)
+- **`to_snapshot()`** / **`from_snapshot()`** serialization
+- **CRC32 checksum** for integrity validation
+- **Postcard serialization** (WASM-compatible)
+- Magic number "EVFI", version 1
+
+```rust
+// Save
+let snapshot = index.to_snapshot()?;
+storage.write("index.bin", &snapshot)?;
+
+// Load
+let data = storage.read("index.bin")?;
+let restored = FlatIndex::from_snapshot(&data)?;
+```
+
+#### Benchmarks
+- `benches/flat_bench.rs` with 6 benchmark groups
+- Insert, search (128D/768D), BQ comparison, metrics, snapshot
+
+**Test Coverage:** 77 FlatIndex tests, 988 total library tests
 
 ---
 
