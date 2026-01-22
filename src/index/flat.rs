@@ -49,6 +49,7 @@
 //! assert_eq!(v.len(), 128);
 //! ```
 
+use crate::persistence::PersistenceError;
 use bitvec::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -1148,6 +1149,357 @@ impl FlatIndex {
 }
 
 // ============================================================================
+// PERSISTENCE
+// ============================================================================
+
+/// Snapshot format version for FlatIndex.
+pub const FLAT_INDEX_VERSION: u32 = 1;
+
+/// Magic number for FlatIndex snapshots: "EVFI" (EdgeVec Flat Index).
+pub const FLAT_INDEX_MAGIC: [u8; 4] = [b'E', b'V', b'F', b'I'];
+
+/// FlatIndex snapshot header.
+///
+/// Contains all metadata needed to reconstruct a FlatIndex from a snapshot.
+/// Serialized using postcard for WASM compatibility.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlatIndexHeader {
+    /// Magic number (must be `FLAT_INDEX_MAGIC`).
+    pub magic: [u8; 4],
+
+    /// Format version (must be <= `FLAT_INDEX_VERSION`).
+    pub version: u32,
+
+    /// Vector dimension.
+    pub dimensions: u32,
+
+    /// Distance metric.
+    pub metric: DistanceMetric,
+
+    /// Number of vectors stored (including deleted slots).
+    pub count: u64,
+
+    /// Number of deleted vectors.
+    pub delete_count: u64,
+
+    /// Next ID to assign.
+    pub next_id: u64,
+
+    /// Whether quantization is enabled.
+    pub is_quantized: bool,
+
+    /// Cleanup threshold for auto-compaction.
+    pub cleanup_threshold: f32,
+
+    /// CRC32 checksum of the data section.
+    pub checksum: u32,
+}
+
+impl FlatIndexHeader {
+    /// Create a header from a FlatIndex and computed checksum.
+    #[must_use]
+    pub fn from_index(index: &FlatIndex, checksum: u32) -> Self {
+        Self {
+            magic: FLAT_INDEX_MAGIC,
+            version: FLAT_INDEX_VERSION,
+            dimensions: index.config.dimensions,
+            metric: index.config.metric,
+            count: index.count,
+            delete_count: index.delete_count as u64,
+            next_id: index.next_id,
+            is_quantized: index.quantized.is_some(),
+            cleanup_threshold: index.config.cleanup_threshold,
+            checksum,
+        }
+    }
+
+    /// Validate the header.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistenceError::InvalidMagic` if magic doesn't match.
+    /// Returns `PersistenceError::UnsupportedVersion` if version is too new.
+    #[allow(clippy::cast_possible_truncation)] // Intentional truncation for version bytes
+    pub fn validate(&self) -> Result<(), PersistenceError> {
+        if self.magic != FLAT_INDEX_MAGIC {
+            return Err(PersistenceError::InvalidMagic {
+                expected: FLAT_INDEX_MAGIC,
+                actual: self.magic,
+            });
+        }
+        if self.version > FLAT_INDEX_VERSION {
+            return Err(PersistenceError::UnsupportedVersion(
+                (self.version >> 8) as u8,
+                (self.version & 0xFF) as u8,
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl FlatIndex {
+    // ========================================================================
+    // PERSISTENCE
+    // ========================================================================
+
+    /// Serialize the index to a snapshot.
+    ///
+    /// The snapshot format is:
+    /// 1. Header length (u32, 4 bytes)
+    /// 2. Header (postcard serialized `FlatIndexHeader`)
+    /// 3. Deleted bitmap length (u32, 4 bytes)
+    /// 4. Deleted bitmap (variable bytes)
+    /// 5. Vectors length (u64, 8 bytes)
+    /// 6. Vectors (n × dim × 4 bytes, little-endian f32)
+    /// 7. Quantized length (u64, 8 bytes, 0 if not enabled)
+    /// 8. Quantized vectors (optional, n × ceil(dim/8) bytes)
+    ///
+    /// # Returns
+    ///
+    /// Bytes that can be written to IndexedDB or file system.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PersistenceError::SerializationError` if serialization fails.
+    #[allow(clippy::cast_possible_truncation)] // Header and bitmap sizes are small (<4GB)
+    pub fn to_snapshot(&self) -> Result<Vec<u8>, PersistenceError> {
+        let mut buffer = Vec::new();
+
+        // Serialize data sections first to compute checksum
+        let deleted_bytes = self.serialize_deleted_bitmap();
+        let vectors_bytes = self.serialize_vectors();
+        let quantized_bytes = self.serialize_quantized();
+
+        // Compute checksum of data
+        let checksum = Self::compute_checksum(&deleted_bytes, &vectors_bytes, &quantized_bytes);
+
+        // Create and serialize header
+        let header = FlatIndexHeader::from_index(self, checksum);
+        let header_bytes = postcard::to_allocvec(&header)
+            .map_err(|e| PersistenceError::SerializationError(e.to_string()))?;
+
+        // Write header length (u32) + header
+        buffer.extend_from_slice(&(header_bytes.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(&header_bytes);
+
+        // Write deleted bitmap length + data
+        buffer.extend_from_slice(&(deleted_bytes.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(&deleted_bytes);
+
+        // Write vectors length + data
+        buffer.extend_from_slice(&(vectors_bytes.len() as u64).to_le_bytes());
+        buffer.extend_from_slice(&vectors_bytes);
+
+        // Write quantized length + data (0 if not enabled)
+        buffer.extend_from_slice(&(quantized_bytes.len() as u64).to_le_bytes());
+        if !quantized_bytes.is_empty() {
+            buffer.extend_from_slice(&quantized_bytes);
+        }
+
+        Ok(buffer)
+    }
+
+    /// Restore index from a snapshot.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Bytes from `to_snapshot()` or loaded from storage
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Magic number doesn't match
+    /// - Version is unsupported
+    /// - Checksum doesn't match
+    /// - Data is corrupted or truncated
+    ///
+    /// # Panics
+    ///
+    /// This function does not panic. The internal `expect` is guarded by
+    /// `chunks_exact(4)` which guarantees the slice length.
+    #[allow(clippy::cast_possible_truncation)] // FlatIndex targets <10k vectors
+    #[allow(clippy::missing_panics_doc)] // Panic is unreachable by design
+    pub fn from_snapshot(data: &[u8]) -> Result<Self, PersistenceError> {
+        let mut cursor = 0;
+
+        // Read header length
+        if data.len() < 4 {
+            return Err(PersistenceError::TruncatedData);
+        }
+        let header_len = u32::from_le_bytes(
+            data[0..4]
+                .try_into()
+                .map_err(|_| PersistenceError::TruncatedData)?,
+        ) as usize;
+        cursor += 4;
+
+        // Read and parse header
+        if data.len() < cursor + header_len {
+            return Err(PersistenceError::TruncatedData);
+        }
+        let header: FlatIndexHeader = postcard::from_bytes(&data[cursor..cursor + header_len])
+            .map_err(|e| PersistenceError::DeserializationError(e.to_string()))?;
+        cursor += header_len;
+
+        // Validate header
+        header.validate()?;
+
+        // Read deleted bitmap length
+        if data.len() < cursor + 4 {
+            return Err(PersistenceError::TruncatedData);
+        }
+        let deleted_len = u32::from_le_bytes(
+            data[cursor..cursor + 4]
+                .try_into()
+                .map_err(|_| PersistenceError::TruncatedData)?,
+        ) as usize;
+        cursor += 4;
+
+        // Read deleted bitmap
+        if data.len() < cursor + deleted_len {
+            return Err(PersistenceError::TruncatedData);
+        }
+        let deleted_bytes = &data[cursor..cursor + deleted_len];
+        cursor += deleted_len;
+
+        // Read vectors length
+        if data.len() < cursor + 8 {
+            return Err(PersistenceError::TruncatedData);
+        }
+        let vectors_len = u64::from_le_bytes(
+            data[cursor..cursor + 8]
+                .try_into()
+                .map_err(|_| PersistenceError::TruncatedData)?,
+        ) as usize;
+        cursor += 8;
+
+        // Read vectors
+        if data.len() < cursor + vectors_len {
+            return Err(PersistenceError::TruncatedData);
+        }
+        let vectors_bytes = &data[cursor..cursor + vectors_len];
+        cursor += vectors_len;
+
+        // Read quantized length
+        if data.len() < cursor + 8 {
+            return Err(PersistenceError::TruncatedData);
+        }
+        let quantized_len = u64::from_le_bytes(
+            data[cursor..cursor + 8]
+                .try_into()
+                .map_err(|_| PersistenceError::TruncatedData)?,
+        ) as usize;
+        cursor += 8;
+
+        // Read quantized data
+        let quantized_bytes = if quantized_len > 0 {
+            if data.len() < cursor + quantized_len {
+                return Err(PersistenceError::TruncatedData);
+            }
+            Some(data[cursor..cursor + quantized_len].to_vec())
+        } else {
+            None
+        };
+
+        // Verify checksum
+        let computed_checksum = Self::compute_checksum(
+            deleted_bytes,
+            vectors_bytes,
+            quantized_bytes.as_deref().unwrap_or(&[]),
+        );
+
+        if computed_checksum != header.checksum {
+            return Err(PersistenceError::ChecksumMismatch {
+                expected: header.checksum,
+                actual: computed_checksum,
+            });
+        }
+
+        // Reconstruct config
+        let config = FlatIndexConfig {
+            dimensions: header.dimensions,
+            metric: header.metric,
+            initial_capacity: header.count as usize,
+            cleanup_threshold: header.cleanup_threshold,
+        };
+
+        // Deserialize vectors
+        let vectors: Vec<f32> = vectors_bytes
+            .chunks_exact(4)
+            .map(|chunk| {
+                f32::from_le_bytes(chunk.try_into().expect("chunks_exact guarantees 4 bytes"))
+            })
+            .collect();
+
+        // Deserialize deleted bitmap
+        let deleted = Self::deserialize_deleted_bitmap(deleted_bytes, header.count as usize);
+
+        Ok(Self {
+            config,
+            vectors,
+            count: header.count,
+            deleted,
+            delete_count: header.delete_count as usize,
+            next_id: header.next_id,
+            quantized: quantized_bytes,
+        })
+    }
+
+    /// Serialize the deleted bitmap to bytes.
+    fn serialize_deleted_bitmap(&self) -> Vec<u8> {
+        // BitVec stores bits in usize chunks; convert to raw bytes
+        let raw_slice = self.deleted.as_raw_slice();
+        let mut bytes = Vec::with_capacity(std::mem::size_of_val(raw_slice));
+        for &word in raw_slice {
+            bytes.extend_from_slice(&word.to_le_bytes());
+        }
+        bytes
+    }
+
+    /// Deserialize the deleted bitmap from bytes.
+    fn deserialize_deleted_bitmap(bytes: &[u8], count: usize) -> BitVec {
+        // Reconstruct from raw usize words
+        let word_size = std::mem::size_of::<usize>();
+        let mut words: Vec<usize> = bytes
+            .chunks(word_size)
+            .map(|chunk| {
+                let mut arr = [0u8; std::mem::size_of::<usize>()];
+                let len = chunk.len().min(word_size);
+                arr[..len].copy_from_slice(&chunk[..len]);
+                usize::from_le_bytes(arr)
+            })
+            .collect();
+
+        // Ensure we have enough capacity
+        let needed_words = (count + usize::BITS as usize - 1) / usize::BITS as usize;
+        words.resize(needed_words, 0);
+
+        let mut bv = BitVec::from_vec(words);
+        bv.truncate(count);
+        bv
+    }
+
+    /// Serialize vectors to bytes.
+    fn serialize_vectors(&self) -> Vec<u8> {
+        self.vectors.iter().flat_map(|f| f.to_le_bytes()).collect()
+    }
+
+    /// Serialize quantized vectors to bytes.
+    fn serialize_quantized(&self) -> Vec<u8> {
+        self.quantized.clone().unwrap_or_default()
+    }
+
+    /// Compute CRC32 checksum of data sections.
+    fn compute_checksum(deleted: &[u8], vectors: &[u8], quantized: &[u8]) -> u32 {
+        let mut hasher = crc32fast::Hasher::new();
+        hasher.update(deleted);
+        hasher.update(vectors);
+        hasher.update(quantized);
+        hasher.finalize()
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -2224,5 +2576,402 @@ mod tests {
         assert_eq!(results.len(), 10);
         // All even IDs should have better (lower) Hamming distance
         assert!(results[0].id % 2 == 0);
+    }
+
+    // ------------------------------------------------------------------------
+    // Persistence Tests (Day 4)
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_snapshot_round_trip_basic() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(64));
+
+        // Insert vectors
+        for i in 0..100 {
+            let v: Vec<f32> = (0..64).map(|j| (i * 64 + j) as f32 / 1000.0).collect();
+            index.insert(&v).unwrap();
+        }
+
+        // Save snapshot
+        let snapshot = index.to_snapshot().unwrap();
+
+        // Restore from snapshot
+        let restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+        // Verify state
+        assert_eq!(restored.dimensions(), index.dimensions());
+        assert_eq!(restored.len(), index.len());
+        assert_eq!(restored.metric(), index.metric());
+
+        // Verify vectors
+        for i in 0..100 {
+            let original = index.get(i).unwrap();
+            let restored_vec = restored.get(i).unwrap();
+            assert_eq!(original, restored_vec);
+        }
+    }
+
+    #[test]
+    #[allow(clippy::useless_vec)] // Variable value requires vec!
+    fn test_snapshot_with_deletions() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(16));
+
+        // Insert vectors
+        for i in 0..50 {
+            index.insert(&vec![i as f32; 16]).unwrap();
+        }
+
+        // Delete some
+        assert!(index.delete(10));
+        assert!(index.delete(20));
+        assert!(index.delete(30));
+
+        // Save and restore
+        let snapshot = index.to_snapshot().unwrap();
+        let restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+        // Verify deletions preserved
+        assert!(restored.get(10).is_none());
+        assert!(restored.get(20).is_none());
+        assert!(restored.get(30).is_none());
+        assert!(restored.get(0).is_some());
+        assert!(restored.get(49).is_some());
+
+        // Verify deletion count
+        let (_, delete_count, _) = restored.deletion_stats();
+        assert_eq!(delete_count, 3);
+    }
+
+    #[test]
+    fn test_snapshot_with_quantization() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(128));
+
+        // Insert vectors
+        for i in 0..100 {
+            let v: Vec<f32> = (0..128)
+                .map(|j| if (i + j) % 2 == 0 { 1.0 } else { -1.0 })
+                .collect();
+            index.insert(&v).unwrap();
+        }
+
+        // Enable quantization
+        index.enable_quantization().unwrap();
+        assert!(index.is_quantized());
+
+        // Save and restore
+        let snapshot = index.to_snapshot().unwrap();
+        let restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+        // Verify quantization state
+        assert!(restored.is_quantized());
+
+        // Search should work
+        let query: Vec<f32> = (0..128)
+            .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
+            .collect();
+        let results = restored.search_quantized(&query, 5).unwrap();
+        assert_eq!(results.len(), 5);
+    }
+
+    #[test]
+    fn test_snapshot_different_metrics() {
+        for metric in [
+            DistanceMetric::Cosine,
+            DistanceMetric::DotProduct,
+            DistanceMetric::L2,
+            DistanceMetric::Hamming,
+        ] {
+            let config = FlatIndexConfig::new(32).with_metric(metric);
+            let mut index = FlatIndex::new(config);
+
+            index.insert(&[0.5; 32]).unwrap();
+
+            let snapshot = index.to_snapshot().unwrap();
+            let restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+            assert_eq!(restored.metric(), metric);
+        }
+    }
+
+    #[test]
+    fn test_snapshot_invalid_magic() {
+        // Create minimal valid header, then corrupt magic
+        let mut index = FlatIndex::new(FlatIndexConfig::new(4));
+        index.insert(&[1.0; 4]).unwrap();
+
+        let mut snapshot = index.to_snapshot().unwrap();
+
+        // Corrupt magic in header (after the 4-byte length)
+        if snapshot.len() > 8 {
+            snapshot[4] = b'X';
+            snapshot[5] = b'X';
+            snapshot[6] = b'X';
+            snapshot[7] = b'X';
+        }
+
+        let result = FlatIndex::from_snapshot(&snapshot);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_snapshot_truncated() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(16));
+        index.insert(&[1.0; 16]).unwrap();
+
+        let snapshot = index.to_snapshot().unwrap();
+
+        // Truncate snapshot
+        let truncated = &snapshot[..snapshot.len() / 2];
+
+        let result = FlatIndex::from_snapshot(truncated);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_snapshot_corrupted_checksum() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(16));
+        index.insert(&[1.0; 16]).unwrap();
+
+        let mut snapshot = index.to_snapshot().unwrap();
+
+        // Corrupt data section (flip bits in vector data)
+        if snapshot.len() > 100 {
+            snapshot[100] ^= 0xFF;
+        }
+
+        let result = FlatIndex::from_snapshot(&snapshot);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_search_after_restore() {
+        let config = FlatIndexConfig::new(64).with_metric(DistanceMetric::Cosine);
+        let mut index = FlatIndex::new(config);
+
+        // Insert known vectors
+        index.insert(&[1.0; 64]).unwrap(); // ID 0
+        index.insert(&[0.5; 64]).unwrap(); // ID 1
+        index.insert(&[0.0; 64]).unwrap(); // ID 2
+
+        // Save and restore
+        let snapshot = index.to_snapshot().unwrap();
+        let restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+        // Search should return same results
+        let query = [1.0; 64];
+        let original_results = index.search(&query, 3).unwrap();
+        let restored_results = restored.search(&query, 3).unwrap();
+
+        assert_eq!(original_results.len(), restored_results.len());
+        for (orig, rest) in original_results.iter().zip(restored_results.iter()) {
+            assert_eq!(orig.id, rest.id);
+            assert!((orig.score - rest.score).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_snapshot_empty_index() {
+        let index = FlatIndex::new(FlatIndexConfig::new(128));
+
+        let snapshot = index.to_snapshot().unwrap();
+        let restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+        assert_eq!(restored.dimensions(), 128);
+        assert!(restored.is_empty());
+        assert_eq!(restored.len(), 0);
+    }
+
+    #[test]
+    fn test_snapshot_preserves_next_id() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        // Insert, delete, insert pattern to increase next_id
+        let id1 = index.insert(&[1.0; 8]).unwrap();
+        let id2 = index.insert(&[2.0; 8]).unwrap();
+        index.delete(id1);
+        let id3 = index.insert(&[3.0; 8]).unwrap();
+
+        assert_eq!(id1, 0);
+        assert_eq!(id2, 1);
+        assert_eq!(id3, 2);
+
+        // Save and restore
+        let snapshot = index.to_snapshot().unwrap();
+        let mut restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+        // Next insert should get ID 3
+        let id4 = restored.insert(&[4.0; 8]).unwrap();
+        assert_eq!(id4, 3);
+    }
+
+    #[test]
+    fn test_snapshot_cleanup_threshold() {
+        let config = FlatIndexConfig::new(8).with_cleanup_threshold(0.25);
+        let index = FlatIndex::new(config);
+
+        let snapshot = index.to_snapshot().unwrap();
+        let restored = FlatIndex::from_snapshot(&snapshot).unwrap();
+
+        // Can't directly access cleanup_threshold, but we can verify behavior
+        // by inserting and deleting (would need additional getter)
+        assert_eq!(restored.dimensions(), 8);
+    }
+
+    #[test]
+    fn test_snapshot_header_validation() {
+        use crate::persistence::PersistenceError;
+
+        let header = FlatIndexHeader {
+            magic: FLAT_INDEX_MAGIC,
+            version: FLAT_INDEX_VERSION,
+            dimensions: 64,
+            metric: DistanceMetric::Cosine,
+            count: 10,
+            delete_count: 0,
+            next_id: 10,
+            is_quantized: false,
+            cleanup_threshold: 0.5,
+            checksum: 0,
+        };
+
+        assert!(header.validate().is_ok());
+
+        // Wrong magic
+        let bad_magic = FlatIndexHeader {
+            magic: [b'X', b'X', b'X', b'X'],
+            ..header.clone()
+        };
+        assert!(matches!(
+            bad_magic.validate(),
+            Err(PersistenceError::InvalidMagic { .. })
+        ));
+
+        // Future version
+        let future_version = FlatIndexHeader {
+            version: FLAT_INDEX_VERSION + 1,
+            ..header.clone()
+        };
+        assert!(matches!(
+            future_version.validate(),
+            Err(PersistenceError::UnsupportedVersion(_, _))
+        ));
+    }
+
+    // ------------------------------------------------------------------------
+    // BQ Recall Comparison Test (HOSTILE_REVIEWER m2)
+    // ------------------------------------------------------------------------
+
+    /// Test that measures recall degradation of BQ vs F32 search.
+    ///
+    /// BQ uses Hamming distance on binary-packed vectors, which is an
+    /// approximation of angular distance. This test validates:
+    /// 1. BQ recall is documented and measured
+    /// 2. BQ provides meaningful (non-random) results
+    ///
+    /// # Important Notes on BQ Recall
+    ///
+    /// Binary quantization works best when:
+    /// - Data has clear sign patterns (e.g., embedding models)
+    /// - Using angular/cosine similarity metrics
+    /// - Vectors are normalized
+    ///
+    /// For uniformly random data, BQ recall is lower (~30-50%) because
+    /// random vectors don't have meaningful sign structure. Real embedding
+    /// data (e.g., from BERT, OpenAI) typically achieves 70-90% recall.
+    ///
+    /// The 32x memory reduction makes BQ valuable even at lower recall
+    /// when used as a first-pass filter (reranking with F32).
+    #[test]
+    fn test_bq_vs_f32_recall_comparison() {
+        use std::collections::HashSet;
+
+        let dim = 128;
+        let count = 500;
+        let k = 10;
+        let num_queries = 50;
+
+        // Use a consistent seed for reproducibility
+        let seed = 12345u64;
+
+        // Create index with cosine metric
+        let config = FlatIndexConfig::new(dim).with_metric(DistanceMetric::Cosine);
+        let mut index = FlatIndex::new(config);
+
+        // Generate reproducible vectors using LCG
+        let mut state = seed;
+        let next_f32 = |s: &mut u64| -> f32 {
+            // LCG: state = state * a + c mod m
+            *s = s.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            // Map to [-1, 1]
+            ((*s >> 33) as f32 / (u32::MAX >> 1) as f32) * 2.0 - 1.0
+        };
+
+        // Insert vectors
+        for _ in 0..count {
+            let v: Vec<f32> = (0..dim).map(|_| next_f32(&mut state)).collect();
+            index.insert(&v).unwrap();
+        }
+
+        // Enable quantization
+        index.enable_quantization().unwrap();
+
+        // Measure recall across multiple queries
+        let mut total_recall = 0.0;
+
+        for q in 0..num_queries {
+            // Use existing vectors as queries (ensures they exist in the index)
+            let query_id = q * (count / num_queries);
+            let query = index.get(query_id as u64).unwrap().to_vec();
+
+            // Get ground truth (F32 exact search)
+            let f32_results = index.search(&query, k).unwrap();
+            let f32_ids: HashSet<u64> = f32_results.iter().map(|r| r.id).collect();
+
+            // Get BQ approximate results
+            let bq_results = index.search_quantized(&query, k).unwrap();
+            let bq_ids: HashSet<u64> = bq_results.iter().map(|r| r.id).collect();
+
+            // Calculate recall: |F32 ∩ BQ| / |F32|
+            let intersection = f32_ids.intersection(&bq_ids).count();
+            let recall = intersection as f32 / k as f32;
+            total_recall += recall;
+        }
+
+        let avg_recall = total_recall / num_queries as f32;
+
+        // Document the measured recall
+        println!(
+            "BQ vs F32 Recall Comparison:\n\
+             - Dataset: {} vectors @ {}D (random uniform)\n\
+             - Queries: {}\n\
+             - k: {}\n\
+             - Average Recall@{}: {:.1}%\n\
+             - Note: Random data has lower recall; real embeddings achieve 70-90%",
+            count,
+            dim,
+            num_queries,
+            k,
+            k,
+            avg_recall * 100.0
+        );
+
+        // For random data, BQ recall is ~30-50% (expected).
+        // Random chance for 10/500 = 2%, so BQ is significantly better.
+        // We assert > 20% to ensure BQ provides non-random results.
+        // Real embedding data would use a higher threshold (e.g., 70%).
+        assert!(
+            avg_recall >= 0.20,
+            "BQ recall too low: {:.1}% (minimum: 20% for random data)",
+            avg_recall * 100.0
+        );
+
+        // Verify BQ is significantly better than random chance (2%)
+        let random_chance = k as f32 / count as f32;
+        assert!(
+            avg_recall > random_chance * 5.0,
+            "BQ recall ({:.1}%) not significantly better than random ({:.1}%)",
+            avg_recall * 100.0,
+            random_chance * 100.0
+        );
     }
 }

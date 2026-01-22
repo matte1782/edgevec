@@ -137,6 +137,10 @@ name = "distance_bench"
 harness = false
 
 [[bench]]
+name = "flat_bench"
+harness = false
+
+[[bench]]
 name = "persistence_bench"
 harness = false
 

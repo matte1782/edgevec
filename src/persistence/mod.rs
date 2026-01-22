@@ -85,4 +85,16 @@ pub enum PersistenceError {
     /// Component not initialized.
     #[error("not initialized")]
     NotInitialized,
+
+    /// Truncated data (unexpected end of snapshot).
+    #[error("truncated data: expected more bytes")]
+    TruncatedData,
+
+    /// Serialization error.
+    #[error("serialization error: {0}")]
+    SerializationError(String),
+
+    /// Deserialization error.
+    #[error("deserialization error: {0}")]
+    DeserializationError(String),
 }

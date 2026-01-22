@@ -31,4 +31,7 @@
 
 mod flat;
 
-pub use flat::{DistanceMetric, FlatIndex, FlatIndexConfig, FlatIndexError, FlatSearchResult};
+pub use flat::{
+    DistanceMetric, FlatIndex, FlatIndexConfig, FlatIndexError, FlatIndexHeader, FlatSearchResult,
+    FLAT_INDEX_MAGIC, FLAT_INDEX_VERSION,
+};

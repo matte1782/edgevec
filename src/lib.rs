@@ -146,7 +146,10 @@ pub use simd::{
 };
 pub use storage::VectorStorage;
 
-pub use index::{DistanceMetric, FlatIndex, FlatIndexConfig, FlatIndexError, FlatSearchResult};
+pub use index::{
+    DistanceMetric, FlatIndex, FlatIndexConfig, FlatIndexError, FlatIndexHeader, FlatSearchResult,
+    FLAT_INDEX_MAGIC, FLAT_INDEX_VERSION,
+};
 
 #[cfg(feature = "sparse")]
 pub use sparse::{SparseError, SparseVector};
