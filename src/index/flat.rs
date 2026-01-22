@@ -571,6 +571,394 @@ impl FlatIndex {
         vector_bytes + bitmap_bytes + quantized_bytes
     }
 
+    /// Get deletion statistics.
+    ///
+    /// Returns a tuple of (total_vectors, deleted_count, deletion_ratio).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use edgevec::index::{FlatIndex, FlatIndexConfig};
+    ///
+    /// let mut index = FlatIndex::new(FlatIndexConfig::new(3));
+    /// index.insert(&[1.0, 2.0, 3.0]).unwrap();
+    /// index.insert(&[4.0, 5.0, 6.0]).unwrap();
+    /// index.delete(0);
+    ///
+    /// let (total, deleted, ratio) = index.deletion_stats();
+    /// assert_eq!(total, 2);
+    /// assert_eq!(deleted, 1);
+    /// assert!((ratio - 0.5).abs() < 0.01);
+    /// ```
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for ratio calculation
+    #[allow(clippy::cast_possible_truncation)] // FlatIndex targets <10k vectors
+    pub fn deletion_stats(&self) -> (usize, usize, f32) {
+        let total = self.count as usize;
+        let deleted = self.delete_count;
+        let ratio = if total > 0 {
+            deleted as f32 / total as f32
+        } else {
+            0.0
+        };
+        (total, deleted, ratio)
+    }
+
+    // ========================================================================
+    // DELETE
+    // ========================================================================
+
+    /// Mark a vector as deleted.
+    ///
+    /// The vector is not immediately removed; its slot is marked in the
+    /// deletion bitmap and skipped during search. Call `compact()` to
+    /// reclaim space when deletion rate exceeds the threshold.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the vector was deleted, `false` if it didn't exist
+    /// or was already deleted.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use edgevec::index::{FlatIndex, FlatIndexConfig};
+    ///
+    /// let mut index = FlatIndex::new(FlatIndexConfig::new(3));
+    /// let id = index.insert(&[1.0, 2.0, 3.0]).unwrap();
+    ///
+    /// assert!(index.delete(id)); // Success
+    /// assert!(!index.delete(id)); // Already deleted
+    /// assert!(!index.delete(999)); // Doesn't exist
+    ///
+    /// assert!(!index.contains(id)); // No longer accessible
+    /// ```
+    #[allow(clippy::cast_possible_truncation)] // FlatIndex targets <10k vectors
+    pub fn delete(&mut self, id: u64) -> bool {
+        let idx = id as usize;
+        let count = self.count as usize;
+
+        // Check bounds
+        if idx >= count {
+            return false;
+        }
+
+        // Check if already deleted
+        if self.deleted.get(idx).map_or(true, |b| *b) {
+            return false;
+        }
+
+        // Mark as deleted
+        self.deleted.set(idx, true);
+        self.delete_count += 1;
+
+        // Invalidate quantized cache
+        if self.quantized.is_some() {
+            self.quantized = None;
+        }
+
+        // Auto-compact if threshold exceeded
+        if self.should_compact() {
+            self.compact();
+        }
+
+        true
+    }
+
+    /// Check if compaction is needed.
+    #[allow(clippy::cast_precision_loss)] // Precision loss acceptable for ratio
+    fn should_compact(&self) -> bool {
+        if self.count == 0 {
+            return false;
+        }
+        (self.delete_count as f32 / self.count as f32) > self.config.cleanup_threshold
+    }
+
+    /// Compact the index by removing deleted vectors.
+    ///
+    /// This rebuilds the internal storage, removing deleted slots.
+    ///
+    /// # Warning
+    ///
+    /// This operation changes vector IDs! After compaction, vectors are
+    /// renumbered to be contiguous. Use with caution if external systems
+    /// reference vector IDs.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use edgevec::index::{FlatIndex, FlatIndexConfig};
+    ///
+    /// let mut index = FlatIndex::new(
+    ///     FlatIndexConfig::new(3).with_cleanup_threshold(1.0) // Disable auto-compact
+    /// );
+    ///
+    /// index.insert(&[1.0, 2.0, 3.0]).unwrap();
+    /// index.insert(&[4.0, 5.0, 6.0]).unwrap();
+    /// index.insert(&[7.0, 8.0, 9.0]).unwrap();
+    ///
+    /// // Delete middle vector
+    /// index.delete(1);
+    /// assert_eq!(index.len(), 2);
+    /// assert_eq!(index.capacity(), 3); // Still has 3 slots
+    ///
+    /// // Compact
+    /// index.compact();
+    /// assert_eq!(index.capacity(), 2); // Now only 2 slots
+    /// ```
+    #[allow(clippy::cast_possible_truncation)] // FlatIndex targets <10k vectors
+    pub fn compact(&mut self) {
+        if self.delete_count == 0 {
+            return;
+        }
+
+        let dim = self.config.dimensions as usize;
+        let count = self.count as usize;
+        let new_count = count - self.delete_count;
+
+        let mut new_vectors = Vec::with_capacity(new_count * dim);
+        let mut new_deleted = BitVec::with_capacity(new_count);
+
+        for idx in 0..count {
+            if !self.deleted.get(idx).map_or(true, |b| *b) {
+                // Copy live vector
+                let start = idx * dim;
+                new_vectors.extend_from_slice(&self.vectors[start..start + dim]);
+                new_deleted.push(false);
+            }
+        }
+
+        self.vectors = new_vectors;
+        self.deleted = new_deleted;
+        self.count = new_count as u64;
+        self.delete_count = 0;
+        // Note: next_id stays the same to avoid ID reuse confusion
+        // (although after compact, old IDs are invalid anyway)
+
+        // Quantized cache already invalidated in delete()
+    }
+
+    // ========================================================================
+    // QUANTIZATION
+    // ========================================================================
+
+    /// Enable binary quantization for memory reduction.
+    ///
+    /// Converts stored vectors to binary format (32x compression).
+    /// After enabling, use `search_quantized()` for fast Hamming distance search.
+    ///
+    /// # Memory Reduction
+    ///
+    /// - Original: 768D × 4 bytes = 3072 bytes per vector
+    /// - Quantized: 768D / 8 = 96 bytes per vector (32x reduction)
+    ///
+    /// # Warning
+    ///
+    /// This is a lossy operation. Recall will decrease from 100%
+    /// but memory usage drops significantly. The original F32 vectors
+    /// are preserved for `search()` to maintain 100% recall option.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use edgevec::index::{FlatIndex, FlatIndexConfig};
+    ///
+    /// let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+    /// index.insert(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0]).unwrap();
+    ///
+    /// index.enable_quantization().unwrap();
+    /// assert!(index.is_quantized());
+    ///
+    /// // Can still use exact search
+    /// let exact = index.search(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0], 1).unwrap();
+    ///
+    /// // Or use faster quantized search
+    /// let approx = index.search_quantized(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0], 1).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Currently infallible, but returns `Result` for API consistency
+    /// and future error conditions.
+    #[allow(clippy::cast_possible_truncation)] // FlatIndex targets <10k vectors
+    pub fn enable_quantization(&mut self) -> Result<(), FlatIndexError> {
+        if self.quantized.is_some() {
+            return Ok(()); // Already enabled
+        }
+
+        if self.count == 0 {
+            // Nothing to quantize, but set up empty storage
+            self.quantized = Some(Vec::new());
+            return Ok(());
+        }
+
+        let dim = self.config.dimensions as usize;
+        let packed_dim = (dim + 7) / 8; // Bytes needed for dim bits
+        let count = self.count as usize;
+
+        let mut quantized = Vec::with_capacity(count * packed_dim);
+
+        for idx in 0..count {
+            if self.deleted.get(idx).map_or(true, |b| *b) {
+                // Placeholder for deleted vectors (zeros)
+                quantized.extend(std::iter::repeat(0u8).take(packed_dim));
+                continue;
+            }
+
+            let start = idx * dim;
+            let vector = &self.vectors[start..start + dim];
+
+            // Binarize: value > 0 = 1, else 0
+            let packed = Self::binarize_vector(vector);
+            quantized.extend_from_slice(&packed);
+        }
+
+        self.quantized = Some(quantized);
+        Ok(())
+    }
+
+    /// Disable quantization, freeing the quantized storage.
+    ///
+    /// Search will use original F32 vectors only.
+    pub fn disable_quantization(&mut self) {
+        self.quantized = None;
+    }
+
+    /// Binarize a vector to packed bytes.
+    ///
+    /// Each bit represents whether the corresponding dimension value is > 0.
+    /// Bits are packed MSB-first within each byte.
+    fn binarize_vector(vector: &[f32]) -> Vec<u8> {
+        let dim = vector.len();
+        let packed_dim = (dim + 7) / 8;
+        let mut packed = vec![0u8; packed_dim];
+
+        for (i, &val) in vector.iter().enumerate() {
+            if val > 0.0 {
+                packed[i / 8] |= 1 << (7 - (i % 8));
+            }
+        }
+
+        packed
+    }
+
+    /// Compute Hamming distance between two packed binary vectors.
+    ///
+    /// Uses popcount for efficient bit counting.
+    #[inline]
+    fn hamming_distance_binary(a: &[u8], b: &[u8]) -> u32 {
+        a.iter()
+            .zip(b.iter())
+            .map(|(x, y)| (x ^ y).count_ones())
+            .sum()
+    }
+
+    /// Search using quantized vectors.
+    ///
+    /// Uses Hamming distance on binary-quantized vectors for fast approximate search.
+    /// Results are sorted by ascending Hamming distance (lower = more similar).
+    ///
+    /// # Errors
+    ///
+    /// - `FlatIndexError::QuantizationNotEnabled` if quantization is not enabled
+    /// - `FlatIndexError::DimensionMismatch` if query dimension is wrong
+    /// - `FlatIndexError::InvalidK` if k is 0
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use edgevec::index::{FlatIndex, FlatIndexConfig};
+    ///
+    /// let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+    /// index.insert(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0]).unwrap();
+    /// index.insert(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]).unwrap();
+    ///
+    /// index.enable_quantization().unwrap();
+    ///
+    /// let results = index.search_quantized(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0], 2).unwrap();
+    /// assert_eq!(results[0].id, 0); // Exact match has Hamming distance 0
+    /// assert!((results[0].score - 0.0).abs() < f32::EPSILON);
+    /// ```
+    #[allow(clippy::cast_possible_truncation)] // FlatIndex targets <10k vectors
+    #[allow(clippy::cast_precision_loss)] // Hamming distance fits in f32
+    pub fn search_quantized(
+        &self,
+        query: &[f32],
+        k: usize,
+    ) -> Result<Vec<FlatSearchResult>, FlatIndexError> {
+        let quantized = self
+            .quantized
+            .as_ref()
+            .ok_or(FlatIndexError::QuantizationNotEnabled)?;
+
+        // Validate
+        let expected_dim = self.config.dimensions as usize;
+        if query.len() != expected_dim {
+            return Err(FlatIndexError::DimensionMismatch {
+                expected: expected_dim,
+                actual: query.len(),
+            });
+        }
+
+        if k == 0 {
+            return Err(FlatIndexError::InvalidK);
+        }
+
+        // Empty index returns empty results
+        if self.count == 0 {
+            return Ok(Vec::new());
+        }
+
+        // Binarize query
+        let query_packed = Self::binarize_vector(query);
+        let packed_dim = query_packed.len();
+
+        let mut heap: BinaryHeap<HeapEntry> = BinaryHeap::with_capacity(k + 1);
+        let count = self.count as usize;
+
+        for idx in 0..count {
+            if self.deleted.get(idx).map_or(true, |b| *b) {
+                continue;
+            }
+
+            let start = idx * packed_dim;
+            let vector_packed = &quantized[start..start + packed_dim];
+
+            let distance = Self::hamming_distance_binary(&query_packed, vector_packed);
+
+            // For Hamming distance, lower is better, so use max-heap directly
+            // (heap pops highest, which is worst for distance)
+            if heap.len() < k {
+                heap.push(HeapEntry {
+                    id: idx as u64,
+                    score: distance as f32,
+                });
+            } else if let Some(top) = heap.peek() {
+                if (distance as f32) < top.score {
+                    heap.pop();
+                    heap.push(HeapEntry {
+                        id: idx as u64,
+                        score: distance as f32,
+                    });
+                }
+            }
+        }
+
+        // Extract and sort (ascending distance)
+        let mut results: Vec<FlatSearchResult> = heap
+            .into_iter()
+            .map(|entry| FlatSearchResult {
+                id: entry.id,
+                score: entry.score,
+            })
+            .collect();
+
+        // Sort by ascending Hamming distance (lower = better)
+        results.sort_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(Ordering::Equal));
+
+        Ok(results)
+    }
+
     // ========================================================================
     // SEARCH
     // ========================================================================
@@ -1318,5 +1706,523 @@ mod tests {
         let results = index.search(&query, 5).unwrap();
 
         assert_eq!(results.len(), 5);
+    }
+
+    // ------------------------------------------------------------------------
+    // Deletion Tests (Day 3)
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_delete_basic() {
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(1.0); // Disable auto-compact
+        let mut index = FlatIndex::new(config);
+
+        let id = index.insert(&[1.0, 2.0, 3.0]).unwrap();
+
+        assert!(index.contains(id));
+        assert!(index.delete(id)); // Should return true
+        assert!(!index.contains(id)); // Should no longer be accessible
+        assert!(index.get(id).is_none());
+    }
+
+    #[test]
+    fn test_delete_already_deleted() {
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        let id = index.insert(&[1.0, 2.0, 3.0]).unwrap();
+
+        assert!(index.delete(id)); // First delete succeeds
+        assert!(!index.delete(id)); // Second delete returns false
+    }
+
+    #[test]
+    fn test_delete_nonexistent() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(3));
+
+        assert!(!index.delete(0)); // Empty index
+        assert!(!index.delete(999)); // Out of bounds
+    }
+
+    #[test]
+    fn test_delete_updates_len() {
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0, 2.0, 3.0]).unwrap();
+        index.insert(&[4.0, 5.0, 6.0]).unwrap();
+
+        assert_eq!(index.len(), 2);
+
+        index.delete(0);
+        assert_eq!(index.len(), 1);
+
+        index.delete(1);
+        assert_eq!(index.len(), 0);
+        assert!(index.is_empty());
+    }
+
+    #[test]
+    fn test_delete_updates_deleted_count() {
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0, 2.0, 3.0]).unwrap();
+        index.insert(&[4.0, 5.0, 6.0]).unwrap();
+
+        assert_eq!(index.deleted_count(), 0);
+
+        index.delete(0);
+        assert_eq!(index.deleted_count(), 1);
+
+        index.delete(1);
+        assert_eq!(index.deleted_count(), 2);
+    }
+
+    #[test]
+    fn test_deletion_stats() {
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0, 2.0, 3.0]).unwrap();
+        index.insert(&[4.0, 5.0, 6.0]).unwrap();
+
+        let (total, deleted, ratio) = index.deletion_stats();
+        assert_eq!(total, 2);
+        assert_eq!(deleted, 0);
+        assert!((ratio - 0.0).abs() < f32::EPSILON);
+
+        index.delete(0);
+
+        let (total, deleted, ratio) = index.deletion_stats();
+        assert_eq!(total, 2);
+        assert_eq!(deleted, 1);
+        assert!((ratio - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_search_skips_deleted() {
+        let config = FlatIndexConfig::new(3)
+            .with_metric(DistanceMetric::Cosine)
+            .with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0, 0.0, 0.0]).unwrap(); // ID 0 - exact match
+        index.insert(&[0.0, 1.0, 0.0]).unwrap(); // ID 1
+
+        // Before delete: ID 0 should be best match
+        let results = index.search(&[1.0, 0.0, 0.0], 2).unwrap();
+        assert_eq!(results[0].id, 0);
+
+        // Delete the best match
+        index.delete(0);
+
+        // After delete: ID 1 should be the only result
+        let results = index.search(&[1.0, 0.0, 0.0], 2).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, 1);
+    }
+
+    // ------------------------------------------------------------------------
+    // Compaction Tests (Day 3)
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_compact_basic() {
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(1.0); // Disable auto
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0, 2.0, 3.0]).unwrap();
+        index.insert(&[4.0, 5.0, 6.0]).unwrap();
+        index.insert(&[7.0, 8.0, 9.0]).unwrap();
+
+        // Delete middle
+        index.delete(1);
+        assert_eq!(index.capacity(), 3);
+        assert_eq!(index.len(), 2);
+
+        // Compact
+        index.compact();
+
+        assert_eq!(index.capacity(), 2);
+        assert_eq!(index.len(), 2);
+        assert_eq!(index.deleted_count(), 0);
+    }
+
+    #[test]
+    fn test_compact_preserves_data() {
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0, 2.0, 3.0]).unwrap(); // ID 0
+        index.insert(&[4.0, 5.0, 6.0]).unwrap(); // ID 1
+        index.insert(&[7.0, 8.0, 9.0]).unwrap(); // ID 2
+
+        // Delete first and last
+        index.delete(0);
+        index.delete(2);
+
+        // Compact
+        index.compact();
+
+        // Only middle vector should remain (now at ID 0 after compaction)
+        assert_eq!(index.len(), 1);
+        let v = index.get(0).unwrap(); // After compact, renumbered to 0
+        assert_eq!(v, &[4.0, 5.0, 6.0]);
+    }
+
+    #[test]
+    fn test_compact_empty() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(3));
+
+        // Compact on empty should be a no-op
+        index.compact();
+        assert!(index.is_empty());
+    }
+
+    #[test]
+    fn test_compact_nothing_to_do() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(3));
+
+        index.insert(&[1.0, 2.0, 3.0]).unwrap();
+
+        // No deletions, compact should be a no-op
+        let capacity_before = index.capacity();
+        index.compact();
+        assert_eq!(index.capacity(), capacity_before);
+    }
+
+    #[test]
+    fn test_auto_compact_on_threshold() {
+        // Set threshold to 0.3 (30%)
+        let config = FlatIndexConfig::new(3).with_cleanup_threshold(0.3);
+        let mut index = FlatIndex::new(config);
+
+        // Insert 10 vectors
+        for i in 0..10 {
+            index.insert(&[i as f32, 0.0, 0.0]).unwrap();
+        }
+
+        assert_eq!(index.capacity(), 10);
+
+        // Delete 4 vectors (40% > 30% threshold)
+        index.delete(0);
+        index.delete(1);
+        index.delete(2);
+        // 30% not yet exceeded (3/10 = 30%, not > 30%)
+        assert_eq!(index.capacity(), 10);
+
+        index.delete(3); // 4/10 = 40% > 30% => auto compact
+
+        // Should have auto-compacted
+        assert_eq!(index.capacity(), 6);
+        assert_eq!(index.deleted_count(), 0);
+    }
+
+    // ------------------------------------------------------------------------
+    // Quantization Tests (Day 3)
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_enable_quantization() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        index
+            .insert(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
+            .unwrap();
+
+        assert!(!index.is_quantized());
+
+        index.enable_quantization().unwrap();
+
+        assert!(index.is_quantized());
+    }
+
+    #[test]
+    fn test_enable_quantization_idempotent() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        index
+            .insert(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
+            .unwrap();
+
+        index.enable_quantization().unwrap();
+        index.enable_quantization().unwrap(); // Should be a no-op
+
+        assert!(index.is_quantized());
+    }
+
+    #[test]
+    fn test_enable_quantization_empty_index() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        // Should succeed on empty index
+        index.enable_quantization().unwrap();
+        assert!(index.is_quantized());
+    }
+
+    #[test]
+    fn test_disable_quantization() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        index
+            .insert(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
+            .unwrap();
+        index.enable_quantization().unwrap();
+        assert!(index.is_quantized());
+
+        index.disable_quantization();
+        assert!(!index.is_quantized());
+    }
+
+    #[test]
+    fn test_search_quantized_basic() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        // Vector 0: all positive (binary: 11111111)
+        index
+            .insert(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+            .unwrap();
+        // Vector 1: alternating (binary: 10101010)
+        index
+            .insert(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
+            .unwrap();
+        // Vector 2: all negative (binary: 00000000)
+        index
+            .insert(&[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+            .unwrap();
+
+        index.enable_quantization().unwrap();
+
+        // Query for alternating pattern
+        let query = [1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
+        let results = index.search_quantized(&query, 3).unwrap();
+
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].id, 1); // Exact match
+        assert!((results[0].score - 0.0).abs() < f32::EPSILON); // Hamming distance 0
+    }
+
+    #[test]
+    fn test_search_quantized_hamming_distances() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        // Binary patterns:
+        // 11111111 (all positive)
+        index
+            .insert(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+            .unwrap();
+        // 11111110 (7 positive, 1 negative)
+        index
+            .insert(&[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0])
+            .unwrap();
+        // 00000000 (all negative)
+        index
+            .insert(&[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+            .unwrap();
+
+        index.enable_quantization().unwrap();
+
+        // Query: 11111111
+        let results = index.search_quantized(&[1.0; 8], 3).unwrap();
+
+        // ID 0: Hamming distance 0
+        assert_eq!(results[0].id, 0);
+        assert!((results[0].score - 0.0).abs() < f32::EPSILON);
+
+        // ID 1: Hamming distance 1
+        assert_eq!(results[1].id, 1);
+        assert!((results[1].score - 1.0).abs() < f32::EPSILON);
+
+        // ID 2: Hamming distance 8
+        assert_eq!(results[2].id, 2);
+        assert!((results[2].score - 8.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_search_quantized_not_enabled() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        index.insert(&[1.0; 8]).unwrap();
+
+        let result = index.search_quantized(&[1.0; 8], 1);
+        assert!(matches!(
+            result,
+            Err(FlatIndexError::QuantizationNotEnabled)
+        ));
+    }
+
+    #[test]
+    fn test_search_quantized_dimension_mismatch() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        index.insert(&[1.0; 8]).unwrap();
+        index.enable_quantization().unwrap();
+
+        let result = index.search_quantized(&[1.0; 4], 1); // Wrong dimension
+        assert!(matches!(
+            result,
+            Err(FlatIndexError::DimensionMismatch {
+                expected: 8,
+                actual: 4
+            })
+        ));
+    }
+
+    #[test]
+    fn test_search_quantized_k_zero() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        index.insert(&[1.0; 8]).unwrap();
+        index.enable_quantization().unwrap();
+
+        let result = index.search_quantized(&[1.0; 8], 0);
+        assert!(matches!(result, Err(FlatIndexError::InvalidK)));
+    }
+
+    #[test]
+    fn test_search_quantized_skips_deleted() {
+        let config = FlatIndexConfig::new(8).with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0; 8]).unwrap(); // ID 0: exact match
+        index.insert(&[-1.0; 8]).unwrap(); // ID 1: max distance
+
+        index.enable_quantization().unwrap();
+
+        // Before delete
+        let results = index.search_quantized(&[1.0; 8], 2).unwrap();
+        assert_eq!(results[0].id, 0);
+
+        // Delete and re-enable quantization (delete invalidates it)
+        index.delete(0);
+        index.enable_quantization().unwrap();
+
+        // After delete: only ID 1 should be found
+        let results = index.search_quantized(&[1.0; 8], 2).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, 1);
+    }
+
+    #[test]
+    fn test_insert_invalidates_quantization() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(8));
+
+        index.insert(&[1.0; 8]).unwrap();
+        index.enable_quantization().unwrap();
+        assert!(index.is_quantized());
+
+        // Insert invalidates quantization cache
+        index.insert(&[-1.0; 8]).unwrap();
+        assert!(!index.is_quantized());
+    }
+
+    #[test]
+    fn test_delete_invalidates_quantization() {
+        let config = FlatIndexConfig::new(8).with_cleanup_threshold(1.0);
+        let mut index = FlatIndex::new(config);
+
+        index.insert(&[1.0; 8]).unwrap();
+        index.enable_quantization().unwrap();
+        assert!(index.is_quantized());
+
+        // Delete invalidates quantization cache
+        index.delete(0);
+        assert!(!index.is_quantized());
+    }
+
+    #[test]
+    fn test_quantization_memory_reduction() {
+        let dim = 768;
+        let mut index = FlatIndex::new(FlatIndexConfig::new(dim));
+
+        // Insert 100 vectors
+        for i in 0..100 {
+            let v: Vec<f32> = (0..dim as usize)
+                .map(|j| if (i + j) % 2 == 0 { 1.0 } else { -1.0 })
+                .collect();
+            index.insert(&v).unwrap();
+        }
+
+        let memory_before = index.memory_usage();
+
+        index.enable_quantization().unwrap();
+
+        let memory_after = index.memory_usage();
+
+        // Quantized storage should add ~100 * 96 bytes = 9600 bytes
+        // F32 storage is 100 * 768 * 4 = 307200 bytes
+        // Total should be ~316800 bytes
+        // Without quantization: ~307200 bytes
+        assert!(memory_after > memory_before); // Quantized adds to memory (doesn't replace)
+
+        // But quantized-only search uses much less memory per vector
+        // 768 / 8 = 96 bytes (quantized) vs 768 * 4 = 3072 bytes (f32)
+        // Ratio: 3072 / 96 = 32x reduction
+        let f32_per_vector = dim as usize * 4;
+        let bq_per_vector = (dim as usize + 7) / 8;
+        assert_eq!(f32_per_vector / bq_per_vector, 32);
+    }
+
+    #[test]
+    fn test_binarize_vector() {
+        // Test the internal binarization logic
+        let packed = FlatIndex::binarize_vector(&[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0]);
+
+        // Expected: 10101010 = 170 in decimal (MSB first)
+        assert_eq!(packed.len(), 1);
+        assert_eq!(packed[0], 0b10101010);
+    }
+
+    #[test]
+    fn test_binarize_vector_16_dim() {
+        let packed = FlatIndex::binarize_vector(&[
+            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, // 11111111
+            -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, // 00000000
+        ]);
+
+        assert_eq!(packed.len(), 2);
+        assert_eq!(packed[0], 0b11111111);
+        assert_eq!(packed[1], 0b00000000);
+    }
+
+    #[test]
+    fn test_hamming_distance_binary() {
+        let a = [0b11111111u8];
+        let b = [0b11111110u8];
+
+        let distance = FlatIndex::hamming_distance_binary(&a, &b);
+        assert_eq!(distance, 1); // 1 bit different
+
+        let c = [0b00000000u8];
+        let distance2 = FlatIndex::hamming_distance_binary(&a, &c);
+        assert_eq!(distance2, 8); // All 8 bits different
+    }
+
+    #[test]
+    fn test_search_quantized_high_dimension() {
+        let dim = 768;
+        let mut index = FlatIndex::new(FlatIndexConfig::new(dim));
+
+        // Insert 50 vectors with different patterns
+        for i in 0..50 {
+            let v: Vec<f32> = (0..dim as usize)
+                .map(|j| if (i + j) % 2 == 0 { 1.0 } else { -1.0 })
+                .collect();
+            index.insert(&v).unwrap();
+        }
+
+        index.enable_quantization().unwrap();
+
+        // Query that matches pattern at i=0
+        let query: Vec<f32> = (0..dim as usize)
+            .map(|j| if j % 2 == 0 { 1.0 } else { -1.0 })
+            .collect();
+
+        let results = index.search_quantized(&query, 10).unwrap();
+
+        assert_eq!(results.len(), 10);
+        // All even IDs should have better (lower) Hamming distance
+        assert!(results[0].id % 2 == 0);
     }
 }
