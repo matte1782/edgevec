@@ -422,3 +422,258 @@ export declare class FilterException extends Error {
   /** Create from JSON error response */
   static fromJson(json: string, filterString?: string): FilterException;
 }
+
+// =============================================================================
+// SPARSE VECTOR TYPES (v0.9.0 — Week 39 RFC-007)
+// =============================================================================
+
+/**
+ * Sparse vector representation for keyword/BM25 features.
+ *
+ * @example
+ * ```typescript
+ * const sparse: SparseVector = {
+ *   indices: new Uint32Array([0, 5, 10]),
+ *   values: new Float32Array([1.0, 2.0, 3.0]),
+ *   dim: 10000  // vocabulary size
+ * };
+ * ```
+ */
+export interface SparseVector {
+  /** Sorted indices of non-zero elements */
+  indices: Uint32Array;
+  /** Values corresponding to indices */
+  values: Float32Array;
+  /** Dimension of the sparse space (vocabulary size) */
+  dim: number;
+}
+
+/**
+ * Result from sparse-only search.
+ */
+export interface SparseSearchResult {
+  /** Sparse vector ID */
+  id: number;
+  /** Dot product similarity score */
+  score: number;
+}
+
+// =============================================================================
+// HYBRID SEARCH TYPES (v0.9.0 — Week 39 RFC-007)
+// =============================================================================
+
+/**
+ * Fusion method for combining dense and sparse results.
+ *
+ * @example
+ * ```typescript
+ * // RRF fusion (recommended default)
+ * const fusion: FusionMethod = 'rrf';
+ *
+ * // Linear combination (70% dense, 30% sparse)
+ * const fusion: FusionMethod = { type: 'linear', alpha: 0.7 };
+ * ```
+ */
+export type FusionMethod =
+  | 'rrf'
+  | { type: 'linear'; alpha: number };
+
+/**
+ * Options for hybrid search.
+ *
+ * @example
+ * ```typescript
+ * const options: HybridSearchOptions = {
+ *   dense_k: 20,    // Get 20 from dense search
+ *   sparse_k: 20,   // Get 20 from sparse search
+ *   k: 10,          // Return top 10 after fusion
+ *   fusion: 'rrf'   // Use RRF fusion
+ * };
+ * ```
+ */
+export interface HybridSearchOptions {
+  /** Number of results to retrieve from dense (HNSW) search. Default: 20 */
+  dense_k?: number;
+
+  /** Number of results to retrieve from sparse search. Default: 20 */
+  sparse_k?: number;
+
+  /** Final number of results to return after fusion. Required. */
+  k: number;
+
+  /** Fusion method. Default: 'rrf' */
+  fusion?: FusionMethod;
+}
+
+/**
+ * Result from hybrid search.
+ *
+ * Includes the combined score and optional information about
+ * the document's rank/score in each individual search.
+ */
+export interface HybridSearchResult {
+  /** Vector/document ID */
+  id: number;
+
+  /** Combined score from fusion algorithm */
+  score: number;
+
+  /** Rank in dense search results (1-indexed). Undefined if not found in dense. */
+  dense_rank?: number;
+
+  /** Original score from dense search. Undefined if not found in dense. */
+  dense_score?: number;
+
+  /** Rank in sparse search results (1-indexed). Undefined if not found in sparse. */
+  sparse_rank?: number;
+
+  /** Original score from sparse search. Undefined if not found in sparse. */
+  sparse_score?: number;
+}
+
+// =============================================================================
+// EDGEVEC CLASS SPARSE EXTENSIONS (v0.9.0 — Week 39 RFC-007)
+// =============================================================================
+
+/**
+ * Extended EdgeVec index with sparse/hybrid search support.
+ */
+export interface EdgeVecSparseExtensions {
+  /**
+   * Initialize sparse storage for hybrid search.
+   * Must be called before using sparse or hybrid search.
+   *
+   * @example
+   * ```typescript
+   * const db = new EdgeVec(config);
+   * db.initSparseStorage();  // Enable hybrid search
+   * ```
+   */
+  initSparseStorage(): void;
+
+  /**
+   * Check if sparse storage is initialized.
+   */
+  hasSparseStorage(): boolean;
+
+  /**
+   * Get the number of sparse vectors stored.
+   */
+  sparseCount(): number;
+
+  /**
+   * Insert a sparse vector (e.g., BM25 scores).
+   *
+   * @param indices - Sorted indices of non-zero elements
+   * @param values - Values corresponding to indices
+   * @param dim - Dimension of sparse space (vocabulary size)
+   * @returns The assigned sparse vector ID
+   *
+   * @example
+   * ```typescript
+   * const indices = new Uint32Array([0, 5, 10]);
+   * const values = new Float32Array([1.0, 2.0, 3.0]);
+   * const id = db.insertSparse(indices, values, 10000);
+   * ```
+   */
+  insertSparse(indices: Uint32Array, values: Float32Array, dim: number): number;
+
+  /**
+   * Search sparse vectors by query.
+   *
+   * @param indices - Query sparse indices (sorted)
+   * @param values - Query sparse values
+   * @param dim - Dimension of sparse space
+   * @param k - Number of results
+   * @returns JSON string of results (parse with JSON.parse)
+   *
+   * @example
+   * ```typescript
+   * const indices = new Uint32Array([0, 5, 10]);
+   * const values = new Float32Array([1.0, 2.0, 3.0]);
+   * const resultsJson = db.searchSparse(indices, values, 10000, 10);
+   * const results: SparseSearchResult[] = JSON.parse(resultsJson);
+   * ```
+   */
+  searchSparse(indices: Uint32Array, values: Float32Array, dim: number, k: number): string;
+
+  /**
+   * Perform hybrid search combining dense and sparse.
+   *
+   * @param denseQuery - Dense embedding vector
+   * @param sparseIndices - Sparse query indices (sorted)
+   * @param sparseValues - Sparse query values
+   * @param sparseDim - Dimension of sparse space
+   * @param optionsJson - JSON string of HybridSearchOptions
+   * @returns JSON string of results (parse with JSON.parse)
+   *
+   * @example
+   * ```typescript
+   * const denseQuery = new Float32Array([0.1, 0.2, ...]);
+   * const sparseIndices = new Uint32Array([0, 5, 10]);
+   * const sparseValues = new Float32Array([1.0, 2.0, 3.0]);
+   *
+   * const options: HybridSearchOptions = {
+   *   dense_k: 20,
+   *   sparse_k: 20,
+   *   k: 10,
+   *   fusion: 'rrf'
+   * };
+   *
+   * const resultsJson = db.hybridSearch(
+   *   denseQuery,
+   *   sparseIndices,
+   *   sparseValues,
+   *   10000,
+   *   JSON.stringify(options)
+   * );
+   * const results: HybridSearchResult[] = JSON.parse(resultsJson);
+   * ```
+   */
+  hybridSearch(
+    denseQuery: Float32Array,
+    sparseIndices: Uint32Array,
+    sparseValues: Float32Array,
+    sparseDim: number,
+    optionsJson: string
+  ): string;
+}
+
+// =============================================================================
+// HELPER FUNCTIONS (v0.9.0 — Week 39 RFC-007)
+// =============================================================================
+
+/**
+ * Create a sparse vector from term-score pairs.
+ *
+ * @param termScores - Object mapping term IDs to scores
+ * @param dim - Vocabulary size
+ * @returns SparseVector ready for insertion/search
+ *
+ * @example
+ * ```typescript
+ * // From BM25 scores
+ * const bm25Scores = { 42: 2.5, 100: 1.8, 500: 3.2 };
+ * const sparse = createSparseVector(bm25Scores, 10000);
+ * ```
+ */
+export function createSparseVector(
+  termScores: Record<number, number>,
+  dim: number
+): SparseVector;
+
+/**
+ * Parse hybrid search results from JSON.
+ *
+ * @param json - JSON string from hybridSearch()
+ * @returns Typed array of HybridSearchResult
+ */
+export function parseHybridResults(json: string): HybridSearchResult[];
+
+/**
+ * Parse sparse search results from JSON.
+ *
+ * @param json - JSON string from searchSparse()
+ * @returns Typed array of SparseSearchResult
+ */
+export function parseSparseResults(json: string): SparseSearchResult[];

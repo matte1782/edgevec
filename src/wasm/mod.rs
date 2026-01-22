@@ -2,8 +2,12 @@
 
 use crate::error::EdgeVecError;
 use crate::hnsw::{GraphError, HnswConfig, HnswIndex};
+#[cfg(feature = "sparse")]
+use crate::hybrid::{FusionMethod, HybridSearchConfig, HybridSearcher};
 use crate::metadata::MetadataStore;
 use crate::persistence::{chunking::ChunkIter, ChunkedWriter, PersistenceError};
+#[cfg(feature = "sparse")]
+use crate::sparse::{SparseSearcher, SparseStorage, SparseVector};
 use crate::storage::VectorStorage;
 use js_sys::{Array, Float32Array, Function, Object, Reflect, Uint32Array, Uint8Array};
 use serde::{Deserialize, Serialize};
@@ -270,6 +274,11 @@ pub struct EdgeVec {
     /// Memory pressure configuration (skipped during serialization).
     #[serde(skip, default)]
     memory_config: MemoryConfig,
+    /// Sparse vector storage for hybrid search (Week 39).
+    /// Initialized lazily via `init_sparse_storage()`.
+    #[cfg(feature = "sparse")]
+    #[serde(skip, default)]
+    sparse_storage: Option<SparseStorage>,
     /// Safety guard for iterators (skipped during serialization).
     #[serde(skip, default = "default_liveness")]
     liveness: Arc<AtomicBool>,
@@ -336,6 +345,8 @@ impl EdgeVec {
             storage,
             metadata: MetadataStore::new(),
             memory_config: MemoryConfig::default(),
+            #[cfg(feature = "sparse")]
+            sparse_storage: None,
             liveness: Arc::new(AtomicBool::new(true)),
         })
     }
@@ -2358,6 +2369,385 @@ impl EdgeVec {
         serde_wasm_bindgen::to_value(&self.memory_config)
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
+
+    // =========================================================================
+    // SPARSE VECTOR & HYBRID SEARCH API (v0.9.0 — Week 39 RFC-007)
+    // =========================================================================
+
+    /// Initialize sparse storage for hybrid search.
+    ///
+    /// Must be called before using sparse or hybrid search functions.
+    /// Sparse storage is lazily initialized to minimize memory footprint
+    /// for users who don't need hybrid search.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const db = new EdgeVec(config);
+    /// db.initSparseStorage();  // Enable hybrid search
+    ///
+    /// // Now sparse/hybrid methods are available
+    /// const id = db.insertSparse(indices, values, 10000);
+    /// ```
+    #[cfg(feature = "sparse")]
+    #[wasm_bindgen(js_name = "initSparseStorage")]
+    pub fn init_sparse_storage(&mut self) {
+        if self.sparse_storage.is_none() {
+            self.sparse_storage = Some(SparseStorage::new());
+        }
+    }
+
+    /// Check if sparse storage is initialized.
+    ///
+    /// # Returns
+    ///
+    /// `true` if sparse storage is ready for use, `false` otherwise.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// if (!db.hasSparseStorage()) {
+    ///     db.initSparseStorage();
+    /// }
+    /// ```
+    #[cfg(feature = "sparse")]
+    #[wasm_bindgen(js_name = "hasSparseStorage")]
+    #[must_use]
+    pub fn has_sparse_storage(&self) -> bool {
+        self.sparse_storage.is_some()
+    }
+
+    /// Get the number of sparse vectors stored.
+    ///
+    /// # Returns
+    ///
+    /// Number of sparse vectors, or 0 if sparse storage is not initialized.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// console.log(`Sparse vectors: ${db.sparseCount()}`);
+    /// ```
+    #[cfg(feature = "sparse")]
+    #[wasm_bindgen(js_name = "sparseCount")]
+    #[must_use]
+    pub fn sparse_count(&self) -> usize {
+        self.sparse_storage.as_ref().map_or(0, SparseStorage::len)
+    }
+
+    /// Insert a sparse vector (e.g., BM25 scores).
+    ///
+    /// # Arguments
+    ///
+    /// * `indices` - Uint32Array of sparse indices (must be sorted ascending)
+    /// * `values` - Float32Array of sparse values (same length as indices)
+    /// * `dim` - Dimension of the sparse space (vocabulary size)
+    ///
+    /// # Returns
+    ///
+    /// The assigned sparse vector ID as a number (f64).
+    ///
+    /// **Note:** JavaScript numbers have integer precision up to 2^53.
+    /// For most use cases (<9 quadrillion vectors), this is not a concern.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Sparse storage not initialized (call `initSparseStorage()` first)
+    /// - `indices` and `values` have different lengths
+    /// - `indices` are not sorted ascending
+    /// - `indices` contain duplicates
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// db.initSparseStorage();
+    /// const indices = new Uint32Array([0, 5, 10]);
+    /// const values = new Float32Array([1.0, 2.0, 3.0]);
+    /// const id = db.insertSparse(indices, values, 10000);
+    /// console.log(`Inserted sparse vector with ID: ${id}`);
+    /// ```
+    #[cfg(feature = "sparse")]
+    #[wasm_bindgen(js_name = "insertSparse")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn insert_sparse(
+        &mut self,
+        indices: Uint32Array,
+        values: Float32Array,
+        dim: u32,
+    ) -> Result<f64, JsValue> {
+        // Validate inputs
+        if indices.length() != values.length() {
+            return Err(JsValue::from_str(
+                "indices and values must have the same length",
+            ));
+        }
+
+        // Convert TypedArrays to Rust types
+        let indices_vec: Vec<u32> = indices.to_vec();
+        let values_vec: Vec<f32> = values.to_vec();
+
+        // Create sparse vector (validates sorted, no duplicates, etc.)
+        let vector = SparseVector::new(indices_vec, values_vec, dim)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        // Get or create sparse storage
+        let sparse_storage = self.sparse_storage.get_or_insert_with(SparseStorage::new);
+
+        // Insert
+        let id = sparse_storage
+            .insert(&vector)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        // Return as f64 (JavaScript number) - precision loss acceptable for IDs < 2^53
+        Ok(id.as_u64() as f64)
+    }
+
+    /// Search sparse vectors by query.
+    ///
+    /// # Arguments
+    ///
+    /// * `indices` - Uint32Array of sparse query indices (sorted ascending)
+    /// * `values` - Float32Array of sparse query values (same length as indices)
+    /// * `dim` - Dimension of the sparse space (vocabulary size)
+    /// * `k` - Number of results to return
+    ///
+    /// # Returns
+    ///
+    /// JSON string: `[{ "id": number, "score": number }, ...]`
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Sparse storage not initialized
+    /// - `indices` and `values` have different lengths
+    /// - `indices` are not sorted ascending
+    /// - `k` is 0
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const indices = new Uint32Array([0, 5, 10]);
+    /// const values = new Float32Array([1.0, 2.0, 3.0]);
+    /// const resultsJson = db.searchSparse(indices, values, 10000, 10);
+    /// const results = JSON.parse(resultsJson);
+    /// for (const r of results) {
+    ///     console.log(`ID: ${r.id}, Score: ${r.score}`);
+    /// }
+    /// ```
+    #[cfg(feature = "sparse")]
+    #[wasm_bindgen(js_name = "searchSparse")]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn search_sparse(
+        &self,
+        indices: Uint32Array,
+        values: Float32Array,
+        dim: u32,
+        k: usize,
+    ) -> Result<String, JsValue> {
+        // Validate inputs
+        if indices.length() != values.length() {
+            return Err(JsValue::from_str(
+                "indices and values must have the same length",
+            ));
+        }
+
+        if k == 0 {
+            return Err(JsValue::from_str("k must be greater than 0"));
+        }
+
+        // Convert TypedArrays to Rust types
+        let indices_vec: Vec<u32> = indices.to_vec();
+        let values_vec: Vec<f32> = values.to_vec();
+
+        // Create sparse vector (validates sorted, no duplicates, etc.)
+        let query = SparseVector::new(indices_vec, values_vec, dim)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        // Get sparse storage (check if it exists)
+        let sparse_storage = self.sparse_storage.as_ref().ok_or_else(|| {
+            JsValue::from_str("Sparse storage not initialized. Call initSparseStorage() first.")
+        })?;
+
+        // Execute search
+        let searcher = SparseSearcher::new(sparse_storage);
+        let results = searcher.search(&query, k);
+
+        // Convert to JSON
+        let json_results: Vec<serde_json::Value> = results
+            .iter()
+            .map(|r| {
+                serde_json::json!({
+                    "id": r.id.as_u64(),
+                    "score": r.score
+                })
+            })
+            .collect();
+
+        serde_json::to_string(&json_results).map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Perform hybrid search combining dense and sparse retrieval.
+    ///
+    /// # Arguments
+    ///
+    /// * `dense_query` - Float32Array dense embedding vector
+    /// * `sparse_indices` - Uint32Array sparse query indices (sorted)
+    /// * `sparse_values` - Float32Array sparse query values
+    /// * `sparse_dim` - Dimension of sparse space (vocabulary size)
+    /// * `options_json` - JSON configuration string
+    ///
+    /// # Options JSON Schema
+    ///
+    /// ```json
+    /// {
+    ///   "dense_k": 20,      // Results from dense search (default: 20)
+    ///   "sparse_k": 20,     // Results from sparse search (default: 20)
+    ///   "k": 10,            // Final results to return (required)
+    ///   "fusion": "rrf"     // or { "type": "linear", "alpha": 0.7 }
+    /// }
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// JSON string:
+    /// ```json
+    /// [
+    ///   {
+    ///     "id": 42,
+    ///     "score": 0.032,
+    ///     "dense_rank": 1,
+    ///     "dense_score": 0.95,
+    ///     "sparse_rank": 3,
+    ///     "sparse_score": 4.2
+    ///   }
+    /// ]
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Sparse storage not initialized
+    /// - Dense query dimensions mismatch index
+    /// - Sparse indices/values length mismatch
+    /// - Invalid options JSON
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const denseQuery = new Float32Array([0.1, 0.2, ...]);
+    /// const sparseIndices = new Uint32Array([0, 5, 10]);
+    /// const sparseValues = new Float32Array([1.0, 2.0, 3.0]);
+    ///
+    /// const results = JSON.parse(db.hybridSearch(
+    ///     denseQuery,
+    ///     sparseIndices,
+    ///     sparseValues,
+    ///     10000,
+    ///     JSON.stringify({ k: 10, fusion: 'rrf' })
+    /// ));
+    /// ```
+    #[cfg(feature = "sparse")]
+    #[wasm_bindgen(js_name = "hybridSearch")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn hybrid_search(
+        &self,
+        dense_query: Float32Array,
+        sparse_indices: Uint32Array,
+        sparse_values: Float32Array,
+        sparse_dim: u32,
+        options_json: &str,
+    ) -> Result<String, JsValue> {
+        // Parse options
+        let options: SparseHybridOptions = serde_json::from_str(options_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid options JSON: {e}")))?;
+
+        // Validate dense query dimensions
+        let expected_dims = self.inner.config.dimensions;
+        if dense_query.length() != expected_dims {
+            return Err(JsValue::from_str(&format!(
+                "Dense query dimension mismatch: expected {}, got {}",
+                expected_dims,
+                dense_query.length()
+            )));
+        }
+
+        // Validate sparse inputs
+        if sparse_indices.length() != sparse_values.length() {
+            return Err(JsValue::from_str(
+                "sparse_indices and sparse_values must have the same length",
+            ));
+        }
+
+        // Convert inputs
+        let dense_vec: Vec<f32> = dense_query.to_vec();
+        let sparse_indices_vec: Vec<u32> = sparse_indices.to_vec();
+        let sparse_values_vec: Vec<f32> = sparse_values.to_vec();
+
+        // Validate dense query for non-finite values
+        if dense_vec.iter().any(|v| !v.is_finite()) {
+            return Err(JsValue::from_str("Dense query contains non-finite values"));
+        }
+
+        // Create sparse query
+        let sparse_query = SparseVector::new(sparse_indices_vec, sparse_values_vec, sparse_dim)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        // Get sparse storage
+        let sparse_storage = self.sparse_storage.as_ref().ok_or_else(|| {
+            JsValue::from_str("Sparse storage not initialized. Call initSparseStorage() first.")
+        })?;
+
+        // Build config
+        let fusion = match &options.fusion {
+            HybridFusionOption::Rrf => FusionMethod::rrf(),
+            HybridFusionOption::Linear { alpha, .. } => FusionMethod::linear(*alpha),
+        };
+
+        let config = HybridSearchConfig::new(
+            options.dense_k.unwrap_or(20),
+            options.sparse_k.unwrap_or(20),
+            options.k,
+            fusion,
+        );
+
+        // Execute hybrid search
+        let searcher = HybridSearcher::new(&self.inner, &self.storage, sparse_storage);
+
+        let results = searcher
+            .search(&dense_vec, &sparse_query, &config)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+        // Convert to JSON
+        let json_results: Vec<serde_json::Value> = results
+            .iter()
+            .map(|r| {
+                let mut obj = serde_json::json!({
+                    "id": r.id.0,
+                    "score": r.score
+                });
+
+                if let Some(rank) = r.dense_rank {
+                    obj["dense_rank"] = serde_json::json!(rank);
+                }
+                if let Some(score) = r.dense_score {
+                    obj["dense_score"] = serde_json::json!(score);
+                }
+                if let Some(rank) = r.sparse_rank {
+                    obj["sparse_rank"] = serde_json::json!(rank);
+                }
+                if let Some(score) = r.sparse_score {
+                    obj["sparse_score"] = serde_json::json!(score);
+                }
+
+                obj
+            })
+            .collect();
+
+        serde_json::to_string(&json_results).map_err(|e| JsValue::from_str(&e.to_string()))
+    }
 }
 
 /// Result of a compaction operation (v0.3.0).
@@ -2740,4 +3130,100 @@ fn parse_hybrid_search_options(options: &JsValue) -> Result<HybridSearchOptions,
         use_bq,
         rescore_factor,
     })
+}
+
+// =============================================================================
+// SPARSE HYBRID SEARCH OPTION TYPES (Week 39 RFC-007)
+// =============================================================================
+
+/// Options for sparse/dense hybrid search (JSON deserialization).
+#[cfg(feature = "sparse")]
+#[derive(Deserialize)]
+struct SparseHybridOptions {
+    /// Final number of results to return.
+    k: usize,
+
+    /// Number of dense results to retrieve (default: 20).
+    dense_k: Option<usize>,
+
+    /// Number of sparse results to retrieve (default: 20).
+    sparse_k: Option<usize>,
+
+    /// Fusion method.
+    #[serde(default)]
+    fusion: HybridFusionOption,
+}
+
+/// Fusion method option (from JSON).
+#[cfg(feature = "sparse")]
+#[derive(Debug, Clone, Default)]
+enum HybridFusionOption {
+    /// RRF fusion.
+    #[default]
+    Rrf,
+    /// Linear combination with alpha weight.
+    Linear { alpha: f32 },
+}
+
+/// Custom deserializer for fusion that handles both string ("rrf") and object ({ type: "linear", alpha: 0.7 }).
+#[cfg(feature = "sparse")]
+impl<'de> Deserialize<'de> for HybridFusionOption {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+
+        struct FusionVisitor;
+
+        impl<'de> Visitor<'de> for FusionVisitor {
+            type Value = HybridFusionOption;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(r#""rrf" or { "type": "linear", "alpha": number }"#)
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<HybridFusionOption, E>
+            where
+                E: de::Error,
+            {
+                match value.to_lowercase().as_str() {
+                    "rrf" => Ok(HybridFusionOption::Rrf),
+                    "linear" => Err(de::Error::custom(
+                        "linear fusion requires an object with alpha: { \"type\": \"linear\", \"alpha\": 0.7 }",
+                    )),
+                    _ => Err(de::Error::unknown_variant(value, &["rrf", "linear"])),
+                }
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<HybridFusionOption, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut fusion_type: Option<String> = None;
+                let mut alpha: Option<f32> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "type" => fusion_type = Some(map.next_value()?),
+                        "alpha" => alpha = Some(map.next_value()?),
+                        _ => {
+                            let _: serde_json::Value = map.next_value()?;
+                        }
+                    }
+                }
+
+                match fusion_type.as_deref() {
+                    Some("linear") => {
+                        let alpha = alpha.ok_or_else(|| de::Error::missing_field("alpha"))?;
+                        Ok(HybridFusionOption::Linear { alpha })
+                    }
+                    Some("rrf") | None => Ok(HybridFusionOption::Rrf),
+                    Some(other) => Err(de::Error::unknown_variant(other, &["rrf", "linear"])),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(FusionVisitor)
+    }
 }

@@ -25,13 +25,12 @@
 
 mod error;
 mod metrics;
+mod search; // Week 39: SparseSearcher implementation
 mod storage;
 mod vector;
 
-// Placeholder for future phase
-// mod search;   // Week 39
-
 pub use error::SparseError;
 pub use metrics::{sparse_cosine, sparse_dot_product, sparse_norm};
+pub use search::{SparseSearchResult, SparseSearcher}; // Week 39
 pub use storage::{SparseId, SparseStorage, SPARSE_FORMAT_VERSION, SPARSE_MAGIC};
 pub use vector::SparseVector;
