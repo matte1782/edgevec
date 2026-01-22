@@ -275,7 +275,20 @@ pub struct EdgeVec {
     #[serde(skip, default)]
     memory_config: MemoryConfig,
     /// Sparse vector storage for hybrid search (Week 39).
+    ///
     /// Initialized lazily via `init_sparse_storage()`.
+    ///
+    /// # Persistence Decision (v0.9.0)
+    ///
+    /// **Sparse storage is intentionally NOT persisted in v0.9.0 snapshots.**
+    ///
+    /// Rationale:
+    /// - Sparse vectors are typically derived from BM25/TF-IDF tokenizers
+    /// - Regenerating from raw text is preferred to maintaining two copies
+    /// - Snapshot format stability: adding sparse would require major version bump
+    /// - Users can serialize `SparseStorage` separately if needed
+    ///
+    /// Future versions may add optional sparse persistence via separate file.
     #[cfg(feature = "sparse")]
     #[serde(skip, default)]
     sparse_storage: Option<SparseStorage>,

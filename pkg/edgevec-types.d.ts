@@ -677,3 +677,29 @@ export function parseHybridResults(json: string): HybridSearchResult[];
  * @returns Typed array of SparseSearchResult
  */
 export function parseSparseResults(json: string): SparseSearchResult[];
+
+/**
+ * Create hybrid search options JSON string.
+ *
+ * Convenience function for building the options JSON required by hybridSearch().
+ *
+ * @param options - Hybrid search options
+ * @returns JSON string ready for hybridSearch()
+ *
+ * @example
+ * ```typescript
+ * // RRF fusion (default, recommended)
+ * const opts1 = createHybridOptions({ k: 10 });
+ *
+ * // Linear fusion with 70% dense, 30% sparse
+ * const opts2 = createHybridOptions({
+ *   k: 10,
+ *   dense_k: 50,
+ *   sparse_k: 50,
+ *   fusion: { type: 'linear', alpha: 0.7 }
+ * });
+ *
+ * const results = db.hybridSearch(dense, idx, val, dim, opts2);
+ * ```
+ */
+export function createHybridOptions(options: HybridSearchOptions): string;

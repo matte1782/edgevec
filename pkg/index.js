@@ -35,4 +35,11 @@ export { Filter, } from './filter.js';
 export { FilterBuilder, FieldCondition } from './filter-builder.js';
 // Re-export high-level wrapper API
 export { EdgeVecIndex, FilterException, } from './edgevec-wrapper.js';
+// Re-export sparse/hybrid search helpers (v0.9.0 — Week 39)
+export {
+  createSparseVector,
+  parseHybridResults,
+  parseSparseResults,
+  createHybridOptions,
+} from './sparse-helpers.js';
 //# sourceMappingURL=index.js.map
