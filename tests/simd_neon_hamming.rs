@@ -157,7 +157,6 @@ fn test_portable_96_bytes_standard() {
 mod neon_tests {
     use super::*;
     use edgevec::simd::neon;
-    use proptest::prelude::*;
 
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(1000))]

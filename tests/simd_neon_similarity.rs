@@ -348,26 +348,32 @@ mod neon_tests {
             let a: Vec<f32> = (0..size).map(|i| (i as f32) * 0.1).collect();
             let b: Vec<f32> = (0..size).map(|i| ((size - i) as f32) * 0.1).collect();
 
-            // Dot product
+            // Dot product - use relative tolerance for large magnitudes
             let neon_dot = neon::dot_product(&a, &b);
             let portable_dot = neon::dot_product_portable(&a, &b);
+            let max_dot = neon_dot.abs().max(portable_dot.abs()).max(1.0);
+            let rel_tol_dot = (neon_dot - portable_dot).abs() / max_dot;
             assert!(
-                (neon_dot - portable_dot).abs() < 0.01,
-                "dot_product size={}: NEON {} != Portable {}",
+                rel_tol_dot < 1e-5,
+                "dot_product size={}: NEON {} != Portable {} (rel_err: {:.2e})",
                 size,
                 neon_dot,
-                portable_dot
+                portable_dot,
+                rel_tol_dot
             );
 
-            // Euclidean
+            // Euclidean - use relative tolerance for large magnitudes
             let neon_euc = neon::euclidean_distance(&a, &b);
             let portable_euc = neon::euclidean_distance_portable(&a, &b);
+            let max_euc = neon_euc.abs().max(portable_euc.abs()).max(1.0);
+            let rel_tol_euc = (neon_euc - portable_euc).abs() / max_euc;
             assert!(
-                (neon_euc - portable_euc).abs() < 0.01,
-                "euclidean size={}: NEON {} != Portable {}",
+                rel_tol_euc < 1e-5,
+                "euclidean size={}: NEON {} != Portable {} (rel_err: {:.2e})",
                 size,
                 neon_euc,
-                portable_euc
+                portable_euc,
+                rel_tol_euc
             );
         }
     }

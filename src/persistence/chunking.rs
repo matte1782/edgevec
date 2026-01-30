@@ -153,8 +153,8 @@ impl<'a> ChunkedWriter for (&'a VectorStorage, &'a HnswIndex) {
             header.deleted_count = index.deleted_count as u32;
         }
 
-        // TODO: RNG seed persistence if needed (index.rng is private or needs exposure?
-        // For now we skip RNG state persistence as it is transient/reseeded).
+        // Note: RNG state is intentionally not persisted. It's transient and reseeded
+        // on load from system entropy, which is fine for HNSW level selection.
 
         header.update_checksum();
 

@@ -380,6 +380,53 @@ impl BinaryQuantizer {
 
         QuantizedVector { data }
     }
+
+    /// Quantizes a vector of arbitrary dimension to a byte vector.
+    ///
+    /// This is a static method that converts an f32 vector of any size to
+    /// a packed binary vector (1 bit per dimension).
+    ///
+    /// # Arguments
+    ///
+    /// * `vector` - An f32 vector of any length.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<u8>` of length `ceil(vector.len() / 8)` containing the packed bits.
+    ///
+    /// # Algorithm
+    ///
+    /// For each dimension `i`:
+    /// - If `vector[i] > 0.0`, set bit `i` to 1
+    /// - Otherwise, set bit `i` to 0
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use edgevec::quantization::binary::BinaryQuantizer;
+    ///
+    /// // 16-element vector -> 2 bytes
+    /// let v = vec![1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
+    ///              1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
+    /// let binary = BinaryQuantizer::quantize_to_bytes(&v);
+    /// assert_eq!(binary.len(), 2);
+    /// assert_eq!(binary[0], 0b01010101); // LSB-first: positions 0,2,4,6 are 1
+    /// ```
+    #[must_use]
+    pub fn quantize_to_bytes(vector: &[f32]) -> Vec<u8> {
+        let num_bytes = (vector.len() + 7) / 8;
+        let mut data = vec![0u8; num_bytes];
+
+        for (i, &value) in vector.iter().enumerate() {
+            if value > 0.0 {
+                let byte_idx = i / 8;
+                let bit_idx = i % 8;
+                data[byte_idx] |= 1 << bit_idx;
+            }
+        }
+
+        data
+    }
 }
 
 #[cfg(test)]

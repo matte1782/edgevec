@@ -182,23 +182,25 @@ pub fn insert_batch_impl(
     let _config = config.unwrap_or_default();
     let total = vectors.length() as usize;
 
+    // Batch insert is only supported for HNSW indexes
+    let (index, storage) = edge_vec
+        .inner
+        .as_hnsw_mut()
+        .map_err(|e| JsValue::from_str(&format!("{e}")))?;
+
     // Get the next available ID from the index
-    let start_id = edge_vec.inner.node_count() as u64;
+    let start_id = index.node_count() as u64;
 
     // Convert JS vectors to Rust format
     let rust_vectors = convert_js_vectors(&vectors, start_id)?;
 
     // Call the BatchInsertable trait method
-    let ids = edge_vec.inner.batch_insert(
-        rust_vectors,
-        &mut edge_vec.storage,
-        None::<fn(usize, usize)>,
-    )?;
+    let ids = index.batch_insert(rust_vectors, storage, None::<fn(usize, usize)>)?;
 
     // Track memory allocation for memory pressure monitoring
     let inserted_count = ids.len();
     if inserted_count > 0 {
-        track_batch_insert(inserted_count, edge_vec.inner.config.dimensions);
+        track_batch_insert(inserted_count, index.config.dimensions);
     }
 
     Ok(BatchInsertResult::from_ids(ids, total))

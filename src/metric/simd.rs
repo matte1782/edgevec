@@ -412,8 +412,8 @@ pub mod wasm {
             let mut sum2 = i32x4_splat(0);
             let mut sum3 = i32x4_splat(0);
 
-            // Process 64 bytes (4 x 16-byte vectors) per iteration
-            while i + 64 <= n {
+            // Process WASM_U8_UNROLL_BYTES (4 x 16-byte vectors) per iteration
+            while i + WASM_U8_UNROLL_BYTES <= n {
                 let ptr_a = a.as_ptr().add(i) as *const v128;
                 let ptr_b = b.as_ptr().add(i) as *const v128;
 
@@ -470,15 +470,15 @@ pub mod wasm {
                 sum2 = i32x4_add(sum2, hsum_to_i32!(cnt2));
                 sum3 = i32x4_add(sum3, hsum_to_i32!(cnt3));
 
-                i += 64;
+                i += WASM_U8_UNROLL_BYTES;
             }
 
             // Reduce 4 accumulators to one
             let sum_mid = i32x4_add(i32x4_add(sum0, sum1), i32x4_add(sum2, sum3));
             let mut sum_v = sum_mid;
 
-            // Handle remaining chunks of 16 bytes
-            while i + 16 <= n {
+            // Handle remaining chunks of WASM_U8_VECTOR_WIDTH bytes
+            while i + WASM_U8_VECTOR_WIDTH <= n {
                 let va = v128_load(a.as_ptr().add(i) as *const v128);
                 let vb = v128_load(b.as_ptr().add(i) as *const v128);
                 let xor = v128_xor(va, vb);
@@ -496,7 +496,7 @@ pub mod wasm {
                 let hi32 = i32x4_extend_high_i16x8(sum16);
                 sum_v = i32x4_add(sum_v, i32x4_add(lo32, hi32));
 
-                i += 16;
+                i += WASM_U8_VECTOR_WIDTH;
             }
 
             // Reduce vector to scalar
