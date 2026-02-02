@@ -65,6 +65,59 @@ let restored = FlatIndex::from_snapshot(&data)?;
 
 ---
 
+### Added (v0.9.0) — BinaryFlatIndex (PR #7 by @jsonMartin)
+
+**Native Binary Vector Storage** — 2026-02-02:
+
+#### BinaryFlatIndex
+- **`BinaryFlatIndex`** — Optimized for binary vectors with O(1) insert, O(n) SIMD search
+  - Native packed binary storage (8 bits per byte)
+  - Hamming and Jaccard distance metrics
+  - 32x memory reduction vs f32 (768D: 3072 → 96 bytes)
+  - ~1μs insert latency (vs ~2ms for HNSW)
+
+```rust
+use edgevec::BinaryFlatIndex;
+
+let mut index = BinaryFlatIndex::new(768);
+let id = index.insert(&binary_vector)?;
+let results = index.search(&query, 10)?;
+```
+
+#### HNSW Binary Methods
+- **`insert_binary()`** — Insert raw binary vectors into HNSW
+- **`search_binary()`** — Search with raw binary queries
+- **`search_binary_with_ef()`** — Search with custom ef parameter
+
+#### WASM Integration
+- **`JsIndexType`** enum — Runtime selection between Flat and HNSW
+- **`VectorType`** enum — Float32 or Binary
+- **`insertBinary()`** / **`searchBinary()`** JavaScript methods
+- Auto-conversion from f32 to binary via sign-bit quantization
+
+#### Storage
+- **`StorageType::Binary(u32)`** — Native binary storage variant
+- Full persistence support (snapshot save/load)
+- Soft delete and compaction support
+
+**Use Cases:**
+- Semantic caching (insert-heavy, exact recall required)
+- Datasets < 100K vectors
+- When insert latency is critical (~1μs vs ~2ms for HNSW)
+
+**Test Coverage:** 20+ new tests, 1019 total library tests
+
+---
+
+### Fixed
+
+#### CI Workflow (2026-02-02)
+- **Fork PR comment permissions** — Added `continue-on-error: true` to PR comment steps
+  - Prevents workflow failure when fork PRs lack write permission (HTTP 403)
+  - Benchmarks and regression checks still run and report correctly
+
+---
+
 ## [0.8.0] - 2026-02-02 — Consolidation + Developer Experience
 
 **Focus:** Developer experience improvements, framework integrations, and technical debt reduction.
