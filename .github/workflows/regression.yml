@@ -154,6 +154,7 @@ jobs:
       # Comment on PR with results
       - name: Comment on PR
         if: github.event_name == 'pull_request' && always()
+        continue-on-error: true  # Don't fail workflow if commenting fails (fork PRs lack write permission)
         uses: actions/github-script@v7
         with:
           script: |
