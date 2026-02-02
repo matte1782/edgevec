@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeVec Binary Vector Benchmark</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Additional styles for binary test */
+        input[type="number"] {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 0.6rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+        select {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 0.6rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            width: 100%;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        select:focus {
+            outline: none;
+            border-color: var(--neon-cyan);
+        }
+        .divider {
+            margin: 0.25rem 0;
+        }
+        /* Sidebar scrolling */
+        .controls {
+            padding: 1.25rem !important;
+            gap: 0.75rem !important;
+            overflow-y: auto !important;
+            max-height: calc(100vh - 60px);
+        }
+        .control-group {
+            gap: 0.4rem !important;
+        }
+        /* Fix button text squashing */
+        button {
+            min-height: 44px !important;
+            line-height: normal !important;
+            font-weight: 500 !important;
+            padding: 12px 16px !important;
+            font-size: 13px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Fix label readability */
+        label {
+            font-size: 0.8rem !important;
+            line-height: 1.3 !important;
+        }
+        /* Fix input/select sizing */
+        input[type="number"], select {
+            line-height: 1.4 !important;
+        }
+        /* Section headers */
+        .section-header {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--neon-cyan);
+            font-weight: 600;
+            margin-top: 0.25rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border-color);
+            line-height: 1.3;
+        }
+        /* Terminal container */
+        .terminal-container {
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 60px);
+        }
+        #log {
+            flex: 1;
+            min-height: 0;
+            overflow-y: scroll !important;
+        }
+        #log::-webkit-scrollbar {
+            width: 10px;
+        }
+        #log::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        #log::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 4px;
+        }
+        #log::-webkit-scrollbar-thumb:hover {
+            background: var(--neon-purple);
+        }
+        /* SIMD info box */
+        .simd-info {
+            background: rgba(0, 243, 255, 0.05);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            padding: 0.5rem;
+            font-size: 0.7rem;
+            font-family: var(--font-mono);
+        }
+        .simd-info .backend {
+            color: var(--neon-green);
+            font-weight: bold;
+        }
+        .simd-info.scalar .backend {
+            color: var(--neon-red);
+        }
+        /* Benchmark results styling */
+        .benchmark-results {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .benchmark-results h3 {
+            margin: 0 0 1rem 0;
+            color: var(--neon-cyan);
+            font-size: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+        .benchmark-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+        .benchmark-table th {
+            text-align: left;
+            padding: 0.5rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .benchmark-table td {
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .benchmark-table tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+        .benchmark-table .selected {
+            background: rgba(0, 243, 255, 0.1);
+        }
+        .benchmark-table .new { color: var(--neon-green); }
+        .benchmark-table .current { color: var(--neon-red); }
+        .benchmark-table .speedup { color: var(--neon-cyan); font-weight: bold; }
+        /* Bar chart */
+        .bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .bar-label {
+            width: 80px;
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+        }
+        .bar-container {
+            flex: 1;
+            height: 28px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            color: #fff;
+            text-shadow: 0 0 4px rgba(0,0,0,0.8);
+            transition: width 0.5s ease;
+            white-space: nowrap;
+            min-width: fit-content;
+        }
+        .bar-fill.new {
+            background: linear-gradient(90deg, #0aff00, #00f3ff);
+        }
+        .bar-fill.current {
+            background: linear-gradient(90deg, #ff003c, #bc13fe);
+        }
+        .speedup-badge {
+            display: inline-block;
+            background: linear-gradient(45deg, var(--neon-purple), var(--neon-cyan));
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .summary-card {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 4px;
+        }
+        .summary-card.new { border-color: var(--neon-green); }
+        .summary-card.current { border-color: var(--neon-red); }
+        .summary-card h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+        .summary-card.new h4 { color: var(--neon-green); }
+        .summary-card.current h4 { color: var(--neon-red); }
+        .summary-value {
+            font-size: 1.5rem;
+            font-family: var(--font-mono);
+            font-weight: bold;
+        }
+        .summary-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        /* Header stats bar */
+        .header-stats {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+        .header-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            min-width: 80px;
+        }
+        .header-stat-value {
+            color: var(--neon-cyan);
+            font-weight: 600;
+            font-size: 1rem;
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.4);
+        }
+        .header-stat-label {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .header-stat-sub {
+            font-size: 0.5rem;
+            opacity: 0.6;
+            font-style: italic;
+        }
+        .header-stat.memory {
+            min-width: 100px;
+        }
+        .header-stat.memory .header-stat-value {
+            color: var(--neon-purple);
+            text-shadow: 0 0 8px rgba(188, 19, 254, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>EdgeVec</h1>
+            <span class="subtitle">Binary Vector Benchmark</span>
+        </div>
+        <div class="header-stats">
+            <div class="header-stat">
+                <span class="header-stat-value" id="statVectors">0</span>
+                <span class="header-stat-label">Vectors</span>
+            </div>
+            <div class="header-stat">
+                <span class="header-stat-value" id="statDimensions">1024</span>
+                <span class="header-stat-label">Dimensions</span>
+            </div>
+            <div class="header-stat memory">
+                <span class="header-stat-value" id="statMemory">0 B</span>
+                <span class="header-stat-label">Binary Storage <span class="header-stat-sub" id="statMemoryEst">(Est)</span></span>
+            </div>
+            <div class="header-stat" style="color: var(--text-muted);">
+                <span class="header-stat-value" id="statFp32Size">0 B</span>
+                <span class="header-stat-label">FP32 Storage <span class="header-stat-sub" id="statFp32Est">(Est)</span></span>
+            </div>
+            <div class="header-stat" style="color: var(--accent-green);">
+                <span class="header-stat-value" id="statCompression">32x</span>
+                <span class="header-stat-label">Savings</span>
+            </div>
+        </div>
+        <div style="font-family: var(--font-mono); color: var(--text-muted);">
+            <span class="status-indicator" id="statusIndicator"></span>
+            <span id="statusText">Initializing...</span>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        <aside class="controls">
+            <!-- SIMD Status -->
+            <div class="simd-info" id="simdInfo">
+                SIMD Backend: <span class="backend" id="simdBackend">detecting...</span>
+            </div>
+
+            <!-- Global Configuration (affects all tests) -->
+            <div class="section-header">Global Configuration</div>
+
+            <div class="control-group">
+                <label>Embedding Dimensions</label>
+                <select id="dimensions">
+                    <option value="128">128 (16 bytes)</option>
+                    <option value="384">384 (48 bytes) - MiniLM</option>
+                    <option value="768">768 (96 bytes) - BERT</option>
+                    <option value="1024" selected>1024 (128 bytes)</option>
+                    <option value="1536">1536 (192 bytes) - OpenAI</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Number of Vectors</label>
+                <input type="number" id="numVectors" value="10000" min="100" max="1000000" step="1000">
+            </div>
+
+            <div class="control-group">
+                <label>Batch Size</label>
+                <input type="number" id="batchSize" value="1000" min="100" max="10000" step="100">
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Standalone Benchmarks -->
+            <div class="section-header">Benchmarks</div>
+
+            <div class="control-group">
+                <label>Scan Iterations (for averaging)</label>
+                <input type="number" id="simdIterations" value="10" min="1" max="100" step="1">
+            </div>
+
+            <button id="btnSimdBench" onclick="runSimdComparison()">Run SIMD vs Scalar</button>
+            <button id="btnCompare" onclick="runComparison()" style="background: linear-gradient(45deg, var(--neon-purple), var(--neon-cyan));">Compare HNSW vs Flat</button>
+
+            <div class="divider"></div>
+
+            <!-- Database Operations -->
+            <div class="section-header">Database</div>
+
+            <div class="control-group">
+                <label>Index Type</label>
+                <select id="indexType" onchange="setIndexType(this.value)">
+                    <option value="hnsw" selected>HNSW (ANN, O(log n))</option>
+                    <option value="flat">Flat (Brute-Force, O(1) insert)</option>
+                </select>
+            </div>
+
+            <button id="btnInit" onclick="initDatabase()">Initialize Database</button>
+            <button id="btnTestOne" onclick="testSingleInsert()" disabled>Test Single Insert</button>
+            <button id="btnInsert" onclick="insertVectors()" disabled>Insert Vectors</button>
+            <button class="danger" id="btnClear" onclick="clearDatabase()" disabled>Clear Database</button>
+
+            <div class="divider"></div>
+
+            <!-- Search Section -->
+            <div class="section-header">Search</div>
+
+            <div class="control-group">
+                <label>Search K (neighbors)</label>
+                <input type="number" id="searchK" value="10" min="1" max="100">
+            </div>
+
+            <button id="btnSearch" onclick="runSearch()" disabled>Run Search Benchmark</button>
+            <button id="btnSearchFiltered" onclick="runFilteredSearch()" disabled>Search with Filter</button>
+        </aside>
+
+        <main class="terminal-container">
+            <div class="terminal-header">
+                <span>benchmark_output.log</span>
+                <span id="timestamp"></span>
+            </div>
+            <div id="log"></div>
+        </main>
+    </div>
+
+    <script type="module">
+        import init, { EdgeVec, EdgeVecConfig, VectorType, MetricType, JsMetadataValue, JsIndexType, getSimdBackend, benchmarkHamming, benchmarkHammingBatch } from '../../pkg/edgevec.js';
+
+        let db = null;           // HNSW index
+        let flatDb = null;       // Flat index (now uses unified EdgeVec API)
+        let isReady = false;
+        let vectorCount = 0;
+        let flatVectorCount = 0;
+        let currentDimensions = 0;
+        let indexType = 'hnsw';  // 'hnsw' or 'flat'
+
+        // Expose functions to window for onclick handlers
+        window.initDatabase = initDatabase;
+        window.testSingleInsert = testSingleInsert;
+        window.insertVectors = insertVectors;
+        window.runSearch = runSearch;
+        window.runFilteredSearch = runFilteredSearch;
+        window.clearDatabase = clearDatabase;
+        window.runComparison = runComparison;
+        window.setIndexType = setIndexType;
+        window.runSimdComparison = runSimdComparison;
+
+        // Initialize WASM
+        async function initialize() {
+            try {
+                await init();
+                setStatus('active', 'WASM Ready');
+                log('EdgeVec WASM module loaded', 'cyan');
+
+                // Check SIMD backend and update UI
+                const simdBackend = getSimdBackend();
+                const simdInfo = document.getElementById('simdInfo');
+                const simdBackendSpan = document.getElementById('simdBackend');
+                simdBackendSpan.textContent = simdBackend;
+
+                if (simdBackend === 'wasm_simd128') {
+                    simdInfo.classList.remove('scalar');
+                    log(`SIMD Backend: ${simdBackend}`, 'green');
+                } else {
+                    simdInfo.classList.add('scalar');
+                    log(`SIMD Backend: ${simdBackend} (SIMD disabled!)`, 'red');
+                }
+
+                // Quick single-point benchmark
+                const hammingTime = benchmarkHamming(128, 10000);
+                log(`Hamming distance (1024D): ${hammingTime.toFixed(3)} μs/call`, 'purple');
+
+                log('', '');
+                log('Click "Run SIMD vs Scalar" to compare implementations', 'cyan');
+                log(`VectorType: Float32=${VectorType.Float32}, Binary=${VectorType.Binary}`, 'purple');
+                log(`MetricType: L2=${MetricType.L2}, Cosine=${MetricType.Cosine}, Hamming=${MetricType.Hamming}`, 'purple');
+
+                document.getElementById('btnInit').disabled = false;
+                isReady = true;
+
+                // Initialize header stats from global config
+                updateStats();
+
+                // Update header stats when global config changes
+                document.getElementById('dimensions').addEventListener('change', () => updateStats());
+                document.getElementById('numVectors').addEventListener('input', () => updateStats());
+            } catch (e) {
+                setStatus('', 'Error');
+                log(`Failed to load WASM: ${e.message}`, 'red');
+                console.error(e);
+            }
+        }
+
+        // SIMD Comparison Benchmark - uses global numVectors parameter
+        async function runSimdComparison() {
+            if (!isReady) return;
+
+            const numVectors = parseInt(document.getElementById('numVectors').value);
+            const iterations = parseInt(document.getElementById('simdIterations').value);
+            const selectedDims = parseInt(document.getElementById('dimensions').value);
+            const selectedBytes = selectedDims / 8;
+
+            log('Running SIMD benchmark...', 'cyan');
+            setStatus('busy', 'Generating vectors...');
+
+            // Generate vectors in JS (same path as real usage)
+            const vectors = [];
+            // Use unified EdgeVec API with Flat index type
+            const tempConfig = new EdgeVecConfig(selectedDims);
+            tempConfig.indexType = JsIndexType.Flat;
+            tempConfig.setMetricType(MetricType.Hamming);
+            const tempIndex = new EdgeVec(tempConfig);
+            for (let i = 0; i < numVectors; i++) {
+                const v = new Uint8Array(selectedBytes);
+                crypto.getRandomValues(v);
+                vectors.push(v);
+                tempIndex.insertBinary(v);
+
+                // Yield periodically for large datasets
+                if (i > 0 && i % 5000 === 0) {
+                    setStatus('busy', `Generating: ${i.toLocaleString()}/${numVectors.toLocaleString()}`);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            // Create query vector
+            const query = new Uint8Array(selectedBytes);
+            crypto.getRandomValues(query);
+
+            // Update stats with actual memory from temp index
+            updateStats(numVectors, selectedDims, tempIndex);
+            log(`Generated ${numVectors.toLocaleString()} vectors (${tempIndex.memoryUsage().toLocaleString()} bytes actual)`, 'green');
+
+            setStatus('busy', 'Benchmarking...');
+            await new Promise(r => setTimeout(r, 50));
+
+            // Run the batch benchmark with JS-created vectors (real usage path)
+            const result = JSON.parse(benchmarkHammingBatch(vectors, query, iterations));
+
+            // Collect micro-benchmark data for table
+            const microIterations = 50000;
+            const byteSizes = [16, 48, 96, 128, 192];
+            if (!byteSizes.includes(selectedBytes) && selectedBytes <= 512) {
+                byteSizes.push(selectedBytes);
+                byteSizes.sort((a, b) => a - b);
+            }
+
+            const microResults = [];
+            for (const bytes of byteSizes) {
+                await new Promise(r => setTimeout(r, 10));
+                const latencyUs = benchmarkHamming(bytes, microIterations);
+                const opsPerSec = 1000000 / latencyUs;
+                microResults.push({ bytes, dims: bytes * 8, latency_us: latencyUs, ops_per_sec: opsPerSec });
+            }
+
+            // Render results as HTML
+            const logEl = document.getElementById('log');
+
+            // Calculate average time per scan (total / iterations)
+            const newAvgMs = result.new_ms / iterations;
+
+            const resultsHtml = `
+                <div class="benchmark-results">
+                    <h3>⚡ SIMD Benchmark Results</h3>
+
+                    <div style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.8rem;">
+                        ${numVectors.toLocaleString()} vectors × ${selectedDims} dimensions
+                    </div>
+
+                    <!-- Summary Card -->
+                    <div class="summary-grid">
+                        <div class="summary-card new">
+                            <h4>✓ WASM SIMD128</h4>
+                            <div class="summary-value">${newAvgMs.toFixed(2)}ms</div>
+                            <div class="summary-label">avg per scan • ${result.new_throughput}</div>
+                            <div class="summary-label" style="opacity: 0.6;">${result.new_ms.toFixed(2)}ms total (${iterations} scans)</div>
+                        </div>
+                    </div>
+
+                    <!-- Micro-benchmark Table -->
+                    <h3 style="margin-top: 2rem;">Per-Call Latency by Dimension</h3>
+                    <table class="benchmark-table">
+                        <thead>
+                            <tr>
+                                <th>Dims</th>
+                                <th>Bytes</th>
+                                <th>Latency (μs)</th>
+                                <th>Throughput</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${microResults.map(r => `
+                                <tr class="${r.bytes === selectedBytes ? 'selected' : ''}">
+                                    <td>${r.dims}</td>
+                                    <td>${r.bytes}</td>
+                                    <td class="new">${r.latency_us.toFixed(3)}</td>
+                                    <td class="speedup">${formatOps(r.ops_per_sec)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <!-- Implementation Details -->
+                    <div style="margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-muted);">
+                        <strong style="color: var(--neon-green);">Backend:</strong>
+                        Compile-time SIMD128 detection • v128 intrinsics • 4-way unrolling
+                    </div>
+                </div>
+            `;
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="message">${resultsHtml}</span>`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+
+            log('Benchmark complete!', 'green');
+        }
+
+        function setIndexType(type) {
+            indexType = type;
+            log(`Index type set to: ${type.toUpperCase()}`, 'cyan');
+            if (type === 'flat') {
+                log('Flat index: O(1) insert, O(n) search - ideal for <100K vectors', 'purple');
+                document.getElementById('btnSearchFiltered').disabled = true;
+            } else {
+                log('HNSW index: O(log n) insert, O(log n) search - approximate results', 'purple');
+            }
+        }
+
+        function initDatabase() {
+            const dimensions = parseInt(document.getElementById('dimensions').value);
+            currentDimensions = dimensions;
+
+            log(`Initializing ${indexType.toUpperCase()} binary index with ${dimensions} dimensions...`, 'cyan');
+            const start = performance.now();
+
+            try {
+                if (indexType === 'flat') {
+                    // Use unified EdgeVec API with Flat index type
+                    const flatConfig = new EdgeVecConfig(dimensions);
+                    flatConfig.indexType = JsIndexType.Flat;
+                    flatConfig.setMetricType(MetricType.Hamming);
+                    flatDb = new EdgeVec(flatConfig);
+                    flatVectorCount = 0;
+
+                    const elapsed = (performance.now() - start).toFixed(2);
+                    log(`Flat index initialized in ${elapsed}ms`, 'green');
+                    log(`O(1) insert, O(n) SIMD search - no graph overhead!`, 'purple');
+                } else {
+                    const config = new EdgeVecConfig(dimensions);
+                    config.vector_type = VectorType.Binary;
+                    config.setMetricType(MetricType.Hamming);
+                    config.m = 16;
+                    config.m0 = 32;
+                    config.ef_construction = 100;
+
+                    db = new EdgeVec(config);
+                    vectorCount = 0;
+
+                    const elapsed = (performance.now() - start).toFixed(2);
+                    log(`HNSW database initialized in ${elapsed}ms`, 'green');
+                    log(`Config: M=16, M0=32, ef_construction=100, metric=Hamming`, 'purple');
+                }
+
+                updateStats();
+                document.getElementById('btnInsert').disabled = false;
+                document.getElementById('btnTestOne').disabled = false;
+                document.getElementById('btnClear').disabled = false;
+                setStatus('active', `${indexType.toUpperCase()} Ready`);
+            } catch (e) {
+                log(`Error initializing database: ${e.message}`, 'red');
+                console.error(e);
+            }
+        }
+
+        function testSingleInsert() {
+            const bytesPerVector = currentDimensions / 8;
+            log(`Testing single ${indexType.toUpperCase()} insert (${bytesPerVector} bytes)...`, 'cyan');
+
+            try {
+                const vector = new Uint8Array(bytesPerVector);
+                log(`Created vector: length=${vector.length}`, 'purple');
+
+                const start = performance.now();
+
+                let id;
+                if (indexType === 'flat') {
+                    if (!flatDb) return;
+                    id = flatDb.insertBinary(vector);
+                    flatVectorCount++;
+                } else {
+                    if (!db) return;
+                    id = db.insertBinary(vector);
+                    vectorCount++;
+                }
+
+                const elapsed = (performance.now() - start).toFixed(2);
+                log(`SUCCESS! Insert completed in ${elapsed}ms, ID: ${id}`, 'green');
+
+                updateStats();
+
+                log('Testing search...', 'purple');
+                const searchStart = performance.now();
+                let results;
+                if (indexType === 'flat') {
+                    results = flatDb.searchBinary(vector, 1);
+                } else {
+                    results = db.searchBinary(vector, 1);
+                }
+                const searchElapsed = (performance.now() - searchStart).toFixed(2);
+                log(`Search completed in ${searchElapsed}ms, found ${results.length} results`, 'green');
+
+                if (results.length > 0) {
+                    const r = results[0];
+                    log(`Result: ID=${r.id}, distance=${r.distance || r.score}`, 'cyan');
+                }
+
+                document.getElementById('btnSearch').disabled = false;
+            } catch (e) {
+                log(`ERROR: ${e.message}`, 'red');
+                console.error('Full error:', e);
+            }
+        }
+
+        async function insertVectors() {
+            if (indexType === 'flat' && !flatDb) return;
+            if (indexType === 'hnsw' && !db) return;
+
+            const numVectors = parseInt(document.getElementById('numVectors').value);
+            const batchSize = parseInt(document.getElementById('batchSize').value);
+            const bytesPerVector = currentDimensions / 8;
+
+            log(`Inserting ${numVectors.toLocaleString()} binary vectors into ${indexType.toUpperCase()} (${bytesPerVector} bytes each)...`, 'cyan');
+            setStatus('busy', 'Inserting...');
+            document.getElementById('btnInsert').disabled = true;
+
+            const totalStart = performance.now();
+            let inserted = 0;
+            const batchTimes = [];
+
+            for (let i = 0; i < numVectors; i += batchSize) {
+                const currentBatch = Math.min(batchSize, numVectors - i);
+                const batchStart = performance.now();
+
+                try {
+                    for (let j = 0; j < currentBatch; j++) {
+                        const vector = new Uint8Array(bytesPerVector);
+                        crypto.getRandomValues(vector);
+
+                        if (inserted === 0) {
+                            log(`First vector: ${vector.length} bytes, first bytes: [${Array.from(vector.slice(0, 4)).join(', ')}...]`, 'purple');
+                        }
+
+                        let id;
+                        if (indexType === 'flat') {
+                            id = flatDb.insertBinary(vector);
+                        } else {
+                            id = db.insertBinary(vector);
+
+                            try {
+                                const category = (inserted % 3 === 0) ? 'A' : (inserted % 3 === 1) ? 'B' : 'C';
+                                db.setMetadata(id, 'category', JsMetadataValue.fromString(category));
+                                db.setMetadata(id, 'value', JsMetadataValue.fromInteger(inserted % 100));
+                            } catch (metaErr) {
+                                if (inserted === 0) {
+                                    log(`Note: Metadata error: ${metaErr.message}`, 'purple');
+                                }
+                            }
+                        }
+
+                        if (inserted === 0) {
+                            log(`First insert succeeded, ID: ${id}`, 'green');
+                        }
+                        inserted++;
+                    }
+                } catch (e) {
+                    log(`Error during insert: ${e.message}`, 'red');
+                    console.error(e);
+                    break;
+                }
+
+                const batchElapsed = performance.now() - batchStart;
+                batchTimes.push(batchElapsed);
+
+                if (indexType === 'flat') {
+                    flatVectorCount = inserted;
+                } else {
+                    vectorCount = inserted;
+                }
+                updateStats();
+
+                if (batchTimes.length % 5 === 0 || i + batchSize >= numVectors) {
+                    const avgBatchTime = batchTimes.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, batchTimes.length);
+                    const vecPerSec = (batchSize / avgBatchTime * 1000).toFixed(0);
+                    log(`Progress: ${inserted.toLocaleString()}/${numVectors.toLocaleString()} (${vecPerSec} vec/s)`, 'purple');
+                }
+
+                await new Promise(r => setTimeout(r, 0));
+            }
+
+            const totalElapsed = performance.now() - totalStart;
+            const avgInsertTime = (totalElapsed / numVectors).toFixed(3);
+            const throughput = (numVectors / totalElapsed * 1000).toFixed(0);
+
+            log('─'.repeat(50), '');
+            log(`${indexType.toUpperCase()} INSERT BENCHMARK COMPLETE`, 'green');
+            log(`Total vectors: ${numVectors.toLocaleString()}`, 'cyan');
+            log(`Total time: ${(totalElapsed / 1000).toFixed(2)}s`, 'cyan');
+            log(`Avg insert time: ${avgInsertTime}ms/vector`, 'cyan');
+            log(`Throughput: ${throughput} vectors/sec`, 'green');
+            log(`Memory estimate: ${formatBytes(numVectors * bytesPerVector)}`, 'purple');
+            log('─'.repeat(50), '');
+
+            document.getElementById('btnInsert').disabled = false;
+            document.getElementById('btnSearch').disabled = false;
+            if (indexType === 'hnsw') {
+                document.getElementById('btnSearchFiltered').disabled = false;
+            }
+            setStatus('active', `${indexType.toUpperCase()}: ${numVectors.toLocaleString()} vectors`);
+        }
+
+        async function runSearch() {
+            const count = indexType === 'flat' ? flatVectorCount : vectorCount;
+            if (count === 0) return;
+            if (indexType === 'flat' && !flatDb) return;
+            if (indexType === 'hnsw' && !db) return;
+
+            const k = parseInt(document.getElementById('searchK').value);
+            const bytesPerVector = currentDimensions / 8;
+            const numQueries = 100;
+
+            log(`Running ${numQueries} ${indexType.toUpperCase()} search queries (k=${k})...`, 'cyan');
+            setStatus('busy', 'Searching...');
+
+            const queryTimes = [];
+            let results = null;
+
+            for (let i = 0; i < numQueries; i++) {
+                const query = new Uint8Array(bytesPerVector);
+                crypto.getRandomValues(query);
+
+                const start = performance.now();
+                if (indexType === 'flat') {
+                    results = flatDb.searchBinary(query, k);
+                } else {
+                    results = db.searchBinary(query, k);
+                }
+                queryTimes.push(performance.now() - start);
+            }
+
+            const avgTime = queryTimes.reduce((a, b) => a + b, 0) / numQueries;
+            const minTime = Math.min(...queryTimes);
+            const maxTime = Math.max(...queryTimes);
+            const p50 = queryTimes.sort((a, b) => a - b)[Math.floor(numQueries * 0.5)];
+            const p99 = queryTimes.sort((a, b) => a - b)[Math.floor(numQueries * 0.99)];
+
+            log('─'.repeat(50), '');
+            log(`${indexType.toUpperCase()} SEARCH BENCHMARK COMPLETE`, 'green');
+            log(`Queries: ${numQueries}`, 'cyan');
+            log(`Avg latency: ${avgTime.toFixed(3)}ms`, 'cyan');
+            log(`Min latency: ${minTime.toFixed(3)}ms`, 'cyan');
+            log(`Max latency: ${maxTime.toFixed(3)}ms`, 'cyan');
+            log(`P50 latency: ${p50.toFixed(3)}ms`, 'green');
+            log(`P99 latency: ${p99.toFixed(3)}ms`, 'green');
+            log(`QPS: ${(1000 / avgTime).toFixed(0)} queries/sec`, 'green');
+            log('─'.repeat(50), '');
+
+            if (results && results.length > 0) {
+                log('Sample results (last query):', 'purple');
+                results.slice(0, 5).forEach((r, i) => {
+                    const dist = r.distance !== undefined ? r.distance : r.score;
+                    log(`  ${i + 1}. ID: ${r.id}, Hamming Distance: ${dist}`, '');
+                });
+            }
+
+            setStatus('active', `${indexType.toUpperCase()}: ${count.toLocaleString()} vectors`);
+        }
+
+        async function runFilteredSearch() {
+            if (!db || vectorCount === 0) return;
+
+            const k = parseInt(document.getElementById('searchK').value);
+            const bytesPerVector = currentDimensions / 8;
+            const numQueries = 50;
+            const filter = 'category = "A"';
+
+            log(`Running ${numQueries} filtered searches (k=${k}, filter: ${filter})...`, 'cyan');
+            setStatus('busy', 'Filtered Search...');
+
+            const queryTimes = [];
+            let lastResult = null;
+
+            for (let i = 0; i < numQueries; i++) {
+                const query = new Uint8Array(bytesPerVector);
+                crypto.getRandomValues(query);
+
+                const start = performance.now();
+                const resultJson = db.searchBinaryFiltered(query, k, JSON.stringify({
+                    filter: filter,
+                    strategy: 'auto',
+                    include_metadata: true
+                }));
+                queryTimes.push(performance.now() - start);
+                lastResult = JSON.parse(resultJson);
+            }
+
+            const avgTime = queryTimes.reduce((a, b) => a + b, 0) / numQueries;
+            const p50 = queryTimes.sort((a, b) => a - b)[Math.floor(numQueries * 0.5)];
+            const p99 = queryTimes.sort((a, b) => a - b)[Math.floor(numQueries * 0.99)];
+
+            log('─'.repeat(50), '');
+            log('FILTERED SEARCH BENCHMARK COMPLETE', 'green');
+            log(`Filter: ${filter}`, 'purple');
+            log(`Queries: ${numQueries}`, 'cyan');
+            log(`Avg latency: ${avgTime.toFixed(3)}ms`, 'cyan');
+            log(`P50 latency: ${p50.toFixed(3)}ms`, 'green');
+            log(`P99 latency: ${p99.toFixed(3)}ms`, 'green');
+            log(`Strategy used: ${lastResult?.strategy_used}`, 'purple');
+            log(`Selectivity: ${(lastResult?.observed_selectivity * 100).toFixed(1)}%`, 'purple');
+            log('─'.repeat(50), '');
+
+            if (lastResult?.results?.length > 0) {
+                log('Sample filtered results:', 'purple');
+                lastResult.results.slice(0, 3).forEach((r, i) => {
+                    log(`  ${i + 1}. ID: ${r.id}, Distance: ${r.score}, Meta: ${JSON.stringify(r.metadata)}`, '');
+                });
+            }
+
+            setStatus('active', `${vectorCount.toLocaleString()} vectors`);
+        }
+
+        function clearDatabase() {
+            if (db) {
+                db.free();
+                db = null;
+            }
+            if (flatDb) {
+                flatDb.free();
+                flatDb = null;
+            }
+            vectorCount = 0;
+            flatVectorCount = 0;
+            currentDimensions = 0;
+            updateStats();
+            document.getElementById('btnInsert').disabled = true;
+            document.getElementById('btnTestOne').disabled = true;
+            document.getElementById('btnSearch').disabled = true;
+            document.getElementById('btnSearchFiltered').disabled = true;
+            document.getElementById('btnClear').disabled = true;
+            log('Database cleared', 'red');
+            setStatus('active', 'WASM Ready');
+        }
+
+        // Update header stats - can be called with overrides for benchmarks
+        // If an index is provided, uses actual memoryUsage() instead of estimate
+        function updateStats(overrideCount = null, overrideDims = null, index = null) {
+            // Use overrides if provided, otherwise use database state or global config
+            let count, dims;
+
+            if (overrideCount !== null) {
+                count = overrideCount;
+            } else {
+                const dbCount = indexType === 'flat' ? flatVectorCount : vectorCount;
+                count = dbCount > 0 ? dbCount : parseInt(document.getElementById('numVectors').value) || 0;
+            }
+
+            if (overrideDims !== null) {
+                dims = overrideDims;
+            } else {
+                dims = currentDimensions > 0 ? currentDimensions : parseInt(document.getElementById('dimensions').value) || 0;
+            }
+
+            document.getElementById('statVectors').textContent = count.toLocaleString();
+            document.getElementById('statDimensions').textContent = dims || '-';
+
+            // Use actual memory if index provided, otherwise estimate
+            let memoryBytes;
+            let isActual = false;
+            const activeIndex = index || (indexType === 'flat' ? flatDb : db);
+            if (activeIndex && typeof activeIndex.memoryUsage === 'function') {
+                memoryBytes = activeIndex.memoryUsage();
+                isActual = true;
+            } else {
+                // Estimate: count * bytes per vector
+                const bytesPerVector = dims / 8;
+                memoryBytes = count * bytesPerVector;
+            }
+            document.getElementById('statMemory').textContent = formatBytes(memoryBytes);
+
+            // FP32 vs Binary comparison (always estimated since we don't store FP32)
+            const fp32Size = count * dims * 4;  // 4 bytes per float32
+            document.getElementById('statFp32Size').textContent = formatBytes(fp32Size);
+
+            // Show/hide "(Est)" based on whether we have actual data
+            document.getElementById('statMemoryEst').style.display = isActual ? 'none' : 'inline';
+            // FP32 is always estimated (hypothetical comparison)
+            document.getElementById('statFp32Est').style.display = 'inline';
+
+            // Compression is always 32x (32 bits / 1 bit per dimension)
+            if (count > 0 && dims > 0) {
+                document.getElementById('statCompression').textContent = '32x';
+            } else {
+                document.getElementById('statCompression').textContent = '-';
+            }
+        }
+
+        async function runComparison() {
+            const dimensions = parseInt(document.getElementById('dimensions').value);
+            const numVectors = parseInt(document.getElementById('numVectors').value);
+            const batchSize = parseInt(document.getElementById('batchSize').value);
+            const k = parseInt(document.getElementById('searchK').value);
+            const bytesPerVector = dimensions / 8;
+
+            // Update header stats with benchmark parameters
+            updateStats(numVectors, dimensions);
+
+            log('═'.repeat(60), 'cyan');
+            log('⚡ HNSW vs FLAT INDEX COMPARISON BENCHMARK', 'cyan');
+            log('═'.repeat(60), 'cyan');
+            log(`Dimensions: ${dimensions} bits (${bytesPerVector} bytes)`, 'purple');
+            log(`Vectors: ${numVectors.toLocaleString()}`, 'purple');
+            log(`Search K: ${k}`, 'purple');
+            log(`Batch Size: ${batchSize.toLocaleString()}`, 'purple');
+            log('─'.repeat(60), '');
+
+            setStatus('busy', 'Generating vectors...');
+            log('Generating random vectors...', 'cyan');
+
+            const vectors = [];
+            for (let i = 0; i < numVectors; i++) {
+                const v = new Uint8Array(bytesPerVector);
+                crypto.getRandomValues(v);
+                vectors.push(v);
+                // Yield periodically during generation for large datasets
+                if (i > 0 && i % 10000 === 0) {
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+            log(`Generated ${numVectors.toLocaleString()} vectors`, 'green');
+
+            // FLAT INDEX TEST
+            log('\n[FLAT INDEX] Inserting...', 'green');
+            setStatus('busy', 'FLAT: Inserting...');
+
+            // Use unified EdgeVec API with Flat index type
+            const flatConfig = new EdgeVecConfig(dimensions);
+            flatConfig.indexType = JsIndexType.Flat;
+            flatConfig.setMetricType(MetricType.Hamming);
+            const flatIndex = new EdgeVec(flatConfig);
+            const flatInsertStart = performance.now();
+            let flatInserted = 0;
+
+            for (const v of vectors) {
+                flatIndex.insertBinary(v);
+                flatInserted++;
+
+                // Progress update at batch boundaries
+                if (flatInserted % batchSize === 0) {
+                    const elapsed = performance.now() - flatInsertStart;
+                    const rate = (flatInserted / elapsed * 1000).toFixed(0);
+                    setStatus('busy', `FLAT: ${flatInserted.toLocaleString()}/${numVectors.toLocaleString()}`);
+                    updateStats(flatInserted, dimensions, flatIndex);
+                    log(`  FLAT Progress: ${flatInserted.toLocaleString()}/${numVectors.toLocaleString()} (${rate} vec/s)`, 'purple');
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+            updateStats(numVectors, dimensions, flatIndex);
+            const flatInsertTime = performance.now() - flatInsertStart;
+            const flatInsertThroughput = (numVectors / flatInsertTime * 1000).toFixed(0);
+
+            const flatSearchTimes = [];
+            setStatus('busy', 'FLAT: Searching...');
+            for (let i = 0; i < 50; i++) {
+                const query = vectors[Math.floor(Math.random() * vectors.length)];
+                const start = performance.now();
+                flatIndex.searchBinary(query, k);
+                flatSearchTimes.push(performance.now() - start);
+            }
+            const flatAvgSearch = flatSearchTimes.reduce((a, b) => a + b, 0) / flatSearchTimes.length;
+
+            const formatTime = (ms) => ms >= 1000 ? `${ms.toFixed(0)}ms (${(ms/1000).toFixed(2)}s)` : `${ms.toFixed(0)}ms`;
+
+            const flatMemory = flatIndex.memoryUsage();
+            log(`  Insert: ${formatTime(flatInsertTime)} — ${flatInsertThroughput} vec/s`, 'cyan');
+            log(`  Search: ${flatAvgSearch.toFixed(3)}ms avg`, 'cyan');
+            log(`  Memory: ${formatBytes(flatMemory)}`, 'cyan');
+
+            // HNSW INDEX TEST
+            log('\n[HNSW INDEX] Inserting...', 'green');
+            setStatus('busy', 'HNSW: Inserting...');
+
+            const hnswConfig = new EdgeVecConfig(dimensions);
+            hnswConfig.vector_type = VectorType.Binary;
+            hnswConfig.setMetricType(MetricType.Hamming);
+            hnswConfig.m = 16;
+            hnswConfig.m0 = 32;
+            hnswConfig.ef_construction = 100;
+
+            const hnswIndex = new EdgeVec(hnswConfig);
+            const hnswInsertStart = performance.now();
+            let hnswInserted = 0;
+
+            for (const v of vectors) {
+                hnswIndex.insertBinary(v);
+                hnswInserted++;
+
+                // Progress update at batch boundaries
+                if (hnswInserted % batchSize === 0) {
+                    const elapsed = performance.now() - hnswInsertStart;
+                    const rate = (hnswInserted / elapsed * 1000).toFixed(0);
+                    setStatus('busy', `HNSW: ${hnswInserted.toLocaleString()}/${numVectors.toLocaleString()}`);
+                    updateStats(hnswInserted, dimensions, hnswIndex);
+                    log(`  HNSW Progress: ${hnswInserted.toLocaleString()}/${numVectors.toLocaleString()} (${rate} vec/s)`, 'purple');
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+            updateStats(numVectors, dimensions, hnswIndex);
+            const hnswInsertTime = performance.now() - hnswInsertStart;
+            const hnswInsertThroughput = (numVectors / hnswInsertTime * 1000).toFixed(0);
+
+            const hnswSearchTimes = [];
+            setStatus('busy', 'HNSW: Searching...');
+            for (let i = 0; i < 50; i++) {
+                const query = vectors[Math.floor(Math.random() * vectors.length)];
+                const start = performance.now();
+                hnswIndex.searchBinary(query, k);
+                hnswSearchTimes.push(performance.now() - start);
+            }
+            const hnswAvgSearch = hnswSearchTimes.reduce((a, b) => a + b, 0) / hnswSearchTimes.length;
+
+            const hnswMemory = hnswIndex.memoryUsage();
+            log(`  Insert: ${formatTime(hnswInsertTime)} — ${hnswInsertThroughput} vec/s`, 'cyan');
+            log(`  Search: ${hnswAvgSearch.toFixed(3)}ms avg`, 'cyan');
+            log(`  Memory: ${formatBytes(hnswMemory)}`, 'cyan');
+
+            // COMPARISON SUMMARY
+            const insertSpeedup = (hnswInsertTime / flatInsertTime).toFixed(1);
+            const memoryRatio = (hnswMemory / flatMemory).toFixed(1);
+
+            // Get disk size (serialized size) for both indexes
+            const flatDiskSize = flatIndex.serializedSize();
+            const hnswDiskSize = hnswIndex.serializedSize();
+            const diskRatio = (hnswDiskSize / flatDiskSize).toFixed(1);
+
+            log('\n' + '═'.repeat(60), 'green');
+            log('📊 COMPARISON SUMMARY', 'green');
+            log('═'.repeat(60), 'green');
+
+            log(`Insert Throughput:`, '');
+            log(`  • FLAT:  ${flatInsertThroughput.padStart(8)} vec/s`, 'green');
+            log(`  • HNSW:  ${hnswInsertThroughput.padStart(8)} vec/s`, 'cyan');
+            log(`  → FLAT is ${insertSpeedup}x FASTER for inserts`, 'green');
+            log(``, '');
+            log(`Search Latency:`, '');
+            log(`  • FLAT:  ${flatAvgSearch.toFixed(3).padStart(8)}ms`, flatAvgSearch < 10 ? 'green' : 'cyan');
+            log(`  • HNSW:  ${hnswAvgSearch.toFixed(3).padStart(8)}ms`, 'cyan');
+            if (flatAvgSearch < hnswAvgSearch) {
+                log(`  → FLAT is ${(hnswAvgSearch / flatAvgSearch).toFixed(1)}x FASTER for search!`, 'green');
+            } else {
+                log(`  → HNSW is ${(flatAvgSearch / hnswAvgSearch).toFixed(1)}x faster for search`, 'purple');
+            }
+            log(``, '');
+            log(`Memory Allocated:`, '');
+            log(`  • FLAT:  ${formatBytes(flatMemory).padStart(10)}`, 'green');
+            log(`  • HNSW:  ${formatBytes(hnswMemory).padStart(10)}`, 'cyan');
+            const rawDataSize = numVectors * bytesPerVector;
+            log(`  (raw data: ${formatBytes(rawDataSize)}, Vec capacity overhead included)`, 'purple');
+            log(`  → HNSW uses ${memoryRatio}x more memory (graph overhead)`, 'purple');
+            log(``, '');
+            log(`Disk Size (serialized):`, '');
+            log(`  • FLAT:  ${formatBytes(flatDiskSize).padStart(10)}`, 'green');
+            log(`  • HNSW:  ${formatBytes(hnswDiskSize).padStart(10)}`, 'cyan');
+            if (flatDiskSize < hnswDiskSize) {
+                log(`  → FLAT is ${diskRatio}x SMALLER on disk`, 'green');
+            } else {
+                log(`  → HNSW is ${(flatDiskSize / hnswDiskSize).toFixed(1)}x smaller on disk`, 'purple');
+            }
+            log(``, '');
+            // FP32 vs Binary compression comparison
+            const fp32Size = numVectors * dimensions * 4;  // 4 bytes per float32
+            const binarySize = numVectors * bytesPerVector;  // 1 bit per dimension
+            const compressionRatio = (fp32Size / binarySize).toFixed(0);
+            const savingsPercent = ((1 - binarySize / fp32Size) * 100).toFixed(1);
+            log(`Binary Quantization Savings (vs FP32):`, '');
+            log(`  • FP32 would be:  ${formatBytes(fp32Size).padStart(10)}`, 'purple');
+            log(`  • Binary actual:  ${formatBytes(binarySize).padStart(10)}`, 'green');
+            log(`  → ${compressionRatio}x compression (${savingsPercent}% disk space saved)`, 'green');
+            log('═'.repeat(60), 'green');
+
+            setStatus('active', 'Comparison complete');
+        }
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+
+        function formatOps(ops) {
+            if (ops >= 1e6) return `${(ops / 1e6).toFixed(1)}M/s`;
+            if (ops >= 1e3) return `${(ops / 1e3).toFixed(1)}K/s`;
+            return `${ops.toFixed(0)}/s`;
+        }
+
+        function log(message, color = '') {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="timestamp">[${time}]</span>
+                <span class="message ${color ? 'highlight-' + color : ''}">${escapeHtml(message)}</span>
+            `;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function setStatus(state, text) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            indicator.className = 'status-indicator ' + state;
+            statusText.textContent = text;
+        }
+
+        setInterval(() => {
+            document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
+        }, 1000);
+
+        initialize();
+    </script>
+</body>
+</html>

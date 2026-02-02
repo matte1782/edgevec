@@ -35,6 +35,8 @@ pub mod Flags {
     pub const QUANTIZED: u16 = 1 << 1;
     /// MetadataStore is present (v0.4+)
     pub const HAS_METADATA: u16 = 1 << 2;
+    /// Index type is Flat (brute-force), not HNSW (v0.8+)
+    pub const INDEX_TYPE_FLAT: u16 = 1 << 3;
 }
 
 /// File header for .evec index files.
@@ -643,9 +645,14 @@ mod tests {
         assert_eq!(Flags::COMPRESSED, 0b0001);
         assert_eq!(Flags::QUANTIZED, 0b0010);
         assert_eq!(Flags::HAS_METADATA, 0b0100);
+        assert_eq!(Flags::INDEX_TYPE_FLAT, 0b1000);
 
         // Flags should be combinable
         let combined = Flags::COMPRESSED | Flags::HAS_METADATA;
         assert_eq!(combined, 0b0101);
+
+        // INDEX_TYPE_FLAT can combine with other flags
+        let flat_with_metadata = Flags::INDEX_TYPE_FLAT | Flags::HAS_METADATA;
+        assert_eq!(flat_with_metadata, 0b1100);
     }
 }

@@ -38,6 +38,7 @@
 //! }
 //! ```
 
+use crate::flat::BinaryFlatIndexError;
 use crate::hnsw::GraphError;
 use crate::persistence::PersistenceError;
 use thiserror::Error;
@@ -56,6 +57,10 @@ pub enum EdgeVecError {
     /// Graph algorithm and index errors.
     #[error(transparent)]
     Graph(#[from] GraphError),
+
+    /// Flat index errors (dimension mismatch, invalid dimensions).
+    #[error(transparent)]
+    FlatIndex(#[from] BinaryFlatIndexError),
 
     /// Validation errors (invalid arguments, dimensions, etc).
     #[error("Validation error: {0}")]
@@ -149,6 +154,14 @@ impl From<EdgeVecError> for JsValue {
                 }
                 GraphError::CapacityExceeded => ("ERR_CAPACITY", ge.to_string()),
                 _ => ("ERR_GRAPH", ge.to_string()),
+            },
+
+            EdgeVecError::FlatIndex(fe) => match fe {
+                BinaryFlatIndexError::InvalidDimensions(_)
+                | BinaryFlatIndexError::DimensionMismatch { .. } => {
+                    ("ERR_DIMENSION", fe.to_string())
+                }
+                BinaryFlatIndexError::CapacityOverflow(_, _) => ("ERR_CAPACITY", fe.to_string()),
             },
 
             EdgeVecError::Validation(msg) => ("ERR_VALIDATION", msg.clone()),

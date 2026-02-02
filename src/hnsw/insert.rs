@@ -3,7 +3,7 @@ use super::graph::{GraphError, HnswIndex, NodeId, VectorId, VectorProvider};
 use super::search::{Candidate, SearchContext, Searcher};
 use crate::hnsw::neighbor::NeighborPool;
 use crate::metric::simd::l2_squared_u8;
-use crate::metric::{DotProduct, L2Squared, Metric};
+use crate::metric::{DotProduct, Hamming, L2Squared, Metric};
 use crate::quantization::variable::BinaryVector;
 use crate::storage::VectorStorage;
 
@@ -101,6 +101,11 @@ impl HnswIndex {
             HnswConfig::METRIC_L2_SQUARED => self.insert_impl::<L2Squared>(vector, storage),
             HnswConfig::METRIC_DOT_PRODUCT | HnswConfig::METRIC_COSINE => {
                 self.insert_impl::<DotProduct>(vector, storage)
+            }
+            HnswConfig::METRIC_HAMMING => {
+                // For Hamming metric, auto-convert f32 to binary and insert
+                let binary = crate::quantization::BinaryQuantizer::quantize_to_bytes(vector);
+                self.insert_binary_impl(&binary, storage)
             }
             _ => Err(GraphError::InvalidConfig(format!(
                 "unsupported metric code: {}",
@@ -305,6 +310,412 @@ impl HnswIndex {
         }
 
         Ok(vector_id)
+    }
+
+    // =========================================================================
+    // Binary Vector Insert (Hamming Distance)
+    // =========================================================================
+
+    /// Inserts a pre-packed binary vector into the index.
+    ///
+    /// This method is for binary vectors (1-bit quantized) using Hamming distance.
+    /// Use this when you have pre-quantized data (e.g., from Turso's `f1bit_blob`).
+    ///
+    /// # Arguments
+    ///
+    /// * `binary` - The binary vector (packed bytes). Length must equal `ceil(dimensions / 8)`.
+    /// * `storage` - The storage backend (must be in Binary mode).
+    ///
+    /// # Returns
+    ///
+    /// The assigned `VectorId` on success, or a `GraphError` on failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns `GraphError` if:
+    /// - Storage is not in Binary mode.
+    /// - Binary vector length doesn't match expected bytes.
+    /// - Internal graph corruption occurs.
+    pub fn insert_binary(
+        &mut self,
+        binary: &[u8],
+        storage: &mut VectorStorage,
+    ) -> Result<VectorId, GraphError> {
+        // Validate dimensions
+        let expected_bytes = ((self.config.dimensions + 7) / 8) as usize;
+        if binary.len() != expected_bytes {
+            return Err(GraphError::DimensionMismatch {
+                expected: expected_bytes,
+                actual: binary.len(),
+            });
+        }
+
+        self.insert_binary_impl(binary, storage)
+    }
+
+    /// Inserts an f32 vector with automatic binary quantization.
+    ///
+    /// The vector is converted to binary (1 bit per dimension) using sign quantization:
+    /// - Positive values → 1
+    /// - Non-positive values → 0
+    ///
+    /// # Arguments
+    ///
+    /// * `vector` - The f32 vector (must match configured dimensions).
+    /// * `storage` - The storage backend (must be in Binary mode).
+    ///
+    /// # Returns
+    ///
+    /// The assigned `VectorId` on success, or a `GraphError` on failure.
+    pub fn insert_with_bq(
+        &mut self,
+        vector: &[f32],
+        storage: &mut VectorStorage,
+    ) -> Result<VectorId, GraphError> {
+        // Validate dimensions
+        if vector.len() != self.config.dimensions as usize {
+            return Err(GraphError::DimensionMismatch {
+                expected: self.config.dimensions as usize,
+                actual: vector.len(),
+            });
+        }
+
+        // Convert to binary using binary quantizer
+        let binary = crate::quantization::BinaryQuantizer::quantize_to_bytes(vector);
+        self.insert_binary_impl(&binary, storage)
+    }
+
+    /// Implementation for binary vector insertion.
+    fn insert_binary_impl(
+        &mut self,
+        binary: &[u8],
+        storage: &mut VectorStorage,
+    ) -> Result<VectorId, GraphError> {
+        // Step 1: Store binary vector in VectorStorage
+        let vector_id = storage
+            .insert_binary(binary)
+            .map_err(|e| GraphError::Storage(e.to_string()))?;
+
+        // Step 2: Determine random level L
+        let level = self.get_random_level();
+
+        // Add node to graph
+        let new_node_id = self.add_node(vector_id, level)?;
+
+        // Step 3: Phase 1 - Greedy search to find entry point at level L+1
+        let mut ep = self.entry_point();
+
+        let mut search_ctx = SearchContext::new();
+
+        if let Some(entry_point_id) = ep {
+            let entry_node = self
+                .get_node(entry_point_id)
+                .ok_or(GraphError::NodeIdOutOfBounds)?;
+            let entry_max_layer = entry_node.max_layer;
+
+            let mut curr_ep = entry_point_id;
+
+            // Go down from top to L+1
+            for lc in (level + 1..=entry_max_layer).rev() {
+                self.search_binary_layer(&mut search_ctx, [curr_ep], binary, 1, lc, storage)?;
+
+                if let Some(best) = search_ctx.scratch.first() {
+                    curr_ep = best.node_id;
+                }
+            }
+            ep = Some(curr_ep);
+        }
+
+        // Step 4: Phase 2 - Insert from min(L, max_layer) down to 0
+        let start_layer = if let Some(entry_point_id) = self.entry_point() {
+            let entry_node = self
+                .get_node(entry_point_id)
+                .ok_or(GraphError::NodeIdOutOfBounds)?;
+            std::cmp::min(level, entry_node.max_layer)
+        } else {
+            0
+        };
+
+        if let Some(mut curr_ep) = ep {
+            for lc in (0..=start_layer).rev() {
+                let ef = self.config.ef_construction as usize;
+
+                // 1. Search for candidates
+                self.search_binary_layer(&mut search_ctx, [curr_ep], binary, ef, lc, storage)?;
+
+                // Save best candidate for next iteration
+                let next_ep = search_ctx.scratch.first().map(|c| c.node_id);
+
+                // 2. Select M neighbors
+                let m_max = if lc == 0 {
+                    self.config.m0
+                } else {
+                    self.config.m
+                } as usize;
+
+                {
+                    let SearchContext {
+                        ref scratch,
+                        ref mut neighbor_scratch,
+                        ..
+                    } = search_ctx;
+
+                    self.select_neighbors_heuristic_binary(
+                        binary,
+                        scratch,
+                        m_max,
+                        storage,
+                        neighbor_scratch,
+                    )?;
+                }
+
+                // 3. Connect Bidirectionally
+                let neighbors = search_ctx.neighbor_scratch.clone();
+
+                for &neighbor_id in &neighbors {
+                    // New -> Neighbor
+                    self.add_connection_binary(
+                        new_node_id,
+                        neighbor_id,
+                        lc,
+                        storage,
+                        &mut search_ctx,
+                    )?;
+
+                    // Neighbor -> New
+                    self.add_connection_binary(
+                        neighbor_id,
+                        new_node_id,
+                        lc,
+                        storage,
+                        &mut search_ctx,
+                    )?;
+                }
+
+                // 4. Update entry point for next layer
+                if let Some(best_id) = next_ep {
+                    curr_ep = best_id;
+                }
+            }
+        }
+
+        // Step 5: Update global entry point if needed
+        if self.entry_point().is_none() || level > start_layer {
+            self.set_entry_point(new_node_id);
+        }
+
+        Ok(vector_id)
+    }
+
+    /// Helper: Select neighbors using HNSW heuristic for binary vectors.
+    fn select_neighbors_heuristic_binary(
+        &self,
+        _query: &[u8],
+        candidates: &[Candidate],
+        m: usize,
+        storage: &VectorStorage,
+        output: &mut Vec<NodeId>,
+    ) -> Result<(), GraphError> {
+        output.clear();
+        if candidates.is_empty() {
+            return Ok(());
+        }
+
+        for c in candidates {
+            if output.len() >= m {
+                break;
+            }
+
+            let c_node = self
+                .get_node(c.node_id)
+                .ok_or(GraphError::NodeIdOutOfBounds)?;
+            let dist_q_c = c.distance;
+
+            let mut closer_to_existing = false;
+
+            // Get binary vector for candidate
+            let c_bin = storage.get_binary_vector(c_node.vector_id);
+
+            for &r_id in output.iter() {
+                let r_node = self.get_node(r_id).ok_or(GraphError::NodeIdOutOfBounds)?;
+                let r_bin = storage.get_binary_vector(r_node.vector_id);
+
+                let dist_c_r = Hamming::distance(c_bin, r_bin);
+
+                if dist_c_r < dist_q_c {
+                    closer_to_existing = true;
+                    break;
+                }
+            }
+
+            if !closer_to_existing {
+                output.push(c.node_id);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Helper: Add a connection between two nodes for binary vectors.
+    fn add_connection_binary(
+        &mut self,
+        source: NodeId,
+        target: NodeId,
+        layer: u8,
+        storage: &VectorStorage,
+        ctx: &mut SearchContext,
+    ) -> Result<(), GraphError> {
+        // 1. Read source node info
+        let (max_layer, vector_id) = {
+            let node = self.get_node(source).ok_or(GraphError::NodeIdOutOfBounds)?;
+            (node.max_layer, node.vector_id)
+        };
+
+        if layer > max_layer {
+            return Ok(());
+        }
+
+        let node_idx = source.0 as usize;
+        let (old_offset, old_len) = {
+            let node = &self.nodes[node_idx];
+            (node.neighbor_offset, node.neighbor_len)
+        };
+
+        // 2. Scan to find the target layer range and decode neighbors
+        ctx.neighbor_id_scratch.clear();
+
+        let start;
+        let end;
+        let max_level_found;
+        let valid_end;
+
+        {
+            let blob = &self.neighbors.buffer
+                [old_offset as usize..(old_offset as usize + old_len as usize)];
+            let (s, e, m) = scan_blob_for_layer(blob, layer);
+            start = s;
+            end = e;
+            max_level_found = m;
+
+            valid_end = if layer == max_layer {
+                e
+            } else {
+                let (_, ve, _) = scan_blob_for_layer(blob, max_layer);
+                ve
+            };
+
+            if s < e {
+                NeighborPool::decode_neighbors_to_buf(&blob[s..e], &mut ctx.neighbor_id_scratch);
+            }
+        }
+
+        // Check duplicates
+        if ctx.neighbor_id_scratch.contains(&target.0) {
+            return Ok(());
+        }
+        ctx.neighbor_id_scratch.push(target.0);
+
+        // 3. Prune if needed
+        let m_max = if layer == 0 {
+            self.config.m0
+        } else {
+            self.config.m
+        } as usize;
+
+        if ctx.neighbor_id_scratch.len() > m_max {
+            // Get source binary vector
+            let source_bin = storage.get_binary_vector(vector_id);
+
+            ctx.scratch.clear();
+
+            for &n_u32 in &ctx.neighbor_id_scratch {
+                let n_id = NodeId(n_u32);
+                let n_node = self.get_node(n_id).ok_or(GraphError::NodeIdOutOfBounds)?;
+                let n_bin = storage.get_binary_vector(n_node.vector_id);
+                let dist = Hamming::distance(source_bin, n_bin);
+                ctx.scratch.push(Candidate {
+                    distance: dist,
+                    node_id: n_id,
+                });
+            }
+
+            ctx.scratch
+                .sort_by(|a, b| a.distance.total_cmp(&b.distance));
+
+            self.select_neighbors_heuristic_binary(
+                source_bin,
+                &ctx.scratch,
+                m_max,
+                storage,
+                &mut ctx.neighbor_scratch,
+            )?;
+
+            ctx.neighbor_id_scratch.clear();
+            ctx.neighbor_id_scratch
+                .extend(ctx.neighbor_scratch.iter().map(|n| n.0));
+        }
+
+        // 4. Encode modified layer
+        ctx.encoding_scratch.clear();
+        NeighborPool::encode_neighbors_to_buf(&ctx.neighbor_id_scratch, &mut ctx.encoding_scratch);
+        let encoded_new_layer = &ctx.encoding_scratch;
+
+        // 5. Calculate new size and fill gaps
+        let gap_count = if layer > max_level_found {
+            (layer - max_level_found) as usize
+        } else {
+            0
+        };
+
+        let new_size = start + gap_count + encoded_new_layer.len() + (valid_end - end);
+
+        // 6. Alloc new space
+        let (new_offset, new_capacity) = self.neighbors.alloc(new_size)?;
+
+        let new_offset_u = new_offset as usize;
+        let old_offset_u = old_offset as usize;
+
+        // 7. Write parts
+        if start > 0 {
+            self.neighbors
+                .buffer
+                .copy_within(old_offset_u..old_offset_u + start, new_offset_u);
+        }
+
+        let mut curr = new_offset_u + start;
+
+        for _ in 0..gap_count {
+            self.neighbors.buffer[curr] = 0;
+            curr += 1;
+        }
+
+        self.neighbors.buffer[curr..curr + encoded_new_layer.len()]
+            .copy_from_slice(encoded_new_layer);
+        curr += encoded_new_layer.len();
+
+        let remaining = valid_end.saturating_sub(end);
+        if remaining > 0 {
+            let src_start = old_offset_u + end;
+            self.neighbors
+                .buffer
+                .copy_within(src_start..src_start + remaining, curr);
+            curr += remaining;
+        }
+
+        let allocated_end = new_offset_u + new_capacity as usize;
+        if curr < allocated_end {
+            self.neighbors.buffer[curr..allocated_end].fill(0);
+        }
+
+        // 8. Update node and free old memory
+        let node = &mut self.nodes[node_idx];
+        if old_len > 0 {
+            self.neighbors.free(old_offset, old_len);
+        }
+        node.neighbor_offset = new_offset;
+        node.neighbor_len = new_capacity;
+
+        Ok(())
     }
 
     /// Helper: Select neighbors using HNSW heuristic.

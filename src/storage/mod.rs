@@ -55,6 +55,9 @@ pub enum StorageType {
     Float32,
     /// Store 8-bit quantized vectors.
     QuantizedU8(QuantizerConfig),
+    /// Store binary (1-bit) vectors for Hamming distance.
+    /// The u32 represents dimensions in bits (e.g., 1024 for 128 bytes).
+    Binary(u32),
 }
 
 /// Contiguous vector storage with WAL persistence.
@@ -69,6 +72,12 @@ pub struct VectorStorage {
     /// Populated if `storage_type` is `QuantizedU8`.
     #[serde(default)]
     pub(crate) quantized_data: Vec<u8>,
+
+    /// Binary vector data (packed bits, layout: [`v0_b0`, ..., `v1_b0`, ...]).
+    /// Populated if `storage_type` is `Binary`.
+    /// Each vector is stored as ceil(dimensions / 8) bytes.
+    #[serde(default)]
+    pub(crate) binary_data: Vec<u8>,
 
     /// Storage configuration.
     #[serde(default)]
@@ -102,6 +111,7 @@ impl VectorStorage {
         Self {
             data_f32: Vec::new(),
             quantized_data: Vec::new(),
+            binary_data: Vec::new(),
             config: StorageType::Float32,
             quantizer: None,
             deleted: BitVec::new(),
@@ -111,12 +121,25 @@ impl VectorStorage {
         }
     }
 
-    /// Set the storage type (e.g. to enable quantization).
+    /// Set the storage type (e.g. to enable quantization or binary mode).
     ///
     /// Note: This does not convert existing data. It only affects future inserts.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The storage type to use. For `Binary(bits)`, the `bits` parameter
+    ///   specifies the number of bits per vector (e.g., 1024 for 128 bytes).
     pub fn set_storage_type(&mut self, config: StorageType) {
-        if let StorageType::QuantizedU8(q_config) = &config {
-            self.quantizer = Some(ScalarQuantizer::new(*q_config));
+        match &config {
+            StorageType::QuantizedU8(q_config) => {
+                self.quantizer = Some(ScalarQuantizer::new(*q_config));
+            }
+            StorageType::Binary(bits) => {
+                // For binary storage, dimensions represents bits (not bytes)
+                // Update dimensions to match the binary config
+                self.dimensions = *bits;
+            }
+            StorageType::Float32 => {}
         }
         self.config = config;
     }
@@ -204,6 +227,11 @@ impl VectorStorage {
                 let quantized = q.quantize(vector);
                 self.quantized_data.extend_from_slice(&quantized);
             }
+            StorageType::Binary(_) => {
+                // For binary storage, auto-quantize f32 to binary
+                let binary = crate::quantization::BinaryQuantizer::quantize_to_bytes(vector);
+                self.binary_data.extend_from_slice(&binary);
+            }
         }
 
         self.deleted.push(false);
@@ -270,6 +298,91 @@ impl VectorStorage {
         self.next_id += 1;
 
         Ok(VectorId(id))
+    }
+
+    /// Inserts a pre-packed binary vector into storage.
+    ///
+    /// This method is for storing binary (1-bit quantized) vectors directly,
+    /// such as those synced from Turso's `f1bit_blob` column.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The packed binary vector data. Length must equal `ceil(dimensions / 8)`.
+    ///
+    /// # Returns
+    ///
+    /// The new `VectorId` or `StorageError`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `StorageError::DimensionMismatch` if `data.len()` doesn't match
+    /// the expected bytes for the configured bit dimensions.
+    /// Returns `StorageError::Corrupted` if storage is not in binary mode.
+    pub fn insert_binary(&mut self, data: &[u8]) -> Result<VectorId, StorageError> {
+        // Validate we're in Binary mode
+        let expected_bits = match &self.config {
+            StorageType::Binary(bits) => *bits,
+            _ => {
+                return Err(StorageError::Corrupted(
+                    "Cannot insert binary data into non-binary storage".into(),
+                ));
+            }
+        };
+
+        // Calculate expected bytes: ceil(bits / 8)
+        let expected_bytes = ((expected_bits + 7) / 8) as usize;
+
+        if data.len() != expected_bytes {
+            return Err(StorageError::DimensionMismatch {
+                expected: expected_bytes as u32,
+                actual: data.len() as u32,
+            });
+        }
+
+        let id = self.next_id;
+
+        if let Some(wal) = &mut self.wal {
+            let mut payload = Vec::with_capacity(8 + data.len());
+            payload.extend_from_slice(&id.to_le_bytes());
+            payload.extend_from_slice(data);
+
+            // Entry Type 2 = Insert Binary
+            wal.append(2, &payload)?;
+        }
+
+        self.binary_data.extend_from_slice(data);
+        self.deleted.push(false);
+        self.next_id += 1;
+
+        Ok(VectorId(id))
+    }
+
+    /// Returns the binary vector slice for a given ID.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the vector ID is invalid (0).
+    /// Panics if storage is not in binary mode.
+    /// Panics if vector ID is out of bounds.
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn get_binary_vector(&self, id: VectorId) -> &[u8] {
+        let bits = match &self.config {
+            StorageType::Binary(b) => *b,
+            _ => panic!("get_binary_vector called on non-binary storage"),
+        };
+
+        // Use checked_sub to safely convert 1-based ID to 0-based index
+        let idx = (id.0 as usize)
+            .checked_sub(1)
+            .expect("attempted to access invalid vector id 0");
+
+        let bytes_per_vector = ((bits + 7) / 8) as usize;
+        let start = idx
+            .checked_mul(bytes_per_vector)
+            .expect("vector offset overflow");
+
+        &self.binary_data[start..start + bytes_per_vector]
     }
 
     /// Recovers storage state from a WAL backend.
@@ -414,6 +527,37 @@ impl VectorStorage {
                 storage.deleted.push(false);
                 storage.next_id = id + 1;
                 max_id = max_id.max(id);
+            } else if entry.entry_type == 2 {
+                // Insert Binary
+                if payload.len() < 8 {
+                    return Err(StorageError::Corrupted(
+                        "Binary insert payload too short".into(),
+                    ));
+                }
+                let id_bytes: [u8; 8] = payload[0..8].try_into().expect("checked");
+                let id = u64::from_le_bytes(id_bytes);
+
+                let vec_bytes = &payload[8..];
+
+                // For binary, expected bytes = ceil(dimensions / 8)
+                let expected_bytes = (config.dimensions as usize + 7) / 8;
+                if vec_bytes.len() != expected_bytes {
+                    return Err(StorageError::Corrupted(format!(
+                        "Binary vector length mismatch: expected {} bytes, got {}",
+                        expected_bytes,
+                        vec_bytes.len()
+                    )));
+                }
+
+                // Set storage type to Binary if not already (first binary entry)
+                if !matches!(storage.config, StorageType::Binary(_)) {
+                    storage.config = StorageType::Binary(config.dimensions);
+                }
+
+                storage.binary_data.extend_from_slice(vec_bytes);
+                storage.deleted.push(false);
+                storage.next_id = id + 1;
+                max_id = max_id.max(id);
             }
         }
 
@@ -496,6 +640,12 @@ impl VectorStorage {
                     .expect("quantizer not initialized in QuantizedU8 mode");
                 Cow::Owned(q.dequantize(q_data))
             }
+            StorageType::Binary(_) => {
+                // Binary storage doesn't store f32 vectors.
+                // For operations that need f32, this should not be called.
+                // Return empty vector to allow compilation; caller should use get_binary_vector instead.
+                panic!("get_vector called on binary storage. Use get_binary_vector instead.");
+            }
         }
     }
 
@@ -570,6 +720,7 @@ impl VectorStorage {
     pub fn compact(&mut self) {
         self.data_f32.shrink_to_fit();
         self.quantized_data.shrink_to_fit();
+        self.binary_data.shrink_to_fit();
         self.deleted.shrink_to_fit();
     }
 
@@ -591,6 +742,7 @@ impl VectorProvider for VectorStorage {
     fn get_quantized_vector(&self, id: VectorId) -> Option<&[u8]> {
         match self.config {
             StorageType::QuantizedU8(_) => Some(self.get_quantized_vector(id)),
+            StorageType::Binary(_) => Some(self.get_binary_vector(id)),
             StorageType::Float32 => None,
         }
     }
@@ -604,6 +756,11 @@ impl VectorProvider for VectorStorage {
                 } else {
                     None
                 }
+            }
+            StorageType::Binary(_) => {
+                // Use binary quantization: sign(x) -> 1 bit per dimension
+                *output = crate::quantization::BinaryQuantizer::quantize_to_bytes(query);
+                Some(output)
             }
             StorageType::Float32 => None,
         }

@@ -45,6 +45,8 @@ impl HnswConfig {
     pub const METRIC_COSINE: u32 = 1;
     /// Metric code for Dot Product.
     pub const METRIC_DOT_PRODUCT: u32 = 2;
+    /// Metric code for Hamming distance (for binary vectors).
+    pub const METRIC_HAMMING: u32 = 3;
 
     /// Creates a default configuration.
     #[must_use]

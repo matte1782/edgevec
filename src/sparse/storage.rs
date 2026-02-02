@@ -1016,8 +1016,8 @@ impl SparseStorage {
     pub fn delete_batch(&mut self, ids: &[SparseId]) -> Result<usize, SparseError> {
         // Validate all IDs first
         for id in ids {
-            let idx = id.as_u64() as usize;
-            if idx >= self.dims.len() {
+            let vector_idx = id.as_u64() as usize;
+            if vector_idx >= self.dims.len() {
                 return Err(SparseError::IdNotFound(id.as_u64()));
             }
         }
@@ -1025,9 +1025,9 @@ impl SparseStorage {
         // Perform deletions
         let mut deleted_count = 0;
         for id in ids {
-            let idx = id.as_u64() as usize;
-            if !self.deleted[idx] {
-                self.deleted.set(idx, true);
+            let vector_idx = id.as_u64() as usize;
+            if !self.deleted[vector_idx] {
+                self.deleted.set(vector_idx, true);
                 deleted_count += 1;
             }
         }

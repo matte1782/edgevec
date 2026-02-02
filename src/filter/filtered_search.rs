@@ -556,6 +556,270 @@ impl<'idx, 'sto, 'meta, M: MetadataStore> FilteredSearcher<'idx, 'sto, 'meta, M>
         };
         Ok(result)
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BINARY FILTERED SEARCH METHODS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Search binary vectors with optional filter and strategy.
+    ///
+    /// This is the binary vector equivalent of `search_filtered()`, using
+    /// Hamming distance for similarity calculation.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Binary query vector (packed bytes)
+    /// * `k` - Number of results to return
+    /// * `filter` - Optional filter expression (None = no filtering)
+    /// * `strategy` - Filter strategy (Auto for automatic selection)
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(FilteredSearchResult)` - Search results with diagnostics
+    /// * `Err(FilteredSearchError)` - On invalid filter or search failure
+    ///
+    /// # Errors
+    ///
+    /// Returns `FilteredSearchError::Filter` if:
+    /// - Filter strategy validation fails
+    /// - Filter expression evaluation fails
+    ///
+    /// Returns `FilteredSearchError::Graph` if:
+    /// - Query dimension mismatches index
+    /// - Binary HNSW search fails
+    pub fn search_binary_filtered(
+        &mut self,
+        query: &[u8],
+        k: usize,
+        filter: Option<&FilterExpr>,
+        strategy: FilterStrategy,
+    ) -> Result<FilteredSearchResult, FilteredSearchError> {
+        // Validate strategy
+        strategy.validate()?;
+
+        // No filter = standard binary search
+        let Some(filter) = filter else {
+            let results = self.index.search_binary(query, k, self.storage)?;
+            return Ok(FilteredSearchResult {
+                complete: results.len() >= k || self.index.is_empty(),
+                vectors_evaluated: k.min(self.index.len()),
+                observed_selectivity: 1.0,
+                strategy_used: strategy,
+                results,
+            });
+        };
+
+        // Handle edge cases (tautology, contradiction, empty index)
+        if let Some(result) = self.handle_binary_filter_edge_cases(filter, k, query)? {
+            return Ok(result);
+        }
+
+        // IMPORTANT: For binary vectors, ALWAYS use PreFilter strategy.
+        //
+        // Rationale: PostFilter and Hybrid strategies could miss top-K results
+        // because binary search returns a fixed candidate set based on Hamming
+        // distance. If we filter AFTER search, high-quality matches might be
+        // excluded from the initial candidate set.
+        //
+        // PreFilter ensures all matching vectors are considered before ranking
+        // by Hamming distance, guaranteeing correct top-K results.
+        //
+        // The `strategy` parameter is accepted for API compatibility but ignored
+        // for binary search - PreFilter is always used.
+        let _ = strategy; // Explicitly ignore - always use PreFilter for binary
+
+        self.search_binary_prefilter(query, k, filter)
+    }
+
+    /// Handle binary filter edge cases before executing search.
+    fn handle_binary_filter_edge_cases(
+        &mut self,
+        filter: &FilterExpr,
+        k: usize,
+        query: &[u8],
+    ) -> Result<Option<FilteredSearchResult>, FilteredSearchError> {
+        // Empty index
+        if self.index.is_empty() {
+            return Ok(Some(FilteredSearchResult::empty(FilterStrategy::Auto)));
+        }
+
+        // Check for tautology (always true) - proceed without filter
+        if is_tautology(filter) {
+            let results = self.index.search_binary(query, k, self.storage)?;
+            return Ok(Some(FilteredSearchResult::full(
+                results,
+                FilterStrategy::Auto,
+            )));
+        }
+
+        // Check for contradiction (always false) - return empty
+        if is_contradiction(filter) {
+            return Ok(Some(FilteredSearchResult::empty(FilterStrategy::Auto)));
+        }
+
+        Ok(None) // No edge case, proceed normally
+    }
+
+    /// Binary PreFilter strategy: scan all metadata, then search on matching subset.
+    fn search_binary_prefilter(
+        &mut self,
+        query: &[u8],
+        k: usize,
+        filter: &FilterExpr,
+    ) -> Result<FilteredSearchResult, FilteredSearchError> {
+        // Build HashSet of passing vector indices for O(1) lookup
+        let mut passing_indices = HashSet::new();
+        let total = self.metadata.len();
+
+        for idx in 0..total {
+            if let Some(metadata) = self.metadata.get_metadata(idx) {
+                if evaluate(filter, metadata).unwrap_or(false) {
+                    passing_indices.insert(idx);
+                }
+            }
+        }
+
+        let passed = passing_indices.len();
+        #[allow(clippy::cast_precision_loss)]
+        let selectivity = if total > 0 {
+            (passed as f32) / (total as f32)
+        } else {
+            0.0
+        };
+
+        if passing_indices.is_empty() {
+            return Ok(FilteredSearchResult {
+                results: vec![],
+                complete: true,
+                observed_selectivity: 0.0,
+                strategy_used: FilterStrategy::PreFilter,
+                vectors_evaluated: total,
+            });
+        }
+
+        // Search on full index and filter results
+        let ef_effective = (k * 10).min(EF_CAP).max(k);
+        let all_results = self.index.search_binary_with_context(
+            query,
+            ef_effective,
+            self.storage,
+            &mut self.search_ctx,
+        )?;
+
+        // Filter to only passing indices
+        let mut results = Vec::with_capacity(k);
+        for result in all_results {
+            if results.len() >= k {
+                break;
+            }
+            #[allow(clippy::cast_possible_truncation)]
+            let idx = (result.vector_id.0 as usize).saturating_sub(1);
+            if passing_indices.contains(&idx) {
+                results.push(result);
+            }
+        }
+
+        Ok(FilteredSearchResult {
+            complete: results.len() >= k,
+            observed_selectivity: selectivity,
+            strategy_used: FilterStrategy::PreFilter,
+            vectors_evaluated: total,
+            results,
+        })
+    }
+
+    /// Binary PostFilter strategy: search with oversampling, then filter results.
+    ///
+    /// NOTE: This function is not currently used because binary search with metadata
+    /// filtering always uses PreFilter (see search_binary_filtered). Kept for potential
+    /// future use in testing or specialized scenarios.
+    #[allow(dead_code)]
+    fn search_binary_postfilter(
+        &mut self,
+        query: &[u8],
+        k: usize,
+        filter: &FilterExpr,
+        oversample: f32,
+    ) -> Result<FilteredSearchResult, FilteredSearchError> {
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_precision_loss)]
+        let ef_effective = ((k as f32) * oversample).ceil() as usize;
+        let ef_effective = ef_effective.min(EF_CAP).max(k);
+
+        // Run binary HNSW search with oversampled ef
+        let candidates = self.index.search_binary_with_context(
+            query,
+            ef_effective,
+            self.storage,
+            &mut self.search_ctx,
+        )?;
+
+        // Filter candidates
+        let mut results = Vec::with_capacity(k);
+        let mut passed = 0;
+        let evaluated = candidates.len();
+
+        for candidate in candidates {
+            if results.len() >= k {
+                break;
+            }
+            #[allow(clippy::cast_possible_truncation)]
+            let idx = (candidate.vector_id.0 as usize).saturating_sub(1);
+            if let Some(metadata) = self.metadata.get_metadata(idx) {
+                if evaluate(filter, metadata).unwrap_or(false) {
+                    results.push(candidate);
+                    passed += 1;
+                }
+            }
+        }
+
+        #[allow(clippy::cast_precision_loss)]
+        let selectivity = if evaluated > 0 {
+            (passed as f32) / (evaluated as f32)
+        } else {
+            0.0
+        };
+
+        Ok(FilteredSearchResult {
+            complete: results.len() >= k,
+            observed_selectivity: selectivity,
+            strategy_used: FilterStrategy::PostFilter { oversample },
+            vectors_evaluated: evaluated,
+            results,
+        })
+    }
+
+    /// Binary Hybrid strategy: estimate selectivity, adapt oversample.
+    ///
+    /// NOTE: This function is not currently used because binary search with metadata
+    /// filtering always uses PreFilter (see search_binary_filtered). Kept for potential
+    /// future use in testing or specialized scenarios.
+    #[allow(dead_code)]
+    fn search_binary_hybrid(
+        &mut self,
+        query: &[u8],
+        k: usize,
+        filter: &FilterExpr,
+        oversample_min: f32,
+        oversample_max: f32,
+    ) -> Result<FilteredSearchResult, FilteredSearchError> {
+        // Estimate selectivity
+        let estimate = estimate_selectivity(filter, self.metadata, Some(42));
+
+        // Calculate adaptive oversample within bounds
+        let oversample = calculate_oversample(estimate.selectivity)
+            .max(oversample_min)
+            .min(oversample_max);
+
+        // Use binary post-filter with calculated oversample
+        let mut result = self.search_binary_postfilter(query, k, filter, oversample)?;
+        result.strategy_used = FilterStrategy::Hybrid {
+            oversample_min,
+            oversample_max,
+        };
+        Ok(result)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

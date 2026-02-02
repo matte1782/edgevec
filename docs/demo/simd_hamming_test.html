@@ -239,19 +239,9 @@
 
             <div class="benchmark-grid" id="benchmark-results">
                 <div class="benchmark-card">
-                    <div class="label">New SIMD</div>
-                    <div class="value" id="new-time">--</div>
-                    <div class="sub" id="new-backend">waiting</div>
-                </div>
-                <div class="benchmark-card">
-                    <div class="label">Old Scalar</div>
-                    <div class="value" id="old-time">--</div>
-                    <div class="sub" id="old-backend">waiting</div>
-                </div>
-                <div class="benchmark-card">
-                    <div class="label">Speedup</div>
-                    <div class="value" id="speedup">--</div>
-                    <div class="sub">SIMD vs Scalar</div>
+                    <div class="label">Latency</div>
+                    <div class="value" id="latency-time">--</div>
+                    <div class="sub" id="simd-backend-result">waiting</div>
                 </div>
                 <div class="benchmark-card">
                     <div class="label">Throughput</div>
@@ -272,13 +262,12 @@
                     <tr>
                         <th>Size</th>
                         <th class="num">Bits</th>
-                        <th class="num">SIMD (μs)</th>
-                        <th class="num">Scalar (μs)</th>
-                        <th class="num">Speedup</th>
+                        <th class="num">Latency (μs)</th>
+                        <th class="num">Throughput</th>
                     </tr>
                 </thead>
                 <tbody id="size-results-body">
-                    <tr><td colspan="5" style="color: #666; text-align: center;">No results yet</td></tr>
+                    <tr><td colspan="4" style="color: #666; text-align: center;">No results yet</td></tr>
                 </tbody>
             </table>
         </div>
@@ -421,20 +410,20 @@
             const iterations = parseInt(document.getElementById('iterations-select').value);
 
             try {
-                const resultJson = wasmModule.benchmarkHammingComparison(bytes, iterations);
-                const result = JSON.parse(resultJson);
+                // benchmarkHamming returns microseconds per iteration
+                const latencyUs = wasmModule.benchmarkHamming(bytes, iterations);
+                const backend = wasmModule.getSimdBackend();
+                const latencyOk = Number.isFinite(latencyUs) && latencyUs > 0;
 
-                document.getElementById('new-time').textContent = result.new_us.toFixed(3) + ' μs';
-                document.getElementById('new-backend').textContent = result.new_backend;
-                document.getElementById('old-time').textContent = result.current_us.toFixed(3) + ' μs';
-                document.getElementById('old-backend').textContent = result.current_backend;
-                document.getElementById('speedup').textContent = result.speedup.toFixed(1) + 'x';
-                document.getElementById('speedup').style.color = result.speedup >= 2 ? '#00ff88' : '#ffaa00';
+                document.getElementById('latency-time').textContent =
+                    latencyOk ? latencyUs.toFixed(3) + ' μs' : 'N/A';
+                document.getElementById('simd-backend-result').textContent = backend.toUpperCase();
 
-                const opsPerSec = 1000000 / result.new_us;
-                document.getElementById('throughput').textContent = formatNumber(opsPerSec);
+                const opsPerSec = latencyOk ? 1000000 / latencyUs : 0;
+                document.getElementById('throughput').textContent =
+                    latencyOk ? formatNumber(opsPerSec) : 'N/A';
 
-                console.log('Hamming benchmark:', result);
+                console.log('Hamming benchmark:', { latencyUs, backend, bytes, iterations });
             } catch (e) {
                 console.error('Benchmark error:', e);
             }
@@ -457,17 +446,20 @@
 
             for (const bytes of sizes) {
                 try {
-                    const resultJson = wasmModule.benchmarkHammingComparison(bytes, iterations);
-                    const result = JSON.parse(resultJson);
-                    results.push({ bytes, ...result });
+                    const latencyUs = wasmModule.benchmarkHamming(bytes, iterations);
+                    const latencyOk = Number.isFinite(latencyUs) && latencyUs > 0;
+                    const opsPerSec = latencyOk ? 1000000 / latencyUs : 0;
+
+                    if (latencyOk) {
+                        results.push({ bytes, latencyUs, opsPerSec });
+                    }
 
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${bytes} bytes</td>
                         <td class="num">${bytes * 8}</td>
-                        <td class="num" style="color: #00ff88">${result.new_us.toFixed(3)}</td>
-                        <td class="num" style="color: #888">${result.current_us.toFixed(3)}</td>
-                        <td class="num" style="color: ${result.speedup >= 5 ? '#00ff88' : result.speedup >= 2 ? '#00d4ff' : '#ffaa00'}">${result.speedup.toFixed(1)}x</td>
+                        <td class="num" style="color: #00ff88">${latencyOk ? latencyUs.toFixed(3) : 'N/A'}</td>
+                        <td class="num" style="color: #00d4ff">${latencyOk ? formatNumber(opsPerSec) : 'N/A'}</td>
                     `;
                     tbody.appendChild(row);
 
@@ -480,9 +472,13 @@
             btn.disabled = false;
             btn.textContent = 'Run All Sizes';
 
-            // Show average speedup
-            const avgSpeedup = results.reduce((sum, r) => sum + r.speedup, 0) / results.length;
-            showSummary('success', `Average speedup across all sizes: ${avgSpeedup.toFixed(1)}x faster with WASM SIMD128`);
+            // Show average latency
+            if (results.length === 0) {
+                showSummary('error', 'No valid benchmark results.');
+                return;
+            }
+            const avgLatency = results.reduce((sum, r) => sum + r.latencyUs, 0) / results.length;
+            showSummary('success', `Average latency: ${avgLatency.toFixed(3)} μs using WASM SIMD128`);
         }
 
         // Store test

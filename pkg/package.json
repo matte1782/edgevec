@@ -25,42 +25,6 @@
     "database",
     "wasm",
     "hnsw",
-    "similarity-search",
-    "react",
-    "vue"
-  ],
-  "peerDependencies": {
-    "react": ">=18.0.0",
-    "vue": ">=3.3.0"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    },
-    "vue": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@types/react": "^19.2.7",
-    "vue": "^3.5.0"
-  },
-  "exports": {
-    ".": {
-      "import": "./edgevec.js",
-      "types": "./edgevec.d.ts"
-    },
-    "./react": {
-      "import": "./react/index.js",
-      "types": "./react/index.d.ts"
-    },
-    "./vue": {
-      "import": "./vue/index.js",
-      "types": "./vue/index.d.ts"
-    },
-    "./filter": {
-      "import": "./filter.js",
-      "types": "./filter.d.ts"
-    }
-  }
+    "similarity-search"
+  ]
 }
