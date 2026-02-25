@@ -10,7 +10,7 @@ use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::metadata::MetadataValue;
 use edgevec::storage::VectorStorage;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 
 /// Test that replicates WASM demo flow exactly.
 #[test]
@@ -40,7 +40,7 @@ fn test_wasm_demo_flow_f32_search() {
     // Step 4: Insert vectors with metadata (like demo's generateData)
     for i in 0..NUM_VECTORS {
         // Generate random normalized vector
-        let mut v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-0.5..0.5)).collect();
+        let mut v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-0.5..0.5)).collect();
         let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
         for x in &mut v {
             *x /= norm;
@@ -55,9 +55,9 @@ fn test_wasm_demo_flow_f32_search() {
             );
             m.insert(
                 "score".to_string(),
-                MetadataValue::Float(rng.gen_range(0.0..1.0)),
+                MetadataValue::Float(rng.random_range(0.0..1.0)),
             );
-            m.insert("active".to_string(), MetadataValue::Boolean(rng.gen()));
+            m.insert("active".to_string(), MetadataValue::Boolean(rng.random()));
             m
         };
 
@@ -71,7 +71,7 @@ fn test_wasm_demo_flow_f32_search() {
     println!("Has BQ: {}", index.has_bq());
 
     // Step 5: Generate random query (like demo does)
-    let mut query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-0.5..0.5)).collect();
+    let mut query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-0.5..0.5)).collect();
     let norm: f32 = query.iter().map(|x| x * x).sum::<f32>().sqrt();
     for x in &mut query {
         *x /= norm;

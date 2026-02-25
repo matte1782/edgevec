@@ -6,7 +6,7 @@
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::storage::VectorStorage;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::collections::HashSet;
 
 /// Helper to create an index with known vectors.
@@ -25,7 +25,7 @@ fn create_test_index(num_vectors: usize, dim: u32) -> (HnswIndex, VectorStorage,
 
     for _ in 0..num_vectors {
         // Use [-1, 1] range for proper BQ quantization (sign-based: positive → 1, non-positive → 0)
-        let v: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let v: Vec<f32> = (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect();
         index.insert_bq(&v, &mut storage).expect("Insert failed");
         vectors.push(v);
     }
@@ -38,7 +38,7 @@ fn test_search_bq_rescored_returns_k() {
     let (index, storage, _vectors) = create_test_index(100, 128);
 
     let mut rng = StdRng::seed_from_u64(123);
-    let query: Vec<f32> = (0..128).map(|_| rng.gen::<f32>()).collect();
+    let query: Vec<f32> = (0..128).map(|_| rng.random::<f32>()).collect();
 
     let results = index
         .search_bq_rescored(&query, 10, 3, &storage)
@@ -93,7 +93,7 @@ fn test_search_bq_rescored_default_factor() {
     let (index, storage, _vectors) = create_test_index(100, 128);
 
     let mut rng = StdRng::seed_from_u64(456);
-    let query: Vec<f32> = (0..128).map(|_| rng.gen::<f32>()).collect();
+    let query: Vec<f32> = (0..128).map(|_| rng.random::<f32>()).collect();
 
     let results = index
         .search_bq_rescored_default(&query, 10, &storage)
@@ -107,7 +107,7 @@ fn test_rescore_factor_affects_candidate_pool() {
     let (index, storage, _vectors) = create_test_index(100, 128);
 
     let mut rng = StdRng::seed_from_u64(789);
-    let query: Vec<f32> = (0..128).map(|_| rng.gen::<f32>()).collect();
+    let query: Vec<f32> = (0..128).map(|_| rng.random::<f32>()).collect();
 
     // Higher rescore factor should fetch more candidates
     let low_factor = index
@@ -130,7 +130,7 @@ fn test_rescored_results_sorted_by_similarity() {
     let (index, storage, _vectors) = create_test_index(100, 128);
 
     let mut rng = StdRng::seed_from_u64(999);
-    let query: Vec<f32> = (0..128).map(|_| rng.gen::<f32>()).collect();
+    let query: Vec<f32> = (0..128).map(|_| rng.random::<f32>()).collect();
 
     let results = index
         .search_bq_rescored(&query, 10, 3, &storage)
@@ -179,7 +179,7 @@ fn test_recall_at_10_with_rescoring() {
     // Insert vectors with values in [-1, 1] range for proper BQ quantization
     // (BQ uses sign bit: positive -> 1, non-positive -> 0)
     let vectors: Vec<Vec<f32>> = (0..NUM_VECTORS)
-        .map(|_| (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .map(|_| (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect())
         .collect();
 
     for v in &vectors {
@@ -190,7 +190,7 @@ fn test_recall_at_10_with_rescoring() {
     let mut total_recall = 0.0;
 
     for _ in 0..NUM_QUERIES {
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // Ground truth: F32 search
         let f32_results = index
@@ -240,7 +240,7 @@ fn test_rescoring_improves_recall() {
 
     // Insert vectors with values in [-1, 1] range for proper BQ quantization
     for _ in 0..NUM_VECTORS {
-        let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
         index.insert_bq(&v, &mut storage).expect("Insert failed");
     }
 
@@ -248,7 +248,7 @@ fn test_rescoring_improves_recall() {
     let mut rescored_recall = 0.0;
 
     for _ in 0..NUM_QUERIES {
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // Ground truth: F32 search
         let f32_results = index
@@ -314,13 +314,13 @@ fn test_latency_bq_rescore_vs_f32() {
 
     // Insert vectors with proper [-1, 1] range
     for _ in 0..NUM_VECTORS {
-        let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
         index.insert_bq(&v, &mut storage).expect("Insert failed");
     }
 
     // Generate queries
     let queries: Vec<Vec<f32>> = (0..NUM_QUERIES)
-        .map(|_| (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .map(|_| (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect())
         .collect();
 
     // Benchmark F32 search

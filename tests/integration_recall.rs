@@ -2,7 +2,7 @@ use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::metric::{L2Squared, Metric};
 use edgevec::storage::VectorStorage;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 
 #[test]
 fn test_integration_recall_001() {
@@ -28,7 +28,7 @@ fn test_integration_recall_001() {
     // 3. Generate Data
     let mut vectors = Vec::with_capacity(NUM_VECTORS);
     for _ in 0..NUM_VECTORS {
-        let vec: Vec<f32> = (0..DIM).map(|_| rng.gen::<f32>()).collect();
+        let vec: Vec<f32> = (0..DIM).map(|_| rng.random::<f32>()).collect();
         vectors.push(vec);
     }
 
@@ -40,7 +40,7 @@ fn test_integration_recall_001() {
     // 5. Generate Queries
     let mut queries = Vec::with_capacity(NUM_QUERIES);
     for _ in 0..NUM_QUERIES {
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen::<f32>()).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random::<f32>()).collect();
         queries.push(query);
     }
 

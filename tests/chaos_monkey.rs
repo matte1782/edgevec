@@ -35,7 +35,7 @@ impl ChaosStorageBackend {
             return false;
         }
         let mut rng = self.rng.lock().unwrap();
-        rng.gen_bool(rate)
+        rng.random_bool(rate)
     }
 }
 
@@ -212,8 +212,8 @@ fn stress_test_execution() {
     for i in 0..iterations {
         if i % 2 == 0 {
             // --- Type 1: Atomic Snapshot Resilience ---
-            let failure_rate = rng.gen_range(0.1..0.9);
-            let chaos_backend = ChaosStorageBackend::new(0.0, rng.gen());
+            let failure_rate = rng.random_range(0.1..0.9);
+            let chaos_backend = ChaosStorageBackend::new(0.0, rng.random());
             let mut backend_handle = chaos_backend.clone();
             let config = HnswConfig::new(2);
 
@@ -255,8 +255,8 @@ fn stress_test_execution() {
             }
         } else {
             // --- Type 2: WAL Append Resilience ---
-            let failure_rate = rng.gen_range(0.1..0.5); // Lower failure rate to allow some progress
-            let chaos_backend = ChaosStorageBackend::new(failure_rate, rng.gen());
+            let failure_rate = rng.random_range(0.1..0.5); // Lower failure rate to allow some progress
+            let chaos_backend = ChaosStorageBackend::new(failure_rate, rng.random());
             let config = HnswConfig::new(2);
 
             let wal = WalAppender::new(Box::new(chaos_backend.clone()), 0);

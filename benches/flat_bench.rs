@@ -17,14 +17,14 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use edgevec::index::{DistanceMetric, FlatIndex, FlatIndexConfig};
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 /// Generates deterministic test vectors.
 fn generate_vectors(count: usize, dims: usize, seed: u64) -> Vec<Vec<f32>> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     (0..count)
-        .map(|_| (0..dims).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .map(|_| (0..dims).map(|_| rng.random_range(-1.0..1.0)).collect())
         .collect()
 }
 
@@ -130,7 +130,7 @@ fn bench_quantized_vs_f32(c: &mut Criterion) {
     let vectors: Vec<Vec<f32>> = (0..count)
         .map(|_| {
             (0..dims)
-                .map(|_| if rng.gen_bool(0.5) { 1.0 } else { -1.0 })
+                .map(|_| if rng.random_bool(0.5) { 1.0 } else { -1.0 })
                 .collect()
         })
         .collect();

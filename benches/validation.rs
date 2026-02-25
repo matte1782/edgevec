@@ -34,7 +34,7 @@ use edgevec::hnsw::{HnswConfig, HnswIndex, SearchContext};
 use edgevec::quantization::binary::QuantizedVector;
 use edgevec::quantization::ScalarQuantizer;
 use edgevec::storage::VectorStorage;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::time::Duration;
 
@@ -65,7 +65,7 @@ const SEARCH_K: usize = 10;
 fn generate_vectors(count: usize, dims: usize, seed: u64) -> Vec<Vec<f32>> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     (0..count)
-        .map(|_| (0..dims).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .map(|_| (0..dims).map(|_| rng.random_range(-1.0..1.0)).collect())
         .collect()
 }
 
@@ -74,7 +74,7 @@ fn generate_quantized_vector(seed: u64) -> QuantizedVector {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let mut data = [0u8; 96];
     for byte in &mut data {
-        *byte = rng.gen();
+        *byte = rng.random();
     }
     QuantizedVector::from_bytes(data)
 }
@@ -172,7 +172,7 @@ fn bench_search_10k(c: &mut Criterion) {
 /// Target: <10µs per 768-dimension vector
 fn bench_quantization_encode(c: &mut Criterion) {
     let mut rng = ChaCha8Rng::seed_from_u64(SEED);
-    let vector: Vec<f32> = (0..DIMS).map(|_| rng.gen_range(-10.0..10.0)).collect();
+    let vector: Vec<f32> = (0..DIMS).map(|_| rng.random_range(-10.0..10.0)).collect();
 
     // Train quantizer
     let batch = vec![vector.as_slice()];

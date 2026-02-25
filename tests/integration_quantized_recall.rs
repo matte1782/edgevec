@@ -4,7 +4,7 @@ use edgevec::metric::Metric;
 use edgevec::quantization::QuantizerConfig;
 use edgevec::storage::{StorageType, VectorStorage};
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::time::Instant;
 
 /// Verification Test for Quantized Index Recall (W6D30)
@@ -52,7 +52,7 @@ fn test_quantized_recall_comparison() {
     let mut vectors = Vec::with_capacity(num_vectors);
     for _ in 0..num_vectors {
         let vec: Vec<f32> = (0..DIM)
-            .map(|_| rng.gen_range(DATA_MIN..DATA_MAX))
+            .map(|_| rng.random_range(DATA_MIN..DATA_MAX))
             .collect();
         vectors.push(vec);
     }
@@ -60,7 +60,7 @@ fn test_quantized_recall_comparison() {
     let mut queries = Vec::with_capacity(NUM_QUERIES);
     for _ in 0..NUM_QUERIES {
         let query: Vec<f32> = (0..DIM)
-            .map(|_| rng.gen_range(DATA_MIN..DATA_MAX))
+            .map(|_| rng.random_range(DATA_MIN..DATA_MAX))
             .collect();
         queries.push(query);
     }

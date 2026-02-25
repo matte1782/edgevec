@@ -22,7 +22,7 @@ fn random_sparse(dim: u32, nnz: usize, seed: u64) -> SparseVector {
     indices.sort();
 
     // Generate random values
-    let values: Vec<f32> = (0..nnz).map(|_| rng.gen_range(-1.0..1.0)).collect();
+    let values: Vec<f32> = (0..nnz).map(|_| rng.random_range(-1.0..1.0)).collect();
 
     SparseVector::new(indices, values, dim).expect("Generated vector should be valid")
 }
@@ -167,7 +167,7 @@ fn bench_construction(c: &mut Criterion) {
 
         let pairs: Vec<(u32, f32)> = indices
             .iter()
-            .map(|&i| (i, rng.gen_range(-1.0..1.0)))
+            .map(|&i| (i, rng.random_range(-1.0..1.0)))
             .collect();
 
         group.bench_with_input(

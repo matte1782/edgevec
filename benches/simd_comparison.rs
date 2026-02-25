@@ -18,7 +18,7 @@ use edgevec::hnsw::{HnswConfig, HnswIndex, SearchContext};
 use edgevec::metric::{DotProduct, L2Squared, Metric};
 use edgevec::quantization::binary::QuantizedVector;
 use edgevec::storage::VectorStorage;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 // ============================================================================
@@ -27,7 +27,7 @@ use rand_chacha::ChaCha8Rng;
 
 fn generate_random_vector(dim: usize, seed: u64) -> Vec<f32> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
+    (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect()
 }
 
 fn generate_vectors(count: usize, dim: usize, seed: u64) -> Vec<Vec<f32>> {
@@ -40,7 +40,7 @@ fn generate_quantized_vector(seed: u64) -> QuantizedVector {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let mut data = [0u8; 96];
     for byte in &mut data {
-        *byte = rng.gen();
+        *byte = rng.random();
     }
     QuantizedVector::from_bytes(data)
 }

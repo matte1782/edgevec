@@ -128,30 +128,30 @@ fn test_search_dimension_mismatch() {
 // Deterministic randomized test to ensure coverage on Windows where fuzzing is disabled.
 #[test]
 fn test_mock_fuzz_proxy() {
-    use rand::{Rng, SeedableRng};
+    use rand::{Rng, RngExt, SeedableRng};
     use rand_chacha::ChaCha8Rng;
 
     let mut rng = ChaCha8Rng::seed_from_u64(42);
 
     for _ in 0..100 {
-        let dim = rng.gen_range(2..=16);
+        let dim = rng.random_range(2..=16);
         let config = HnswConfig::new(dim);
         let mut index = create_index(config);
         let mut provider = MockVectorProvider::new();
 
-        let n = rng.gen_range(5..50);
+        let n = rng.random_range(5..50);
         for i in 0..n {
-            let vec: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let vec: Vec<f32> = (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect();
             provider.add(i + 1, vec);
             index.add_node(VectorId(i + 1), 0).unwrap();
         }
 
         // Random connections
         for i in 0..n {
-            let n_neighbors = rng.gen_range(0..5);
+            let n_neighbors = rng.random_range(0..5);
             let mut neighbors = Vec::new();
             for _ in 0..n_neighbors {
-                let neighbor = rng.gen_range(0..n);
+                let neighbor = rng.random_range(0..n);
                 if neighbor != i {
                     neighbors.push(NodeId(neighbor as u32));
                 }
@@ -159,7 +159,7 @@ fn test_mock_fuzz_proxy() {
             index.set_neighbors(NodeId(i as u32), &neighbors).unwrap();
         }
 
-        let query: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect();
         let entry = vec![NodeId(0)];
 
         // Should not panic

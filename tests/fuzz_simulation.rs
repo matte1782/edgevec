@@ -1,7 +1,7 @@
 use edgevec::hnsw::VectorId;
 use edgevec::wasm::EdgeVec;
 use edgevec::{HnswConfig, HnswIndex, VectorStorage};
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::time::{Duration, Instant};
 
 // Mock Op for Graph Ops
@@ -19,14 +19,14 @@ fn fuzz_simulation_persistence_load() {
     // Run with higher duration for campaign.
     let duration = Duration::from_secs(1);
     let start = Instant::now();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut buffer = vec![0u8; 1024];
     let mut iterations = 0;
 
     println!("Starting persistence_load fuzz simulation (smoke test)...");
     while start.elapsed() < duration {
         // Generate random length and data
-        let len = rng.gen_range(0..buffer.len());
+        let len = rng.random_range(0..buffer.len());
         rng.fill(&mut buffer[0..len]);
         let data = &buffer[0..len];
 
@@ -62,22 +62,22 @@ fn fuzz_simulation_graph_ops() {
     let mut inserted_ids: Vec<VectorId> = Vec::new();
 
     while start.elapsed() < duration {
-        let op_type = rng.gen_range(0..4);
+        let op_type = rng.random_range(0..4);
         let op = match op_type {
             0 => {
                 // Insert
-                let vec: Vec<f32> = (0..dim).map(|_| rng.gen()).collect();
+                let vec: Vec<f32> = (0..dim).map(|_| rng.random()).collect();
                 Op::Insert { vector: vec }
             }
             1 => {
                 // Delete
-                let id = rng.gen();
+                let id = rng.random();
                 Op::Delete { id }
             }
             2 => {
                 // Search
-                let vec: Vec<f32> = (0..dim).map(|_| rng.gen()).collect();
-                let k = rng.gen_range(1..20);
+                let vec: Vec<f32> = (0..dim).map(|_| rng.random()).collect();
+                let k = rng.random_range(1..20);
                 Op::Search { vector: vec, k }
             }
             3 => Op::SaveLoad,

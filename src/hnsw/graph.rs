@@ -28,7 +28,7 @@ use crate::quantization::variable::BinaryVector;
 use crate::storage::binary::BinaryVectorStorage;
 use crate::storage::VectorStorage;
 use bytemuck::{Pod, Zeroable};
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -648,7 +648,7 @@ impl HnswIndex {
     #[must_use]
     pub fn get_random_level(&mut self) -> u8 {
         // Generate uniform(0, 1)
-        let r: f32 = self.rng.gen_range(f32::EPSILON..=1.0);
+        let r: f32 = self.rng.random_range(f32::EPSILON..=1.0);
         let level = (-r.ln() * self.level_mult).floor();
 
         // Safety cap (e.g. 16)

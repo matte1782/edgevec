@@ -26,7 +26,7 @@ fn random_sparse(dim: u32, nnz: usize, seed: u64) -> SparseVector {
     // Generate random non-zero values
     let values: Vec<f32> = (0..nnz)
         .map(|_| {
-            let mut v = rng.gen_range(-1.0..1.0);
+            let mut v = rng.random_range(-1.0..1.0);
             // Avoid exact zero
             if v == 0.0 {
                 v = 0.001;
@@ -132,7 +132,7 @@ fn bench_storage_get(c: &mut Criterion) {
     group.bench_function("random_from_10k", |b| {
         let mut rng = ChaCha8Rng::seed_from_u64(42);
         b.iter(|| {
-            let id = SparseId::new(rng.gen_range(0..10_000u64));
+            let id = SparseId::new(rng.random_range(0..10_000u64));
             storage.get(black_box(id))
         });
     });

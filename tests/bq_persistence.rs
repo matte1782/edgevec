@@ -11,7 +11,7 @@ use edgevec::metadata::MetadataValue;
 use edgevec::persistence::{read_snapshot, write_snapshot, MemoryBackend};
 use edgevec::storage::VectorStorage;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::collections::HashSet;
 
 // =============================================================================
@@ -46,7 +46,7 @@ mod bq_persistence {
         let mut rng = StdRng::seed_from_u64(42);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
@@ -89,12 +89,12 @@ mod bq_persistence {
         let mut rng = StdRng::seed_from_u64(123);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
         // Generate query
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // Search before save
         let results_before = index.search(&query, K, &storage).expect("Search failed");
@@ -139,7 +139,7 @@ mod bq_persistence {
         let categories = ["news", "sports", "tech"];
 
         for i in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             let vector_id = index.insert_bq(&v, &mut storage).expect("Insert failed");
 
             #[allow(clippy::cast_possible_truncation)]
@@ -204,7 +204,7 @@ mod bq_persistence {
         let mut rng = StdRng::seed_from_u64(789);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
@@ -240,7 +240,7 @@ mod bq_persistence {
         let mut rng = StdRng::seed_from_u64(999);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
@@ -252,7 +252,7 @@ mod bq_persistence {
 
         // Insert more vectors after load (using regular insert since BQ not persisted)
         for _ in 0..50 {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             loaded_index
                 .insert(&v, &mut loaded_storage)
                 .expect("Insert after load failed");
@@ -262,7 +262,7 @@ mod bq_persistence {
         assert_eq!(loaded_storage.len(), 100);
 
         // Search should still work
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
         let results = loaded_index
             .search(&query, 10, &loaded_storage)
             .expect("Search failed");
@@ -314,7 +314,7 @@ mod bq_persistence {
         let mut rng = StdRng::seed_from_u64(12345);
 
         for i in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             let vector_id = index.insert_bq(&v, &mut storage).expect("Insert failed");
 
             // Add metadata to every 10th vector
@@ -340,7 +340,7 @@ mod bq_persistence {
         assert_eq!(loaded_index.metadata().vector_count(), 50); // Every 10th vector
 
         // Verify search works
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
         let results = loaded_index
             .search(&query, K, &loaded_storage)
             .expect("Search failed");

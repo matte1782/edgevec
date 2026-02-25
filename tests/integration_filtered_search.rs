@@ -7,7 +7,7 @@ use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::metadata::MetadataValue;
 use edgevec::storage::VectorStorage;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::collections::HashMap;
 
 // =============================================================================
@@ -46,7 +46,7 @@ fn setup_test_index(
     // Generate and insert vectors with metadata
     let mut vectors = Vec::with_capacity(num_vectors);
     for i in 0..num_vectors {
-        let vec: Vec<f32> = (0..dim).map(|_| rng.gen::<f32>()).collect();
+        let vec: Vec<f32> = (0..dim).map(|_| rng.random::<f32>()).collect();
         vectors.push(vec.clone());
 
         // Insert vector

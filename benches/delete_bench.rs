@@ -7,14 +7,14 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use edgevec::hnsw::{HnswConfig, HnswIndex, VectorId};
 use edgevec::storage::VectorStorage;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 /// Generates deterministic test vectors.
 fn generate_vectors(count: usize, dims: usize, seed: u64) -> Vec<Vec<f32>> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     (0..count)
-        .map(|_| (0..dims).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .map(|_| (0..dims).map(|_| rng.random_range(-1.0..1.0)).collect())
         .collect()
 }
 

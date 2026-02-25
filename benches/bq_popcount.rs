@@ -21,19 +21,19 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use edgevec::quantization::variable::BinaryVector;
 use edgevec::simd::popcount::{scalar_popcount_xor, simd_popcount_xor};
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 /// Generate a random f32 vector of given dimension.
 fn generate_f32_vector(dims: usize, seed: u64) -> Vec<f32> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    (0..dims).map(|_| rng.gen_range(-1.0..1.0)).collect()
+    (0..dims).map(|_| rng.random_range(-1.0..1.0)).collect()
 }
 
 /// Generate a random byte vector of given length.
 fn generate_byte_vector(bytes: usize, seed: u64) -> Vec<u8> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    (0..bytes).map(|_| rng.gen()).collect()
+    (0..bytes).map(|_| rng.random()).collect()
 }
 
 // ============================================================================

@@ -3,12 +3,12 @@ use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::persistence::storage::MemoryBackend;
 use edgevec::persistence::{read_snapshot, write_snapshot};
 use edgevec::storage::VectorStorage;
-use rand::Rng;
+use rand::{Rng, RngExt};
 
 fn generate_vectors(count: usize, dim: usize) -> Vec<Vec<f32>> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     (0..count)
-        .map(|_| (0..dim).map(|_| rng.gen()).collect())
+        .map(|_| (0..dim).map(|_| rng.random()).collect())
         .collect()
 }
 

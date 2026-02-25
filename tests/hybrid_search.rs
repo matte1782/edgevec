@@ -8,7 +8,7 @@ use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::metadata::MetadataValue;
 use edgevec::storage::VectorStorage;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::collections::HashSet;
 
 // =============================================================================
@@ -18,7 +18,7 @@ use std::collections::HashSet;
 #[allow(dead_code)]
 fn make_vector(dim: u32, seed: u32) -> Vec<f32> {
     let mut rng = StdRng::seed_from_u64(seed as u64);
-    (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
+    (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect()
 }
 
 fn calculate_recall(ground_truth: &HashSet<u64>, test_results: &HashSet<u64>, k: usize) -> f64 {
@@ -54,7 +54,7 @@ mod hybrid_search {
 
         // Insert vectors with metadata using insert_bq + manual metadata
         for i in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             let vector_id = index.insert_bq(&v, &mut storage).expect("Insert failed");
 
             // Add metadata manually
@@ -73,7 +73,7 @@ mod hybrid_search {
                 .insert(
                     meta_id,
                     "score",
-                    MetadataValue::Float(rng.gen_range(0.0..1.0)),
+                    MetadataValue::Float(rng.random_range(0.0..1.0)),
                 )
                 .expect("Metadata insert failed");
             index
@@ -83,7 +83,7 @@ mod hybrid_search {
         }
 
         // Query with filter
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
         let filter_expr = parse("category = \"news\"").expect("Parse failed");
 
         // Get BQ candidates
@@ -138,7 +138,7 @@ mod hybrid_search {
         let mut rng = StdRng::seed_from_u64(123);
 
         for i in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             let vector_id = index.insert_bq(&v, &mut storage).expect("Insert failed");
 
             #[allow(clippy::cast_possible_truncation)]
@@ -157,7 +157,7 @@ mod hybrid_search {
                 .expect("Metadata insert failed");
         }
 
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // Complex filter: (news OR tech) AND active
         let filter_expr = parse("(category = \"news\" OR category = \"tech\") AND active = true")
@@ -220,7 +220,7 @@ mod hybrid_search {
         let mut rng = StdRng::seed_from_u64(456);
 
         for i in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             let vector_id = index.insert_bq(&v, &mut storage).expect("Insert failed");
 
             // Every 3rd vector has "featured" tag
@@ -238,7 +238,7 @@ mod hybrid_search {
                 .expect("Metadata insert failed");
         }
 
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // Filter: tags ANY ["featured"] (array membership)
         let filter_expr = parse(r#"tags ANY ["featured"]"#).expect("Parse failed");
@@ -293,7 +293,7 @@ mod hybrid_search {
         let mut rng = StdRng::seed_from_u64(789);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             let mut metadata = std::collections::HashMap::new();
             metadata.insert(
                 "category".to_string(),
@@ -306,7 +306,7 @@ mod hybrid_search {
         }
 
         // BQ search should fail gracefully
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // BQ is not enabled, so search_bq should error
         assert!(!index.has_bq(), "Index should not have BQ");
@@ -338,7 +338,7 @@ mod hybrid_search {
         let mut rng = StdRng::seed_from_u64(999);
 
         for idx in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             let vector_id = index.insert_bq(&v, &mut storage).expect("Insert failed");
 
             #[allow(clippy::cast_possible_truncation)]
@@ -353,7 +353,7 @@ mod hybrid_search {
                 .expect("Metadata insert failed");
         }
 
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
         let filter_expr = parse("category = \"a\"").expect("Parse failed");
 
         // Ground truth: F32 search filtered

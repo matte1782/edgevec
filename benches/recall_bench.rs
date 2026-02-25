@@ -134,13 +134,13 @@ fn run_synthetic_benchmark(use_sq8: bool) {
     println!("Recall metrics are only meaningful with real datasets (SIFT, GloVe).\n");
 
     // Generate random vectors
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
+    use rand::{Rng, RngExt};
+    let mut rng = rand::rng();
 
     let base_vectors: Vec<Vec<f32>> = (0..SYNTHETIC_BASE_COUNT)
         .map(|_| {
             (0..SYNTHETIC_DIM as usize)
-                .map(|_| rng.gen::<f32>())
+                .map(|_| rng.random::<f32>())
                 .collect()
         })
         .collect();
@@ -148,7 +148,7 @@ fn run_synthetic_benchmark(use_sq8: bool) {
     let queries: Vec<Vec<f32>> = (0..SYNTHETIC_QUERY_COUNT)
         .map(|_| {
             (0..SYNTHETIC_DIM as usize)
-                .map(|_| rng.gen::<f32>())
+                .map(|_| rng.random::<f32>())
                 .collect()
         })
         .collect();

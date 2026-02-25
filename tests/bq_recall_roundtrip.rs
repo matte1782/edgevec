@@ -16,7 +16,7 @@
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::storage::VectorStorage;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use std::collections::HashSet;
 
 // =============================================================================
@@ -59,13 +59,13 @@ mod bq_recall_validation {
 
         // Insert vectors
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
         // Generate test queries
         let queries: Vec<Vec<f32>> = (0..NUM_QUERIES)
-            .map(|_| (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect())
+            .map(|_| (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect())
             .collect();
 
         // Measure recall with rescoring
@@ -112,12 +112,12 @@ mod bq_recall_validation {
         let mut rng = StdRng::seed_from_u64(42);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
         let queries: Vec<Vec<f32>> = (0..NUM_QUERIES)
-            .map(|_| (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect())
+            .map(|_| (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect())
             .collect();
 
         let mut total_recall = 0.0;
@@ -164,12 +164,12 @@ mod bq_recall_validation {
         let mut rng = StdRng::seed_from_u64(123);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
         let queries: Vec<Vec<f32>> = (0..NUM_QUERIES)
-            .map(|_| (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect())
+            .map(|_| (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect())
             .collect();
 
         let mut total_recall = 0.0;
@@ -216,11 +216,11 @@ mod bq_recall_validation {
         let mut rng = StdRng::seed_from_u64(456);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // Ground truth: F32 search
         let f32_results = index
@@ -286,11 +286,11 @@ mod bq_recall_validation {
         let mut rng = StdRng::seed_from_u64(789);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
-        let query: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+        let query: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
 
         // Test various k values
         for k in [1, 5, 10, 50] {
@@ -333,12 +333,12 @@ mod bq_recall_validation {
         let mut rng = StdRng::seed_from_u64(999);
 
         for _ in 0..NUM_VECTORS {
-            let v: Vec<f32> = (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect();
+            let v: Vec<f32> = (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect();
             index.insert_bq(&v, &mut storage).expect("Insert failed");
         }
 
         let queries: Vec<Vec<f32>> = (0..NUM_QUERIES)
-            .map(|_| (0..DIM).map(|_| rng.gen_range(-1.0..1.0)).collect())
+            .map(|_| (0..DIM).map(|_| rng.random_range(-1.0..1.0)).collect())
             .collect();
 
         let mut total_recall = 0.0;

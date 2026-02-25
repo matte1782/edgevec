@@ -19,20 +19,20 @@ use edgevec::metric::scalar;
 use edgevec::metric::simd::x86;
 use edgevec::metric::{DotProduct, L2Squared, Metric};
 use edgevec::quantization::binary::QuantizedVector;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 fn generate_vectors(count: usize, dims: usize, seed: u64) -> Vec<Vec<f32>> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     (0..count)
-        .map(|_| (0..dims).map(|_| rng.gen_range(-1.0..1.0)).collect())
+        .map(|_| (0..dims).map(|_| rng.random_range(-1.0..1.0)).collect())
         .collect()
 }
 
 fn generate_u8_vectors(count: usize, dims: usize, seed: u64) -> Vec<Vec<u8>> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     (0..count)
-        .map(|_| (0..dims).map(|_| rng.gen_range(0..255)).collect())
+        .map(|_| (0..dims).map(|_| rng.random_range(0..255)).collect())
         .collect()
 }
 
@@ -45,7 +45,7 @@ fn generate_quantized_vector(seed: u64) -> QuantizedVector {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let mut data = [0u8; 96];
     for byte in &mut data {
-        *byte = rng.gen();
+        *byte = rng.random();
     }
     QuantizedVector::from_bytes(data)
 }

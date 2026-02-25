@@ -596,7 +596,10 @@ pub fn estimate_selectivity<M: MetadataStore>(
     // Generate random sample indices using deterministic RNG
     let mut rng = match seed {
         Some(s) => ChaCha8Rng::seed_from_u64(s),
-        None => ChaCha8Rng::from_entropy(),
+        None => {
+            let mut sys = rand::rng();
+            ChaCha8Rng::from_rng(&mut sys)
+        }
     };
 
     let mut indices: Vec<usize> = (0..total_vectors).collect();

@@ -98,8 +98,8 @@ pest_derive = "2.7"
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 
 # Random Number Generation (Required for HNSW construction)
-rand = { version = "0.8", features = ["small_rng"] }
-rand_chacha = { version = "0.3", features = ["serde1"] }
+rand = "0.10"
+rand_chacha = { version = "0.10", features = ["serde"] }
 
 # Serde helpers for binary efficiency
 serde_bytes = "0.11"
@@ -114,7 +114,7 @@ serde-wasm-bindgen = "0.6"
 console_error_panic_hook = "0.1"
 console_log = "1.0"
 log = "0.4"
-getrandom = { version = "0.2.14", features = ["js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }
 cfg-if = "1.0.4"
 
 # =============================================================================

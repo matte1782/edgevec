@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use edgevec::quantization::ScalarQuantizer;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 /// Benchmark: Quantization Speed
@@ -20,7 +20,7 @@ fn bench_quantization_speed(c: &mut Criterion) {
 
     for &dim in &dimensions {
         // Generate a random vector
-        let vector: Vec<f32> = (0..dim).map(|_| rng.gen_range(-10.0..10.0)).collect();
+        let vector: Vec<f32> = (0..dim).map(|_| rng.random_range(-10.0..10.0)).collect();
 
         // Train a quantizer (once)
         let batch = vec![vector.as_slice()];
@@ -49,7 +49,7 @@ fn bench_quantization_throughput(c: &mut Criterion) {
     let batch_size = 1000;
 
     let vectors: Vec<Vec<f32>> = (0..batch_size)
-        .map(|_| (0..dim).map(|_| rng.gen_range(-10.0..10.0)).collect())
+        .map(|_| (0..dim).map(|_| rng.random_range(-10.0..10.0)).collect())
         .collect();
 
     // Pre-train

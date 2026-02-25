@@ -45,7 +45,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use edgevec::quantization::simd::portable::hamming_distance_slice as portable_hamming;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 
 #[cfg(target_arch = "aarch64")]
@@ -58,16 +58,16 @@ use edgevec::simd::neon::{
 /// Generate random byte vectors for benchmarking.
 fn generate_byte_vectors(size: usize, seed: u64) -> (Vec<u8>, Vec<u8>) {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    let a: Vec<u8> = (0..size).map(|_| rng.gen()).collect();
-    let b: Vec<u8> = (0..size).map(|_| rng.gen()).collect();
+    let a: Vec<u8> = (0..size).map(|_| rng.random()).collect();
+    let b: Vec<u8> = (0..size).map(|_| rng.random()).collect();
     (a, b)
 }
 
 /// Generate random f32 vectors for benchmarking.
 fn generate_f32_vectors(size: usize, seed: u64) -> (Vec<f32>, Vec<f32>) {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
-    let a: Vec<f32> = (0..size).map(|_| rng.gen_range(-1.0..1.0)).collect();
-    let b: Vec<f32> = (0..size).map(|_| rng.gen_range(-1.0..1.0)).collect();
+    let a: Vec<f32> = (0..size).map(|_| rng.random_range(-1.0..1.0)).collect();
+    let b: Vec<f32> = (0..size).map(|_| rng.random_range(-1.0..1.0)).collect();
     (a, b)
 }
 
