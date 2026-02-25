@@ -9,7 +9,8 @@
 //! - Dimensions: 128
 //! - Distribution: Uniform [-1, 1]
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};

@@ -1557,7 +1557,7 @@ mod tests {
 
     #[test]
     fn test_distance_metric_default() {
-        let metric: DistanceMetric = Default::default();
+        let metric: DistanceMetric = DistanceMetric::default();
         assert_eq!(metric, DistanceMetric::Cosine);
     }
 
@@ -2021,7 +2021,7 @@ mod tests {
         // Insert 100 deterministic vectors using LCG
         let mut seed: u64 = 42;
         let lcg = |s: &mut u64| -> f32 {
-            *s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
+            *s = s.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
             ((*s >> 33) as f32) / (u32::MAX as f32)
         };
 
@@ -2523,7 +2523,7 @@ mod tests {
 
         // Expected: 10101010 = 170 in decimal (MSB first)
         assert_eq!(packed.len(), 1);
-        assert_eq!(packed[0], 0b10101010);
+        assert_eq!(packed[0], 0b1010_1010);
     }
 
     #[test]
@@ -2534,19 +2534,19 @@ mod tests {
         ]);
 
         assert_eq!(packed.len(), 2);
-        assert_eq!(packed[0], 0b11111111);
-        assert_eq!(packed[1], 0b00000000);
+        assert_eq!(packed[0], 0b1111_1111);
+        assert_eq!(packed[1], 0b0000_0000);
     }
 
     #[test]
     fn test_hamming_distance_binary() {
-        let a = [0b11111111u8];
-        let b = [0b11111110u8];
+        let a = [0b1111_1111u8];
+        let b = [0b1111_1110u8];
 
         let distance = FlatIndex::hamming_distance_binary(&a, &b);
         assert_eq!(distance, 1); // 1 bit different
 
-        let c = [0b00000000u8];
+        let c = [0b0000_0000u8];
         let distance2 = FlatIndex::hamming_distance_binary(&a, &c);
         assert_eq!(distance2, 8); // All 8 bits different
     }
@@ -2921,7 +2921,10 @@ mod tests {
         for q in 0..num_queries {
             // Use existing vectors as queries (ensures they exist in the index)
             let query_id = q * (count / num_queries);
-            let query = index.get(query_id as u64).unwrap().to_vec();
+            let query = index
+                .get(u64::try_from(query_id).unwrap())
+                .unwrap()
+                .to_vec();
 
             // Get ground truth (F32 exact search)
             let f32_results = index.search(&query, k).unwrap();

@@ -1017,10 +1017,10 @@ pub mod x86 {
     // =========================================================================
 
     /// AVX2 vector width in bytes (256 bits / 8 bits per byte).
-    const AVX2_U8_VECTOR_WIDTH: usize = 32;
+    const _AVX2_U8_VECTOR_WIDTH: usize = 32;
 
     /// Optimal unroll factor for AVX2 u8 operations (2 vectors = 64 bytes).
-    const AVX2_U8_UNROLL_BYTES: usize = 64;
+    const _AVX2_U8_UNROLL_BYTES: usize = 64;
 
     /// Mask to extract low nibble (4 bits) from a byte.
     const LOW_NIBBLE_MASK_I8: i8 = 0x0F;
@@ -1065,9 +1065,9 @@ pub mod x86 {
     #[must_use]
     pub unsafe fn hamming_distance(a: &[u8], b: &[u8]) -> u32 {
         use std::arch::x86_64::{
-            __m256i, _mm256_add_epi64, _mm256_add_epi8, _mm256_and_si256, _mm256_loadu_si256,
-            _mm256_sad_epu8, _mm256_set1_epi8, _mm256_setzero_si256, _mm256_shuffle_epi8,
-            _mm256_srli_epi16, _mm256_xor_si256,
+            __m256i, _mm256_add_epi64, _mm256_add_epi8, _mm256_and_si256, _mm256_extract_epi64,
+            _mm256_loadu_si256, _mm256_sad_epu8, _mm256_set1_epi8, _mm256_setzero_si256,
+            _mm256_shuffle_epi8, _mm256_srli_epi16, _mm256_xor_si256,
         };
 
         assert_eq!(a.len(), b.len());
@@ -1156,12 +1156,12 @@ pub mod x86 {
             i += 32;
         }
 
-        // Extract and sum the 4 u64 lanes
-        use std::arch::x86_64::_mm256_extract_epi64;
-        let mut sum = (_mm256_extract_epi64(sum256, 0) as u64
-            + _mm256_extract_epi64(sum256, 1) as u64
-            + _mm256_extract_epi64(sum256, 2) as u64
-            + _mm256_extract_epi64(sum256, 3) as u64) as u32;
+        // Extract and sum the 4 u64 lanes (values are non-negative popcount sums)
+        let lane0 = u64::try_from(_mm256_extract_epi64(sum256, 0)).unwrap_or(0);
+        let lane1 = u64::try_from(_mm256_extract_epi64(sum256, 1)).unwrap_or(0);
+        let lane2 = u64::try_from(_mm256_extract_epi64(sum256, 2)).unwrap_or(0);
+        let lane3 = u64::try_from(_mm256_extract_epi64(sum256, 3)).unwrap_or(0);
+        let mut sum = (lane0 + lane1 + lane2 + lane3) as u32;
 
         // Scalar tail
         while i < n {

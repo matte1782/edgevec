@@ -27,7 +27,8 @@
 //! This benchmark is run as part of the regression.yml workflow to track
 //! tail latency over time and detect performance degradation.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, SamplingMode};
+use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
+use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};

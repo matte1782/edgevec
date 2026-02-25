@@ -2,7 +2,8 @@
 //!
 //! Run with: `cargo bench --bench storage_bench`
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use std::hint::black_box;
 use edgevec::hnsw::HnswConfig;
 use edgevec::persistence::storage::file::FileBackend;
 use edgevec::persistence::wal::WalAppender;

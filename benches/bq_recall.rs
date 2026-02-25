@@ -21,6 +21,7 @@
 //! 4. Report average recall over all queries
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};

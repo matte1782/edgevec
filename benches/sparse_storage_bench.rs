@@ -5,7 +5,8 @@
 //! - Get: <1us
 //! - Iteration: <100ms for 100k vectors
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use edgevec::sparse::{SparseId, SparseStorage, SparseVector};
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;

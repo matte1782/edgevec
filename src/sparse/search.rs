@@ -515,7 +515,8 @@ mod tests {
         // Insert 1000 vectors, all with overlapping index 0
         // Vector i has indices [0, i+1] so all overlap with query [0]
         for i in 0..1000 {
-            let v = SparseVector::new(vec![0, (i + 1) as u32], vec![1.0, 1.0], 2000).unwrap();
+            let v = SparseVector::new(vec![0, u32::try_from(i + 1).unwrap()], vec![1.0, 1.0], 2000)
+                .unwrap();
             storage.insert(&v).unwrap();
         }
 

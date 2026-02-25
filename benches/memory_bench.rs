@@ -8,6 +8,7 @@
 //! - Compares QuantizedU8 vs Float32.
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 use edgevec::hnsw::HnswConfig;
 use edgevec::quantization::QuantizerConfig;
 use edgevec::storage::{StorageType, VectorStorage};

@@ -594,9 +594,10 @@ pub fn estimate_selectivity<M: MetadataStore>(
     let sample_size = SELECTIVITY_SAMPLE_SIZE.min(total_vectors);
 
     // Generate random sample indices using deterministic RNG
-    let mut rng = match seed {
-        Some(s) => ChaCha8Rng::seed_from_u64(s),
-        None => ChaCha8Rng::from_entropy(),
+    let mut rng = if let Some(s) = seed {
+        ChaCha8Rng::seed_from_u64(s)
+    } else {
+        ChaCha8Rng::from_entropy()
     };
 
     let mut indices: Vec<usize> = (0..total_vectors).collect();

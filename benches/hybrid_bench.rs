@@ -6,7 +6,8 @@
 //! - Linear fusion (1k results): <2ms
 //! - Hybrid search (10k, k=10): <50ms
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::hybrid::{linear_fusion, rrf_fusion, HybridSearchConfig, HybridSearcher};
