@@ -136,8 +136,8 @@ fn test_hamming_distance_correctness() {
     let all_ones = vec![0xFFu8; bytes];
     let half_ones = {
         let mut v = vec![0u8; bytes];
-        for i in 0..bytes / 2 {
-            v[i] = 0xFF;
+        for byte in v.iter_mut().take(bytes / 2) {
+            *byte = 0xFF;
         }
         v
     };

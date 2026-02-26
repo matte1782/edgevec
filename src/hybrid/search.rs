@@ -512,7 +512,7 @@ mod tests {
         let config = HybridSearchConfig::linear(20, 20, 10, 0.7);
         match config.fusion {
             FusionMethod::Linear { alpha } => assert!((alpha - 0.7).abs() < 1e-6),
-            _ => panic!("Expected Linear fusion"),
+            FusionMethod::Rrf { .. } => panic!("Expected Linear fusion"),
         }
     }
 
@@ -606,7 +606,7 @@ mod tests {
         let result = HybridSearchResult::from_fusion(&fusion, &dense_scores, &sparse_scores);
 
         assert_eq!(result.id.0, 42);
-        assert_eq!(result.score, 0.5);
+        assert!((result.score - 0.5).abs() < f32::EPSILON);
         assert_eq!(result.dense_rank, Some(1));
         assert_eq!(result.sparse_rank, Some(2));
         assert_eq!(result.dense_score, Some(0.9));

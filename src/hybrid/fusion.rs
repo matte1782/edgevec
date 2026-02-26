@@ -648,11 +648,11 @@ mod tests {
     #[test]
     fn test_rrf_large_lists() {
         // Test with larger lists
-        let dense: Vec<(u64, f32)> = (0..1000)
-            .map(|i| (i as u64, 1.0 - (i as f32 / 1000.0)))
+        let dense: Vec<(u64, f32)> = (0..1000u64)
+            .map(|i| (i, 1.0 - (i as f32 / 1000.0)))
             .collect();
-        let sparse: Vec<(u64, f32)> = (500..1500)
-            .map(|i| (i as u64, 1.0 - ((i - 500) as f32 / 1000.0)))
+        let sparse: Vec<(u64, f32)> = (500..1500u64)
+            .map(|i| (i, 1.0 - ((i - 500) as f32 / 1000.0)))
             .collect();
 
         let results = rrf_fusion(&dense, &sparse, 60, 100);
@@ -687,7 +687,7 @@ mod tests {
         let results = vec![(1, 0.5)];
         let normalized = normalize_scores(&results);
         assert_eq!(normalized.len(), 1);
-        assert_eq!(normalized.get(&1).copied().unwrap(), 1.0);
+        assert!((normalized.get(&1).copied().unwrap() - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -696,7 +696,7 @@ mod tests {
         let normalized = normalize_scores(&results);
         assert_eq!(normalized.len(), 3);
         for id in 1..=3 {
-            assert_eq!(normalized.get(&id).copied().unwrap(), 1.0);
+            assert!((normalized.get(&id).copied().unwrap() - 1.0).abs() < f32::EPSILON);
         }
     }
 
@@ -992,7 +992,7 @@ mod tests {
     fn test_fusion_result_new() {
         let result = FusionResult::new(42, 0.5);
         assert_eq!(result.id, 42);
-        assert_eq!(result.score, 0.5);
+        assert!((result.score - 0.5).abs() < f32::EPSILON);
         assert_eq!(result.dense_rank, None);
         assert_eq!(result.sparse_rank, None);
     }
@@ -1001,7 +1001,7 @@ mod tests {
     fn test_fusion_result_with_ranks() {
         let result = FusionResult::with_ranks(42, 0.5, Some(1), Some(2));
         assert_eq!(result.id, 42);
-        assert_eq!(result.score, 0.5);
+        assert!((result.score - 0.5).abs() < f32::EPSILON);
         assert_eq!(result.dense_rank, Some(1));
         assert_eq!(result.sparse_rank, Some(2));
     }
@@ -1023,7 +1023,7 @@ mod tests {
         let method = FusionMethod::default();
         match method {
             FusionMethod::Rrf { k } => assert_eq!(k, 60),
-            _ => panic!("Expected RRF"),
+            FusionMethod::Linear { .. } => panic!("Expected RRF"),
         }
     }
 
@@ -1032,7 +1032,7 @@ mod tests {
         let method = FusionMethod::rrf();
         match method {
             FusionMethod::Rrf { k } => assert_eq!(k, RRF_DEFAULT_K),
-            _ => panic!("Expected RRF"),
+            FusionMethod::Linear { .. } => panic!("Expected RRF"),
         }
     }
 
@@ -1041,7 +1041,7 @@ mod tests {
         let method = FusionMethod::rrf_with_k(100);
         match method {
             FusionMethod::Rrf { k } => assert_eq!(k, 100),
-            _ => panic!("Expected RRF"),
+            FusionMethod::Linear { .. } => panic!("Expected RRF"),
         }
     }
 
@@ -1049,8 +1049,8 @@ mod tests {
     fn test_fusion_method_linear() {
         let method = FusionMethod::linear(0.7);
         match method {
-            FusionMethod::Linear { alpha } => assert_eq!(alpha, 0.7),
-            _ => panic!("Expected Linear"),
+            FusionMethod::Linear { alpha } => assert!((alpha - 0.7).abs() < f32::EPSILON),
+            FusionMethod::Rrf { .. } => panic!("Expected Linear"),
         }
     }
 
@@ -1058,8 +1058,8 @@ mod tests {
     fn test_fusion_method_linear_balanced() {
         let method = FusionMethod::linear_balanced();
         match method {
-            FusionMethod::Linear { alpha } => assert_eq!(alpha, 0.5),
-            _ => panic!("Expected Linear"),
+            FusionMethod::Linear { alpha } => assert!((alpha - 0.5).abs() < f32::EPSILON),
+            FusionMethod::Rrf { .. } => panic!("Expected Linear"),
         }
     }
 

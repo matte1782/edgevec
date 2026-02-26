@@ -4,7 +4,8 @@
 //! Expected: Batch should be comparable or faster due to deduplication overhead
 //! being amortized over many operations.
 
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex, VectorId};
 use edgevec::storage::VectorStorage;
 

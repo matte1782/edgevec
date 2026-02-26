@@ -15,7 +15,8 @@
 //! - Search (10k @ 768D): <50ms
 //! - BQ Search: ~10x faster than F32 search
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use edgevec::index::{DistanceMetric, FlatIndex, FlatIndexConfig};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;

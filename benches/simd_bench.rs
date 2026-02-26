@@ -13,7 +13,8 @@
 //!
 //! See: `docs/benchmarks/SIMD_TARGETS.md` for full specification.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use edgevec::metric::scalar;
 #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
 use edgevec::metric::simd::x86;

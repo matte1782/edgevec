@@ -26,8 +26,9 @@
 //! - Sample size: 20 iterations for better statistical significance
 //! - Throughput measured in elements/second
 
+use std::hint::black_box;
 use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
+    criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
 use edgevec::batch::BatchInsertable;
 use edgevec::hnsw::{HnswConfig, HnswIndex};

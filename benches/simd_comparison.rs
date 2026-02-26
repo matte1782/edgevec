@@ -13,7 +13,8 @@
 //! | Search (10k, k=10) | ~5ms | ~2ms | 2.5x |
 //! | Hamming Distance (1024-bit) | ~100ns | <40ns | 2.5x |
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex, SearchContext};
 use edgevec::metric::{DotProduct, L2Squared, Metric};
 use edgevec::quantization::binary::QuantizedVector;

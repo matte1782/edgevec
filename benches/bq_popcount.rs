@@ -18,7 +18,8 @@
 //! - Measurement: Criterion with 100 sample iterations
 //! - RNG: Deterministic seeded ChaCha8Rng for reproducibility
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use edgevec::quantization::variable::BinaryVector;
 use edgevec::simd::popcount::{scalar_popcount_xor, simd_popcount_xor};
 use rand::{Rng, SeedableRng};

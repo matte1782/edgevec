@@ -9,8 +9,9 @@
 //! # Sizes
 //! [10_000, 50_000, 100_000]
 
+use std::hint::black_box;
 use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode, Throughput,
+    criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode, Throughput,
 };
 use edgevec::hnsw::{HnswConfig, HnswIndex, SearchContext};
 use edgevec::quantization::QuantizerConfig;

@@ -360,7 +360,7 @@ mod tests {
         let results = index.search(&v2, 1).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, VectorId(2)); // v2 is second insert, ID=2
-        assert_eq!(results[0].distance, 0.0);
+        assert!((results[0].distance - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -381,11 +381,11 @@ mod tests {
 
         // Should be ordered by distance (IDs are 1-based)
         assert_eq!(results[0].id, VectorId(3)); // Closest
-        assert_eq!(results[0].distance, 8.0);
+        assert!((results[0].distance - 8.0).abs() < f32::EPSILON);
         assert_eq!(results[1].id, VectorId(2));
-        assert_eq!(results[1].distance, 32.0);
+        assert!((results[1].distance - 32.0).abs() < f32::EPSILON);
         assert_eq!(results[2].id, VectorId(1)); // Farthest
-        assert_eq!(results[2].distance, 64.0);
+        assert!((results[2].distance - 64.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -393,7 +393,9 @@ mod tests {
         let mut index = BinaryFlatIndex::new(64).unwrap();
 
         for i in 0..100 {
-            let v: Vec<u8> = (0..8).map(|j| ((i + j) % 256) as u8).collect();
+            let v: Vec<u8> = (0..8)
+                .map(|j| u8::try_from((i + j) % 256).unwrap())
+                .collect();
             index.insert(&v).unwrap();
         }
 
