@@ -7,7 +7,7 @@
 //! The v2 format includes magic bytes, version, CRC32 checksum, and vector data.
 //! Random bytes should exercise all validation paths.
 
-use edgevec::sparse::SparseStorage;
+use edgevec::sparse::{SparseId, SparseStorage};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
@@ -20,7 +20,7 @@ fuzz_target!(|data: &[u8]| {
 
         // Try to get vectors at various IDs
         for id in 0..storage.len().min(10) as u64 {
-            let _ = storage.get(id);
+            let _ = storage.get(SparseId::from(id));
         }
 
         // Roundtrip: serialize back and verify

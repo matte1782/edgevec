@@ -172,8 +172,8 @@ fn test_flat_index_dimension_mismatch() {
     assert!(result.is_err());
 
     // Insert correct, then search with wrong dimension
-    index.insert(&vec![1.0; 16]).unwrap();
-    let result = index.search(&vec![1.0; 32], 1);
+    index.insert(&[1.0; 16]).unwrap();
+    let result = index.search(&[1.0; 32], 1);
     assert!(result.is_err());
 }
 
@@ -183,7 +183,7 @@ fn test_flat_index_empty_search() {
     let index = FlatIndex::new(config);
 
     // FlatIndex::search on empty index returns EmptyIndex error or empty results
-    let result = index.search(&vec![1.0; 8], 5);
+    let result = index.search(&[1.0; 8], 5);
     match result {
         Err(_) => {} // EmptyIndex error is acceptable
         Ok(results) => assert!(results.is_empty(), "empty index should return no results"),

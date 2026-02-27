@@ -1,7 +1,7 @@
 # EdgeVec API Reference
 
-**Version:** EdgeVec v0.7.0
-**Last Updated:** 2025-12-29
+**Version:** EdgeVec v0.9.0
+**Last Updated:** 2026-02-27
 
 ---
 
@@ -19,6 +19,10 @@ EdgeVec is a high-performance embedded vector database for browser and Node.js e
 | [MEMORY.md](./MEMORY.md) | Memory management and pressure API |
 | [DATABASE_OPERATIONS.md](./DATABASE_OPERATIONS.md) | CRUD operations guide |
 | [ERROR_REFERENCE.md](./ERROR_REFERENCE.md) | Error codes and handling |
+| [FlatIndex API](./FLAT_INDEX.md) | Brute-force exact nearest neighbor search |
+| [BinaryFlatIndex API](./BINARY_FLAT_INDEX.md) | Native binary vector storage with SIMD Hamming |
+| [Sparse Vectors API](./SPARSE_VECTORS.md) | Sparse vector storage for keyword/BM25 features |
+| [Hybrid Search API](./HYBRID_SEARCH.md) | Combined dense + sparse search with RRF fusion |
 
 ---
 

@@ -1,3 +1,4 @@
+#![cfg(target_arch = "wasm32")]
 //! Test that replicates the exact WASM demo flow to find F32 crash.
 //!
 //! The WASM demo:

@@ -1,3 +1,4 @@
+#![cfg(target_arch = "wasm32")]
 //! WASM Initialization Tests (W4.1)
 
 use edgevec::wasm::init_logging;

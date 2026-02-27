@@ -581,7 +581,10 @@ mod tests {
 
         // Verify vector data (starts at offset 64)
         let vector_bytes = &combined[64..64 + 48]; // 3 vectors * 4 dims * 4 bytes = 48
-        let vectors: &[f32] = bytemuck::cast_slice(vector_bytes);
+        let vectors: Vec<f32> = vector_bytes
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .collect();
 
         assert_eq!(vectors[0..4], test_vectors[0]);
         assert_eq!(vectors[4..8], test_vectors[1]);

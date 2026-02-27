@@ -1,5 +1,4 @@
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use std::hint::black_box;
 use edgevec::hnsw::neighbor::NeighborPool;
 
 fn bench_neighbor_operations(c: &mut Criterion) {

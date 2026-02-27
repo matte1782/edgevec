@@ -1,3 +1,4 @@
+#![cfg(target_arch = "wasm32")]
 use edgevec::hnsw::VectorId;
 use edgevec::wasm::EdgeVec;
 use edgevec::{HnswConfig, HnswIndex, VectorStorage};

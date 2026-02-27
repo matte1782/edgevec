@@ -626,7 +626,7 @@ mod tests {
         // 0.0 passes the is_finite() check, so construction succeeds,
         // but normalize() must return Err(SparseError::ZeroNorm).
         let v = SparseVector::new(vec![0], vec![0.0], 100).unwrap();
-        assert_eq!(v.norm(), 0.0);
+        assert!(v.norm().abs() < f32::EPSILON);
         let result = v.normalize();
         assert!(
             matches!(result, Err(SparseError::ZeroNorm)),

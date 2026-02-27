@@ -4,7 +4,7 @@
  * High-level wrapper for EdgeVec WASM module with filtered search support.
  *
  * @module edgevec-wrapper
- * @version 0.5.0
+ * @version 0.9.0
  */
 import { FilterExpression, MetadataValue } from './filter.js';
 /** Filter strategy for search */
@@ -223,11 +223,87 @@ export declare class EdgeVecIndex {
      * @returns Loaded index
      */
     static load(name: string): Promise<EdgeVecIndex>;
+    /**
+     * Initialize sparse storage for hybrid search.
+     * Must be called before using sparse or hybrid search.
+     */
+    initSparseStorage(): void;
+    /**
+     * Check if sparse storage is initialized.
+     */
+    hasSparseStorage(): boolean;
+    /**
+     * Get the number of sparse vectors stored.
+     */
+    sparseCount(): number;
+    /**
+     * Insert a sparse vector (e.g., BM25 scores).
+     *
+     * @param indices - Sorted indices of non-zero elements
+     * @param values - Values corresponding to indices
+     * @param dim - Dimension of sparse space (vocabulary size)
+     * @returns The assigned sparse vector ID
+     */
+    insertSparse(indices: Uint32Array, values: Float32Array, dim: number): number;
+    /**
+     * Search sparse vectors by query.
+     *
+     * @param indices - Query sparse indices (sorted)
+     * @param values - Query sparse values
+     * @param dim - Dimension of sparse space
+     * @param k - Number of results
+     * @returns Parsed sparse search results
+     */
+    searchSparse(indices: Uint32Array, values: Float32Array, dim: number, k: number): SparseSearchResult[];
+    /**
+     * Perform hybrid search combining dense and sparse results.
+     *
+     * @param denseQuery - Dense embedding vector
+     * @param sparseIndices - Sparse query indices (sorted)
+     * @param sparseValues - Sparse query values
+     * @param sparseDim - Dimension of sparse space
+     * @param options - Hybrid search options
+     * @returns Hybrid search results with fusion scores
+     */
+    hybridSearch(denseQuery: Float32Array, sparseIndices: Uint32Array, sparseValues: Float32Array, sparseDim: number, options: HybridSearchOptions): HybridSearchResult[];
+    /**
+     * Insert a binary vector into the index.
+     *
+     * @param vector - Binary vector as packed bytes
+     * @returns Vector ID
+     */
+    insertBinary(vector: Uint8Array): number;
+    /**
+     * Search with a binary query vector.
+     *
+     * @param query - Binary query vector as packed bytes
+     * @param k - Number of results
+     * @returns Search results sorted by Hamming distance
+     */
+    searchBinary(query: Uint8Array, k: number): SearchResult[];
+    /**
+     * Search binary with custom ef parameter.
+     *
+     * @param query - Binary query vector
+     * @param k - Number of results
+     * @param efSearch - ef_search parameter for accuracy/speed tradeoff
+     * @returns Search results
+     */
+    searchBinaryWithEf(query: Uint8Array, k: number, efSearch: number): SearchResult[];
+    /**
+     * Insert a batch of flat vectors.
+     *
+     * @param vectors - Flat array of vectors (concatenated Float32)
+     * @param count - Number of vectors
+     * @returns Array of assigned vector IDs
+     */
+    insertBatchFlat(vectors: Float32Array, count: number): Uint32Array;
     private buildOptionsJson;
     private wrapError;
     private toJsMetadataValue;
 }
 export { Filter, FilterExpression, MetadataValue } from './filter.js';
 export { FilterBuilder, FieldCondition } from './filter-builder.js';
+export type { SparseSearchResult, HybridSearchResult, HybridSearchOptions } from './edgevec-types.js';
 export default EdgeVecIndex;
 //# sourceMappingURL=edgevec-wrapper.d.ts.map

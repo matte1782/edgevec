@@ -50,7 +50,7 @@ fuzz_target!(|ops: Vec<Op>| {
                 // We don't remove from inserted_ids because we want to see if search handles deleted items gracefully
                 // (should not return them).
                 // But for the connectivity invariant "succeed", we need to know what IS valid.
-                let _ = index.delete(vid, &mut storage);
+                let _ = index.soft_delete(vid);
             }
             Op::Search { mut vector, k } => {
                 if vector.len() != dim as usize {
@@ -94,7 +94,7 @@ fuzz_target!(|ops: Vec<Op>| {
     if !inserted_ids.is_empty() {
         // Find one valid ID
         for &id in &inserted_ids {
-            if !storage.is_deleted(id) {
+            if !index.is_deleted(id).unwrap_or(true) {
                 let vec = storage.get_vector(id);
                 // Search for it - borrow from Cow since get_vector returns Cow<'_, [f32]>
                 if let Ok(results) = index.search(&vec, 10, &storage) {

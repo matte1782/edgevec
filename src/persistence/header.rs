@@ -216,11 +216,8 @@ impl MetadataSectionHeader {
             return Err(MetadataHeaderError::BufferTooShort(bytes.len()));
         }
 
-        // Copy to aligned buffer to avoid alignment issues
-        // This is necessary because the metadata section may not start at an aligned offset
-        let mut aligned_buf = [0u8; 16];
-        aligned_buf.copy_from_slice(&bytes[..16]);
-        let header = *bytemuck::from_bytes::<MetadataSectionHeader>(&aligned_buf);
+        // Use pod_read_unaligned to safely read from potentially unaligned bytes
+        let header = bytemuck::pod_read_unaligned::<MetadataSectionHeader>(&bytes[..16]);
 
         header.validate_magic()?;
         header.validate_version()?;
@@ -298,6 +295,13 @@ pub enum MetadataHeaderError {
     BufferTooShort(usize),
 
     /// Buffer is not 4-byte aligned.
+    ///
+    /// Deprecated: `from_bytes` now uses `pod_read_unaligned` and handles any alignment.
+    /// This variant is never constructed but kept for backwards compatibility.
+    #[deprecated(
+        since = "1.0.0",
+        note = "from_bytes now handles unaligned buffers gracefully"
+    )]
     #[error("buffer is not 4-byte aligned")]
     UnalignedBuffer,
 
@@ -336,6 +340,13 @@ pub enum HeaderError {
     BufferTooShort(usize),
 
     /// Buffer is not 8-byte aligned.
+    ///
+    /// Deprecated: `from_bytes` now uses `pod_read_unaligned` and handles any alignment.
+    /// This variant is never constructed but kept for backwards compatibility.
+    #[deprecated(
+        since = "1.0.0",
+        note = "from_bytes now handles unaligned buffers gracefully"
+    )]
     #[error("buffer is not 8-byte aligned")]
     UnalignedBuffer,
 }
@@ -382,13 +393,11 @@ impl FileHeader {
     /// # Requirements
     ///
     /// - `bytes` must be at least 64 bytes
-    /// - `bytes` must be 8-byte aligned
     ///
     /// # Errors
     ///
     /// Returns `Err` if:
     /// - Buffer is less than 64 bytes (`BufferTooShort`)
-    /// - Buffer is not 8-byte aligned (`UnalignedBuffer`)
     /// - Magic number is invalid (`InvalidMagic`)
     /// - Version is unsupported (`UnsupportedVersion`)
     /// - Checksum mismatch (`ChecksumMismatch`)
@@ -397,14 +406,8 @@ impl FileHeader {
             return Err(HeaderError::BufferTooShort(bytes.len()));
         }
 
-        // SAFETY: Length is checked above; alignment is validated via `try_from_bytes`.
-        //
-        // This function is safe because:
-        // - Buffer length is verified to be exactly 64 bytes
-        // - FileHeader is Pod + Zeroable (all bit patterns valid)
-        // - bytemuck::try_from_bytes validates alignment
-        let header = *bytemuck::try_from_bytes::<FileHeader>(&bytes[..64])
-            .map_err(|_| HeaderError::UnalignedBuffer)?;
+        // Use pod_read_unaligned to safely read from potentially unaligned bytes
+        let header = bytemuck::pod_read_unaligned::<FileHeader>(&bytes[..64]);
 
         if header.magic != MAGIC {
             return Err(HeaderError::InvalidMagic(header.magic));
@@ -530,7 +533,8 @@ mod tests {
     }
 
     #[test]
-    fn test_unaligned_buffer_rejected() {
+    fn test_unaligned_buffer_handled() {
+        // Unaligned buffers are now handled gracefully via pod_read_unaligned
         let header = FileHeader::new(64);
         let mut buf = Vec::with_capacity(65);
         buf.push(0); // create an offset to force misalignment
@@ -538,7 +542,12 @@ mod tests {
 
         let slice = &buf[1..65];
         let result = FileHeader::from_bytes(slice);
-        assert!(matches!(result, Err(HeaderError::UnalignedBuffer)));
+        assert!(
+            result.is_ok(),
+            "Unaligned buffers should be handled gracefully"
+        );
+        let decoded = result.unwrap();
+        assert_eq!(decoded.dimensions, 64);
     }
 
     // =========================================================================

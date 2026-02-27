@@ -118,7 +118,8 @@ pub mod metric;
 /// Vector storage.
 pub mod storage;
 
-/// WASM bindings.
+/// WASM bindings (only compiled on wasm32 targets).
+#[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
 /// Quantization support.

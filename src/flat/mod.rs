@@ -573,8 +573,8 @@ mod tests {
         // Data must still be intact
         assert_eq!(index.len(), 10);
         assert_eq!(index.vectors_len(), 10 * 128);
-        for i in 1..=10 {
-            assert_eq!(index.get(VectorId(i as u64)), Some([0xAA; 128].as_slice()));
+        for i in 1..=10_u64 {
+            assert_eq!(index.get(VectorId(i)), Some([0xAA; 128].as_slice()));
         }
 
         // Shrink on empty index should not panic

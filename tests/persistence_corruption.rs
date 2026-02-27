@@ -134,6 +134,7 @@ proptest! {
                     HeaderError::UnsupportedVersion(_, _) => {},
                     HeaderError::ChecksumMismatch { .. } => {},
                     HeaderError::BufferTooShort(_) => panic!("Did not truncate, but got BufferTooShort"),
+                    #[allow(deprecated)]
                     HeaderError::UnalignedBuffer => panic!("Did not misalign, but got UnalignedBuffer"),
                 }
             }

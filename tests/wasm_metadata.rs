@@ -1,3 +1,4 @@
+#![cfg(target_arch = "wasm32")]
 //! WASM Metadata API Tests (W21.3)
 //!
 //! Tests the JavaScript-facing metadata API for EdgeVec.

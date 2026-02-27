@@ -13,7 +13,6 @@ use edgevec::quantization::QuantizerConfig;
 use edgevec::storage::{StorageType, VectorStorage};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use std::hint::black_box;
 
 fn bench_storage_memory(c: &mut Criterion) {
     let dims = 768;

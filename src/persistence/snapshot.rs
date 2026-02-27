@@ -7,7 +7,6 @@ use crate::persistence::storage::load_snapshot;
 use crate::persistence::{PersistenceError, StorageBackend};
 use crate::storage::VectorStorage;
 use bitvec::prelude::*;
-use bytemuck::try_cast_slice;
 use log::{debug, info, warn};
 use std::mem::size_of;
 
@@ -226,32 +225,28 @@ pub fn read_snapshot(
     let neighbors_len = neighbors_end.saturating_sub(nodes_len_bytes);
     let neighbors_bytes = &neighbors_rest[..std::cmp::min(neighbors_len, neighbors_rest.len())];
 
-    // Parse Nodes using bytemuck for alignment-safe casting.
+    // Parse Nodes using bytemuck for alignment-safe reading.
     //
-    // This replaces the previous unsafe pointer cast that had undefined behavior
-    // when alignment was not guaranteed. bytemuck::try_cast_slice verifies
-    // alignment at runtime and returns an error if misaligned.
+    // Uses pod_read_unaligned to safely handle any byte alignment.
+    // This avoids undefined behavior from unaligned casts.
     //
     // See: docs/audits/unsafe_audit_persistence.md for the original issue.
     // Fixed in: W13.2 (bytemuck integration)
-    // Updated in: W26.5 - handle alignment fallback by copying to aligned Vec
+    // Updated in: W42 - use pod_read_unaligned for guaranteed safety (Miri audit)
+    let node_size = std::mem::size_of::<HnswNode>();
     let nodes: Vec<HnswNode> = if nodes_bytes.is_empty() {
         Vec::new()
-    } else if let Ok(nodes) = try_cast_slice::<u8, HnswNode>(nodes_bytes) {
-        nodes.to_vec()
+    } else if nodes_bytes.len() % node_size != 0 {
+        return Err(PersistenceError::Corrupted(format!(
+            "Node data length {} is not a multiple of HnswNode size {}",
+            nodes_bytes.len(),
+            node_size
+        )));
     } else {
-        // Alignment issue - copy to aligned Vec<u8> first, then cast
-        // This is slower but handles arbitrary alignment
-        let mut aligned: Vec<u8> = Vec::with_capacity(nodes_bytes.len());
-        aligned.extend_from_slice(nodes_bytes);
-        // Now aligned should be properly aligned for HnswNode
-        try_cast_slice::<u8, HnswNode>(&aligned)
-            .map_err(|e| {
-                PersistenceError::Corrupted(format!(
-                    "HnswNode alignment error after copy: {e:?}. Data may be corrupted."
-                ))
-            })?
-            .to_vec()
+        nodes_bytes
+            .chunks_exact(node_size)
+            .map(bytemuck::pod_read_unaligned::<HnswNode>)
+            .collect()
     };
 
     // Verify we got the expected number of nodes

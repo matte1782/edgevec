@@ -1,0 +1,59 @@
+Hi @matte1782: happy holidays, and wanted to thank you for this awesome open-source project!
+
+I noticed that WASM detection and binary hamming were not working on my Macbook (M2 Max), so thought I'd go ahead and submit a fix; I've actually been working on a similar feature for another project before I stumbled across EdgeVec! Currently using SQLite in one of my projects (libSQL to be exact), but libSQL's binary hamming isn't optimized, so I've been working on a client side solution for maximum performance. Since the implementation logic is so similar I thought that I'd go ahead and contribute the functionality into EdgeVec!
+
+I ran all of these changes through the hostile reviewer via Claude Code (Opus 4.5), and also had the agent cross-check with CONTRIBUTING.md. The only discrepancy found was that simd.rs uses assert_eq! patterns, so the new function matches the current codebase standard instead of introducing a larger refactor (that can be done in a follow-up PR).
+
+P.S. Future work: Flat Index RFC
+I've also been working on a much larger feature (nearly completed) to introduce a flat index (offered by others such as usearch, faiss, sqlite-vec, Weaviate, etc). This adds another option in addition to HNSW, results in much faster O(1) append time (adding hundreds of thousands of vectors in HNSW can take hours, vs nearly instant for flat), and allows exact brute-force search (100% recall) that works great for small to medium-sized datasets (and can actually be faster than HNSW for small datasets).
+
+I also added a feature to optionally store and search true binary (bit) vectors (1-bit per dimension), which reduces storage requirements from FP32 to binary by 32x—at the cost of using Hamming distance scoring rather than float distance (though you can retrieve top-k candidates cheaply and then rescore in an external database with higher-fidelity vectors for high-accuracy ranking).
+
+Since this isn't in the roadmap, I wanted to respect CONTRIBUTING.md and add an RFC first; I'll open that PR after the holidays to share the design.
+
+PR Details
+Add SIMD-accelerated Hamming distance for binary vectors, addressing the v0.7.0 roadmap item for WASM SIMD enablement.
+
+Benchmark Comparison
+After
+CleanShot 2025-12-24 at 15 14 22@2x
+Before
+CleanShot 2025-12-24 at 15 16 13@2x
+Features
+WASM SIMD128 implementation using LUT-based popcount (~2-12x speedup)
+AVX2 implementation using SAD for horizontal summation (~4-10x speedup)
+Top-level dispatcher: WASM SIMD128 → AVX2 → scalar fallback
+Benchmark functions exported to WASM for verification
+Bugfixes
+Fix SIMD detection bytecode in simd_benchmark.html (was returning false even when SIMD was supported, now uses wasm-feature-detect bytecode)
+Hamming metric now uses SIMD dispatcher instead of scalar loop
+Implementation Details
+4-bit nibble LUT approach (Warren, "Hacker's Delight")
+4-wide unrolling (64 bytes/iteration) for instruction-level parallelism
+Proper SAFETY comments on all unsafe blocks
+Named constants (WASM_U8_VECTOR_WIDTH, LOW_NIBBLE_MASK, etc.)
+Testing
+10 unit tests covering edge cases, boundaries, and panic behavior
+Interactive benchmark page at docs/demo/simd_hamming_test.html
+Verified 8.75x speedup in Chrome (768-bit vectors, 10K iterations)
+Files Changed
+src/metric/simd.rs: Core SIMD implementations + unit tests
+src/metric/hamming.rs: Hamming metric using SIMD dispatcher
+src/wasm/mod.rs: Benchmark functions (getSimdBackend, benchmarkHamming)
+docs/demo/simd_hamming_test.html: Interactive test page
+docs/demo/simd_benchmark.html: Fixed SIMD detection
+docs/demo/pkg/*: Rebuilt WASM package
+Notes
+assert_eq! pattern matches existing simd.rs functions
+Future PR should convert all SIMD functions to Result<T, E>
+@jsonMartin
+feat(simd): add WASM SIMD128 Hamming distance 
+6c2c743
+This branch has not been deployed
+No deployments
+Merge info
+4 workflows awaiting approval
+This workflow requires approval from a maintainer. Learn more about approving workflows.
+
+No conflicts with base branch
+Merging can be performed automatically.

@@ -15,6 +15,7 @@
 #   lint:       5 minutes  (cargo fmt + clippy)
 #   wasm-check: 5 minutes  (cargo check --target wasm32-unknown-unknown)
 #   fuzz-check: 5 minutes  (cargo +nightly check)
+#   miri:       15 minutes (cargo +nightly miri test)
 
 name: EdgeVec CI
 
@@ -84,16 +85,41 @@ jobs:
       - name: Check WASM Build
         run: cargo check --target wasm32-unknown-unknown
 
-  # Job 4: Fuzz Harness Verification
-  # Note: Some fuzz targets need API updates - only check dummy_harness for now
+  # Job 4: Fuzz Harness Verification — All 15 targets
   fuzz-check:
-    name: Fuzz Harness Build
+    name: Fuzz Harness Build (All Targets)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Nightly Rust
         uses: dtolnay/rust-toolchain@nightly
 
-      - name: Check Fuzz Target Compiles
-        run: cargo +nightly check --manifest-path fuzz/Cargo.toml --bin dummy_harness
+      - name: Check ALL Fuzz Targets Compile
+        run: cargo +nightly check --manifest-path fuzz/Cargo.toml --all-targets
+
+  # Job 5: Miri Safety Audit (UB detection)
+  miri:
+    name: Miri Safety Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nightly Rust with Miri
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+
+      - name: Run Miri (core)
+        run: cargo +nightly miri test --lib --no-default-features -- --skip wasm --skip test_bq_vs_f32_recall_comparison
+        env:
+          MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check"
+          PROPTEST_CASES: "4"
+
+      - name: Run Miri (sparse feature)
+        run: cargo +nightly miri test --lib --no-default-features --features sparse -- --skip wasm --skip test_bq_vs_f32_recall_comparison
+        env:
+          MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check"
+          PROPTEST_CASES: "4"

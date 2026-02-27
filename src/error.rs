@@ -133,8 +133,10 @@ pub enum BatchError {
     },
 }
 
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+#[cfg(target_arch = "wasm32")]
 impl From<EdgeVecError> for JsValue {
     fn from(err: EdgeVecError) -> Self {
         let (code, msg) = match &err {
@@ -181,6 +183,7 @@ impl From<EdgeVecError> for JsValue {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 impl From<BatchError> for JsValue {
     fn from(err: BatchError) -> Self {
         let (code, msg) = match &err {

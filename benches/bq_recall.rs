@@ -26,7 +26,6 @@ use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::HashSet;
-use std::hint::black_box;
 
 /// Generate a random f32 vector with values in [-1, 1].
 fn generate_vector(dims: usize, seed: u64) -> Vec<f32> {

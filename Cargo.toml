@@ -105,7 +105,17 @@ rand_chacha = { version = "0.3", features = ["serde1"] }
 serde_bytes = "0.11"
 postcard = { version = "1.0", features = ["use-std"] }
 
-# WASM Dependencies (W4.1)
+# Non-WASM utilities used across codebase
+log = "0.4"
+cfg-if = "1.0.4"
+
+# =============================================================================
+# WASM-ONLY DEPENDENCIES — Only compiled on wasm32 targets
+# =============================================================================
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# getrandom "js" feature enables JS-based RNG on WASM targets
+getrandom = { version = "0.2.14", features = ["js"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
@@ -113,9 +123,6 @@ web-sys = { version = "0.3", features = ["console", "Window", "Performance", "Id
 serde-wasm-bindgen = "0.6"
 console_error_panic_hook = "0.1"
 console_log = "1.0"
-log = "0.4"
-getrandom = { version = "0.2.14", features = ["js"] }
-cfg-if = "1.0.4"
 
 # =============================================================================
 # DEV DEPENDENCIES — Day 1: Testing Infrastructure
@@ -257,10 +264,8 @@ name = "batch_insert"
 # =============================================================================
 
 [package.metadata.wasm-pack.profile.release]
-# Disable wasm-opt temporarily to investigate iOS Safari compatibility issues
-# Root cause: wasm-opt was failing with "unexpected false: all used features should be allowed"
-# on i32.trunc_sat_f64_u instruction, which requires --enable-nontrapping-float-to-int
-# TODO: Re-enable wasm-opt with correct feature flags after verifying WASM works on iOS
+# wasm-opt disabled: iOS Safari fails on i32.trunc_sat_f64_u without --enable-nontrapping-float-to-int
+# Tracked: W43.2 in v1.0 plan — re-enable with correct feature flags after iOS verification
 wasm-opt = false
 
 [profile.release]

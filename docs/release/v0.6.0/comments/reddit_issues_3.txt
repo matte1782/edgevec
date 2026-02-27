@@ -1,0 +1,1 @@
+Bel progetto. Spero davvero che un giorno potremo generare embedding vectors nei browser. Così potremmo pagare meno per il servizio.

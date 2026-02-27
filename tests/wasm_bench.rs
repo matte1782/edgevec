@@ -1,3 +1,5 @@
+#![cfg(target_arch = "wasm32")]
+
 use edgevec::wasm::{EdgeVec, EdgeVecConfig};
 use js_sys::{Array, Date, Float32Array, Function, Uint32Array};
 use std::cell::RefCell;

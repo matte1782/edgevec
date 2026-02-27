@@ -1,3 +1,4 @@
+#![cfg(target_arch = "wasm32")]
 //! WASM Integration Tests for Sparse/Hybrid Search (Week 39)
 //!
 //! Tests the WASM bindings for sparse storage and hybrid search.

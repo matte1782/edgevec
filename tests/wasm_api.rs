@@ -1,3 +1,4 @@
+#![cfg(target_arch = "wasm32")]
 //! WASM API Tests (W4.2)
 //!
 //! Tests the high-level JS API for insert and search.
