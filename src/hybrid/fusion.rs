@@ -138,17 +138,15 @@ impl FusionMethod {
 
     /// Create linear fusion with alpha weight.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if alpha is not in range [0.0, 1.0].
+    /// Returns `Err(String)` if alpha is not in range [0.0, 1.0].
     #[inline]
-    #[must_use]
-    pub fn linear(alpha: f32) -> Self {
-        assert!(
-            (0.0..=1.0).contains(&alpha),
-            "Alpha must be in range [0.0, 1.0], got {alpha}"
-        );
-        FusionMethod::Linear { alpha }
+    pub fn linear(alpha: f32) -> Result<Self, String> {
+        if !(0.0..=1.0).contains(&alpha) {
+            return Err(format!("Alpha must be in range [0.0, 1.0], got {alpha}"));
+        }
+        Ok(FusionMethod::Linear { alpha })
     }
 
     /// Create balanced linear fusion (alpha=0.5).
@@ -1047,7 +1045,7 @@ mod tests {
 
     #[test]
     fn test_fusion_method_linear() {
-        let method = FusionMethod::linear(0.7);
+        let method = FusionMethod::linear(0.7).unwrap();
         match method {
             FusionMethod::Linear { alpha } => assert!((alpha - 0.7).abs() < f32::EPSILON),
             FusionMethod::Rrf { .. } => panic!("Expected Linear"),
@@ -1064,14 +1062,22 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Alpha must be in range")]
     fn test_fusion_method_linear_invalid_high() {
-        let _ = FusionMethod::linear(1.5);
+        let result = FusionMethod::linear(1.5);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().contains("Alpha must be in range"),
+            "Error message should mention valid range"
+        );
     }
 
     #[test]
-    #[should_panic(expected = "Alpha must be in range")]
     fn test_fusion_method_linear_invalid_low() {
-        let _ = FusionMethod::linear(-0.1);
+        let result = FusionMethod::linear(-0.1);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().contains("Alpha must be in range"),
+            "Error message should mention valid range"
+        );
     }
 }

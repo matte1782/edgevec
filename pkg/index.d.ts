@@ -4,7 +4,7 @@
  * A WebAssembly-powered vector database for Browser, Node, and Edge environments.
  *
  * @module edgevec
- * @version 0.5.2
+ * @version 0.9.0
  *
  * @example
  * ```typescript
@@ -31,4 +31,6 @@ export { default, EdgeVec, EdgeVecConfig, JsMetadataValue, BatchInsertConfig, Ba
 export { Filter, FilterExpression, FilterValidation, FilterValidationError, FilterValidationWarning, MetadataValue, } from './filter.js';
 export { FilterBuilder, FieldCondition } from './filter-builder.js';
 export { EdgeVecIndex, FilterException, FilterStrategy, Metadata, SearchOptions, SearchResult, FilteredSearchResult, IndexConfig, SourcePosition, } from './edgevec-wrapper.js';
+export type { SparseSearchResult, HybridSearchResult, HybridSearchOptions } from './edgevec-wrapper.js';
+export { createSparseVector, parseHybridResults, parseSparseResults, createHybridOptions } from './sparse-helpers.js';
 //# sourceMappingURL=index.d.ts.map

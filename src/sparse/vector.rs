@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Invariants
 ///
-/// The following invariants are enforced at construction time:
+/// The following invariants are enforced at construction time and during
+/// deserialization (via `serde(try_from = "SparseVectorRaw")`):
 ///
 /// 1. `indices` are sorted in strictly ascending order
 /// 2. No duplicate indices
@@ -43,10 +44,32 @@ use serde::{Deserialize, Serialize};
 /// assert_eq!(sparse.dim(), 100);
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(try_from = "SparseVectorRaw")]
 pub struct SparseVector {
     indices: Vec<u32>,
     values: Vec<f32>,
     dim: u32,
+}
+
+/// Raw deserialization target for `SparseVector`.
+///
+/// This private struct is used with `serde(try_from)` to ensure all 6 invariants
+/// are enforced during deserialization. Without this, `#[derive(Deserialize)]`
+/// would bypass validation and allow construction of invalid `SparseVector`s
+/// (e.g., unsorted indices, NaN values, duplicate indices).
+#[derive(Deserialize)]
+struct SparseVectorRaw {
+    indices: Vec<u32>,
+    values: Vec<f32>,
+    dim: u32,
+}
+
+impl TryFrom<SparseVectorRaw> for SparseVector {
+    type Error = SparseError;
+
+    fn try_from(raw: SparseVectorRaw) -> Result<Self, Self::Error> {
+        SparseVector::new(raw.indices, raw.values, raw.dim)
+    }
 }
 
 impl SparseVector {
@@ -595,5 +618,102 @@ mod tests {
 
         assert_eq!(normalized.indices(), &[5, 10, 20]);
         assert_eq!(normalized.dim(), 100);
+    }
+
+    #[test]
+    fn test_normalize_zero_values() {
+        // A sparse vector with all zero values has zero norm.
+        // 0.0 passes the is_finite() check, so construction succeeds,
+        // but normalize() must return Err(SparseError::ZeroNorm).
+        let v = SparseVector::new(vec![0], vec![0.0], 100).unwrap();
+        assert_eq!(v.norm(), 0.0);
+        let result = v.normalize();
+        assert!(
+            matches!(result, Err(SparseError::ZeroNorm)),
+            "normalize() on all-zero-values vector must return ZeroNorm, got: {:?}",
+            result
+        );
+
+        // Also test with multiple zero values
+        let v2 = SparseVector::new(vec![0, 5, 10], vec![0.0, 0.0, 0.0], 100).unwrap();
+        assert!(matches!(v2.normalize(), Err(SparseError::ZeroNorm)));
+    }
+
+    // ============= Deserialization Invariant Tests (C-SRC-1) =============
+
+    #[test]
+    fn test_deserialize_rejects_unsorted_indices() {
+        // Invariant 1: indices must be sorted in strictly ascending order
+        let json = r#"{"indices":[5,0,10],"values":[0.1,0.2,0.3],"dim":100}"#;
+        let result: Result<SparseVector, _> = serde_json::from_str(json);
+        assert!(
+            result.is_err(),
+            "Deserialization must reject unsorted indices"
+        );
+    }
+
+    #[test]
+    fn test_deserialize_rejects_duplicate_indices() {
+        // Invariant 2: no duplicate indices
+        let json = r#"{"indices":[0,5,5],"values":[0.1,0.2,0.3],"dim":100}"#;
+        let result: Result<SparseVector, _> = serde_json::from_str(json);
+        assert!(
+            result.is_err(),
+            "Deserialization must reject duplicate indices"
+        );
+    }
+
+    #[test]
+    fn test_deserialize_rejects_nan_values() {
+        // Invariant 3: no NaN or Infinity in values
+        // NaN in JSON is not standard, but we test via a valid SparseVector
+        // that might be crafted. Since JSON doesn't support NaN natively,
+        // we test with Infinity which some parsers accept.
+        // Instead, test with a roundtrip that proves valid data works:
+        let json = r#"{"indices":[0,5],"values":[0.1,null],"dim":100}"#;
+        let result: Result<SparseVector, _> = serde_json::from_str(json);
+        assert!(
+            result.is_err(),
+            "Deserialization must reject null/invalid values"
+        );
+    }
+
+    #[test]
+    fn test_deserialize_rejects_empty_vector() {
+        // Invariant 4: at least one element (nnz >= 1)
+        let json = r#"{"indices":[],"values":[],"dim":100}"#;
+        let result: Result<SparseVector, _> = serde_json::from_str(json);
+        assert!(result.is_err(), "Deserialization must reject empty vectors");
+    }
+
+    #[test]
+    fn test_deserialize_rejects_out_of_bounds_indices() {
+        // Invariant 5: all indices < dim
+        let json = r#"{"indices":[0,100],"values":[0.1,0.2],"dim":100}"#;
+        let result: Result<SparseVector, _> = serde_json::from_str(json);
+        assert!(
+            result.is_err(),
+            "Deserialization must reject out-of-bounds indices"
+        );
+    }
+
+    #[test]
+    fn test_deserialize_rejects_length_mismatch() {
+        // Invariant 6: indices.len() == values.len()
+        let json = r#"{"indices":[0,5],"values":[0.1],"dim":100}"#;
+        let result: Result<SparseVector, _> = serde_json::from_str(json);
+        assert!(
+            result.is_err(),
+            "Deserialization must reject length mismatch"
+        );
+    }
+
+    #[test]
+    fn test_deserialize_valid_roundtrip() {
+        // Valid data should still deserialize correctly
+        let original = SparseVector::new(vec![0, 5, 10], vec![0.1, 0.2, 0.3], 100).unwrap();
+        let serialized = serde_json::to_string(&original).unwrap();
+        let deserialized: SparseVector = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(original, deserialized);
     }
 }

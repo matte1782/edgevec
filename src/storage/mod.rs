@@ -220,6 +220,8 @@ impl VectorStorage {
                 if self.quantizer.is_none() {
                     self.quantizer = Some(ScalarQuantizer::new(*config));
                 }
+                // SAFETY: quantizer is guaranteed initialized by the `is_none()` check
+                // on line 220 above, which creates it if missing.
                 let q = self
                     .quantizer
                     .as_ref()
@@ -359,30 +361,34 @@ impl VectorStorage {
 
     /// Returns the binary vector slice for a given ID.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the vector ID is invalid (0).
-    /// Panics if storage is not in binary mode.
-    /// Panics if vector ID is out of bounds.
-    #[must_use]
+    /// Returns `StorageError::Corrupted` if:
+    /// - Storage is not in binary mode
+    /// - Vector ID is 0 (invalid)
+    /// - Vector offset overflows
     #[allow(clippy::cast_possible_truncation)]
-    pub fn get_binary_vector(&self, id: VectorId) -> &[u8] {
+    pub fn get_binary_vector(&self, id: VectorId) -> Result<&[u8], StorageError> {
         let bits = match &self.config {
             StorageType::Binary(b) => *b,
-            _ => panic!("get_binary_vector called on non-binary storage"),
+            _ => {
+                return Err(StorageError::Corrupted(
+                    "get_binary_vector called on non-binary storage".into(),
+                ))
+            }
         };
 
         // Use checked_sub to safely convert 1-based ID to 0-based index
-        let idx = (id.0 as usize)
-            .checked_sub(1)
-            .expect("attempted to access invalid vector id 0");
+        let idx = (id.0 as usize).checked_sub(1).ok_or_else(|| {
+            StorageError::Corrupted("attempted to access invalid vector id 0".into())
+        })?;
 
         let bytes_per_vector = ((bits + 7) / 8) as usize;
         let start = idx
             .checked_mul(bytes_per_vector)
-            .expect("vector offset overflow");
+            .ok_or_else(|| StorageError::Corrupted("vector offset overflow".into()))?;
 
-        &self.binary_data[start..start + bytes_per_vector]
+        Ok(&self.binary_data[start..start + bytes_per_vector])
     }
 
     /// Recovers storage state from a WAL backend.
@@ -509,7 +515,8 @@ impl VectorStorage {
                 if payload.len() < 8 {
                     return Err(StorageError::Corrupted("Insert payload too short".into()));
                 }
-                let id_bytes: [u8; 8] = payload[0..8].try_into().expect("checked");
+                // SAFETY: payload.len() >= 8 checked above, so [0..8] is exactly 8 bytes.
+                let id_bytes: [u8; 8] = payload[0..8].try_into().expect("payload length checked");
                 let id = u64::from_le_bytes(id_bytes);
 
                 let vec_bytes = &payload[8..];
@@ -534,7 +541,8 @@ impl VectorStorage {
                         "Binary insert payload too short".into(),
                     ));
                 }
-                let id_bytes: [u8; 8] = payload[0..8].try_into().expect("checked");
+                // SAFETY: payload.len() >= 8 checked above, so [0..8] is exactly 8 bytes.
+                let id_bytes: [u8; 8] = payload[0..8].try_into().expect("payload length checked");
                 let id = u64::from_le_bytes(id_bytes);
 
                 let vec_bytes = &payload[8..];
@@ -634,10 +642,14 @@ impl VectorStorage {
                     self.quantized_data.len()
                 );
                 let q_data = &self.quantized_data[start..end];
+                // SAFETY: The quantizer is guaranteed to be initialized when storage is
+                // in QuantizedU8 mode. It is initialized in `insert()` on first vector
+                // insertion (see the `QuantizedU8` arm of `insert()`). If this ever fails,
+                // it indicates a logic error in the storage initialization path.
                 let q = self
                     .quantizer
                     .as_ref()
-                    .expect("quantizer not initialized in QuantizedU8 mode");
+                    .expect("quantizer must be initialized in QuantizedU8 mode");
                 Cow::Owned(q.dequantize(q_data))
             }
             StorageType::Binary(_) => {
@@ -742,7 +754,7 @@ impl VectorProvider for VectorStorage {
     fn get_quantized_vector(&self, id: VectorId) -> Option<&[u8]> {
         match self.config {
             StorageType::QuantizedU8(_) => Some(self.get_quantized_vector(id)),
-            StorageType::Binary(_) => Some(self.get_binary_vector(id)),
+            StorageType::Binary(_) => self.get_binary_vector(id).ok(),
             StorageType::Float32 => None,
         }
     }

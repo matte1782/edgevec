@@ -105,17 +105,20 @@ impl<R: Read> Iterator for WalIterator<R> {
 
         // 2. Parse WalEntry (Manual Little-Endian Deserialization)
         // Layout: sequence(8) + type(1) + pad(3) + len(4)
+        // SAFETY: header_bytes is exactly 16 bytes (WAL_ENTRY_SIZE), so slicing
+        // [0..8] yields exactly 8 bytes and [12..16] yields exactly 4 bytes.
+        // The try_into() conversions are infallible for these exact-length slices.
         let sequence = u64::from_le_bytes(
             header_bytes[0..8]
                 .try_into()
-                .expect("slice length is strictly 8 bytes"),
+                .expect("slice is exactly 8 bytes from 16-byte header"),
         );
         let entry_type = header_bytes[8];
         // Bytes 9..12 are padding, ignore them
         let payload_len_u32 = u32::from_le_bytes(
             header_bytes[12..16]
                 .try_into()
-                .expect("slice length is strictly 4 bytes"),
+                .expect("slice is exactly 4 bytes from 16-byte header"),
         );
 
         let entry = WalEntry::new(sequence, entry_type, payload_len_u32);

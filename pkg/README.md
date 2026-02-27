@@ -6,9 +6,9 @@
 [![License](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/matte1782/edgevec/blob/main/LICENSE-MIT)
 
 > **The first WASM-native vector database.**
-> Binary quantization, metadata filtering, memory management — all in the browser.
+> Dense + sparse vectors, hybrid search, binary quantization, metadata filtering — all in the browser.
 
-EdgeVec is an embedded vector database built in Rust with first-class WebAssembly support. It brings server-grade vector database features to the browser: **32x memory reduction** via binary quantization, metadata filtering, soft delete, persistence, and sub-millisecond search.
+EdgeVec is an embedded vector database built in Rust with first-class WebAssembly support. It brings server-grade vector database features to the browser: **HNSW + FlatIndex**, **sparse vectors with BM25**, **hybrid search (RRF fusion)**, **32x memory reduction** via binary quantization, metadata filtering, soft delete, persistence, and sub-millisecond search.
 
 ---
 
@@ -19,6 +19,10 @@ EdgeVec is an embedded vector database built in Rust with first-class WebAssembl
 | Vector Search | Yes | Yes | Yes |
 | **Binary Quantization** | **Yes (32x)** | No | No |
 | **Metadata Filtering** | **Yes** | No | Yes |
+| **Sparse Vectors** | **Yes** | No | Yes |
+| **Hybrid Search (RRF)** | **Yes** | No | Yes |
+| **FlatIndex (exact)** | **Yes** | No | Limited |
+| **BinaryFlatIndex** | **Yes** | No | No |
 | **SQL-like Queries** | **Yes** | No | Yes |
 | **Memory Pressure API** | **Yes** | No | No |
 | **Soft Delete** | **Yes** | No | Yes |
@@ -27,7 +31,7 @@ EdgeVec is an embedded vector database built in Rust with first-class WebAssembl
 | No server required | Yes | Yes | No |
 | Offline capable | Yes | Yes | No |
 
-**EdgeVec is the only WASM vector database with binary quantization and filtered search.**
+**EdgeVec is the only WASM vector database with binary quantization, sparse vectors, hybrid search, BinaryFlatIndex, and filtered search.**
 
 ---
 
@@ -112,7 +116,7 @@ python -m http.server 8080
 
 ## Performance
 
-EdgeVec v0.7.0 uses **SIMD instructions** for 2x+ faster vector operations on modern browsers.
+EdgeVec v0.9.0 uses **SIMD instructions** for 2x+ faster vector operations on modern browsers.
 
 ### Distance Calculation (Native Benchmark)
 
@@ -263,6 +267,72 @@ config.quantized = true;  // Enable SQ8 quantization
 // 3.6x memory reduction: 3.03 GB -> 832 MB at 1M vectors
 ```
 
+### FlatIndex (v0.9.0)
+
+Brute-force exact nearest neighbor search for small datasets. No graph overhead, 100% recall guarantee.
+
+```rust
+use edgevec::{FlatIndex, FlatIndexConfig, DistanceMetric};
+
+let config = FlatIndexConfig::new(768)
+    .with_metric(DistanceMetric::Cosine)
+    .with_capacity(10_000);
+let mut index = FlatIndex::new(config);
+
+let id = index.insert(&embedding)?;
+let results = index.search(&query, 10)?;
+```
+
+### Sparse Vectors (v0.9.0)
+
+CSR-format sparse vector storage with inverted index for fast keyword-style retrieval.
+
+```rust
+use edgevec::SparseVector;
+use edgevec::sparse::{SparseStorage, SparseSearcher};
+
+let sv = SparseVector::new(
+    vec![10, 42, 999],       // term indices
+    vec![0.8, 1.2, 0.3],    // term weights
+    30_000,                   // vocabulary size
+)?;
+
+let mut storage = SparseStorage::new();
+let id = storage.insert(&sv)?;
+
+let searcher = SparseSearcher::new(&storage);
+let results = searcher.search(&query_sv, 10);
+```
+
+### Hybrid Search (v0.9.0)
+
+Combine dense (HNSW) and sparse retrieval with RRF or linear fusion.
+
+```rust
+use edgevec::hybrid::{HybridSearcher, HybridSearchConfig, FusionMethod};
+
+let searcher = HybridSearcher::new(&hnsw_index, &dense_storage, &sparse_storage);
+
+let config = HybridSearchConfig::new(
+    50, 50, 10,
+    FusionMethod::Rrf { k: 60 },
+);
+
+let results = searcher.search(&dense_query, &sparse_query, &config)?;
+```
+
+### BinaryFlatIndex (v0.9.0)
+
+Native binary vector storage with Hamming distance search. 32x memory reduction.
+
+```rust
+use edgevec::BinaryFlatIndex;
+
+let mut index = BinaryFlatIndex::new(768)?;
+let id = index.insert(&binary_vector)?;
+let results = index.search(&query, 10)?;
+```
+
 ---
 
 ## Rust Usage
@@ -299,6 +369,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 | [Tutorial](docs/TUTORIAL.md) | Getting started guide |
 | [Filter Syntax](docs/api/FILTER_SYNTAX.md) | Complete filter expression reference |
 | [Database Operations](docs/api/DATABASE_OPERATIONS.md) | CRUD operations guide |
+| [FlatIndex API](docs/api/FLAT_INDEX.md) | FlatIndex reference |
+| [Sparse Vectors](docs/api/SPARSE_VECTORS.md) | Sparse vector storage and search |
+| [Hybrid Search](docs/api/HYBRID_SEARCH.md) | Dense + sparse fusion guide |
+| [BinaryFlatIndex](docs/api/BINARY_FLAT_INDEX.md) | Binary vector index reference |
 | [Performance Tuning](docs/PERFORMANCE_TUNING.md) | HNSW parameter optimization |
 | [Migration Guide](docs/MIGRATION.md) | Migrating from hnswlib, FAISS, Pinecone |
 | [Comparison](docs/COMPARISON.md) | When to use EdgeVec vs alternatives |
@@ -319,6 +393,8 @@ For these use cases, consider [Pinecone](https://pinecone.io), [Qdrant](https://
 
 ## Version History
 
+- **v0.9.0** — Sparse vectors (CSR), hybrid search (RRF + linear fusion), FlatIndex, BinaryFlatIndex (PR #7 by @marlon-costa-dc)
+- **v0.8.0** — Vue 3 composables, functional filter API, SIMD Euclidean, tech debt reduction
 - **v0.7.0** — SIMD acceleration (2x+ speedup), **First Community Contribution** (@jsonMartin — 8.75x Hamming)
 - **v0.6.0** — Binary quantization (32x memory), metadata storage, memory pressure API
 - **v0.5.4** — iOS Safari compatibility fixes
@@ -339,6 +415,7 @@ Thank you to everyone who has contributed to EdgeVec!
 | Contributor | Contribution |
 |:------------|:-------------|
 | [@jsonMartin](https://github.com/jsonMartin) | SIMD Hamming distance (PR #4) — 8.75x speedup |
+| [@marlon-costa-dc](https://github.com/marlon-costa-dc) | BinaryFlatIndex + clippy quality fixes (PR #7, PR #8) |
 
 ---
 

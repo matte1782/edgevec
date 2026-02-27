@@ -6,7 +6,7 @@
  * 2. Builder methods: Filter.eq('category', 'gpu')
  *
  * @module filter
- * @version 0.5.0
+ * @version 0.9.0
  */
 /** Supported metadata value types */
 export type MetadataValue = string | number | boolean | string[];

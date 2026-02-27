@@ -959,10 +959,11 @@ impl HnswIndex {
         let metadata_id = vector_id.0 as u32;
 
         for (key, value) in metadata {
-            // We've already validated, so insert should succeed
+            // Pre-validated above, but propagate errors instead of panicking
+            // in case of unexpected edge cases (e.g., key count limits).
             self.metadata
                 .insert(metadata_id, &key, value)
-                .expect("pre-validated metadata should not fail");
+                .map_err(GraphError::MetadataValidation)?;
         }
 
         Ok(vector_id)

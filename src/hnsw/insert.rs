@@ -534,11 +534,15 @@ impl HnswIndex {
             let mut closer_to_existing = false;
 
             // Get binary vector for candidate
-            let c_bin = storage.get_binary_vector(c_node.vector_id);
+            let c_bin = storage
+                .get_binary_vector(c_node.vector_id)
+                .map_err(|e| GraphError::Storage(e.to_string()))?;
 
             for &r_id in output.iter() {
                 let r_node = self.get_node(r_id).ok_or(GraphError::NodeIdOutOfBounds)?;
-                let r_bin = storage.get_binary_vector(r_node.vector_id);
+                let r_bin = storage
+                    .get_binary_vector(r_node.vector_id)
+                    .map_err(|e| GraphError::Storage(e.to_string()))?;
 
                 let dist_c_r = Hamming::distance(c_bin, r_bin);
 
@@ -624,14 +628,18 @@ impl HnswIndex {
 
         if ctx.neighbor_id_scratch.len() > m_max {
             // Get source binary vector
-            let source_bin = storage.get_binary_vector(vector_id);
+            let source_bin = storage
+                .get_binary_vector(vector_id)
+                .map_err(|e| GraphError::Storage(e.to_string()))?;
 
             ctx.scratch.clear();
 
             for &n_u32 in &ctx.neighbor_id_scratch {
                 let n_id = NodeId(n_u32);
                 let n_node = self.get_node(n_id).ok_or(GraphError::NodeIdOutOfBounds)?;
-                let n_bin = storage.get_binary_vector(n_node.vector_id);
+                let n_bin = storage
+                    .get_binary_vector(n_node.vector_id)
+                    .map_err(|e| GraphError::Storage(e.to_string()))?;
                 let dist = Hamming::distance(source_bin, n_bin);
                 ctx.scratch.push(Candidate {
                     distance: dist,

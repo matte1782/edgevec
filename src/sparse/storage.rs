@@ -35,7 +35,7 @@
 //! ```
 
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufWriter, Read, Write};
 use std::path::Path;
 
 use bitvec::prelude::*;
@@ -56,7 +56,12 @@ pub const SPARSE_MAGIC: [u8; 4] = [b'E', b'S', b'P', b'V'];
 ///
 /// Version history:
 /// - v1: Initial format with CSR-like packed arrays
-pub const SPARSE_FORMAT_VERSION: u32 = 1;
+/// - v2: Added CRC32 checksum as final 4 bytes after payload
+pub const SPARSE_FORMAT_VERSION: u32 = 2;
+
+/// Maximum supported format version for backward-compatible loading.
+/// Version 1 files are loaded without checksum validation.
+const SPARSE_MAX_SUPPORTED_VERSION: u32 = 2;
 
 // =============================================================================
 // SPARSE ID
@@ -517,9 +522,9 @@ impl SparseStorage {
     /// # Ok::<(), edgevec::sparse::SparseError>(())
     /// ```
     pub fn insert(&mut self, vector: &SparseVector) -> Result<SparseId, SparseError> {
-        // Assign ID
+        // Assign ID (with overflow protection)
         let id = SparseId::new(self.next_id);
-        self.next_id += 1;
+        self.next_id = self.next_id.checked_add(1).ok_or(SparseError::IdOverflow)?;
 
         // Append indices
         self.indices.extend_from_slice(vector.indices());
@@ -1110,64 +1115,11 @@ impl SparseStorage {
         let file = File::create(path).map_err(|e| SparseError::Io(e.to_string()))?;
         let mut writer = BufWriter::new(file);
 
-        // Write header
+        // Serialize to bytes (includes header, payload, and CRC32 checksum)
+        let bytes = self.to_bytes();
         writer
-            .write_all(&SPARSE_MAGIC)
+            .write_all(&bytes)
             .map_err(|e| SparseError::Io(e.to_string()))?;
-        writer
-            .write_all(&SPARSE_FORMAT_VERSION.to_le_bytes())
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-
-        // Write count (number of vectors)
-        let count = self.dims.len() as u64;
-        writer
-            .write_all(&count.to_le_bytes())
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-
-        // Write offsets (count+1 elements)
-        for offset in &self.offsets {
-            writer
-                .write_all(&offset.to_le_bytes())
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-        }
-
-        // Write dims
-        for dim in &self.dims {
-            writer
-                .write_all(&dim.to_le_bytes())
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-        }
-
-        // Write deleted bitmap
-        let deleted_bytes = self.pack_deleted_bits();
-        writer
-            .write_all(&deleted_bytes)
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-
-        // Write next_id
-        writer
-            .write_all(&self.next_id.to_le_bytes())
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-
-        // Write total_nnz
-        let total_nnz = self.indices.len() as u64;
-        writer
-            .write_all(&total_nnz.to_le_bytes())
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-
-        // Write indices
-        for idx in &self.indices {
-            writer
-                .write_all(&idx.to_le_bytes())
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-        }
-
-        // Write values
-        for val in &self.values {
-            writer
-                .write_all(&val.to_le_bytes())
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-        }
 
         writer.flush().map_err(|e| SparseError::Io(e.to_string()))?;
         Ok(())
@@ -1191,6 +1143,7 @@ impl SparseStorage {
     /// - total_nnz (8 bytes)
     /// - Indices (total_nnz * 4 bytes)
     /// - Values (total_nnz * 4 bytes)
+    /// - CRC32 checksum (4 bytes, v2+) — covers everything after the 8-byte header
     ///
     /// # Example
     ///
@@ -1214,7 +1167,7 @@ impl SparseStorage {
         let total_nnz = self.indices.len();
         let deleted_bytes_len = (count + 7) / 8;
 
-        // Pre-allocate with exact size
+        // Pre-allocate with exact size (including CRC32 checksum for v2)
         let capacity = 4 // magic
             + 4 // version
             + 8 // count
@@ -1224,7 +1177,8 @@ impl SparseStorage {
             + 8 // next_id
             + 8 // total_nnz
             + total_nnz * 4 // indices
-            + total_nnz * 4; // values
+            + total_nnz * 4 // values
+            + 4; // CRC32 checksum
 
         let mut bytes = Vec::with_capacity(capacity);
 
@@ -1261,6 +1215,13 @@ impl SparseStorage {
         for val in &self.values {
             bytes.extend_from_slice(&val.to_le_bytes());
         }
+
+        // CRC32 checksum covers everything after the 8-byte header (magic + version).
+        // The header itself is excluded so that version detection remains independent
+        // of checksum validation.
+        let payload = &bytes[8..]; // skip magic (4) + version (4)
+        let checksum = crc32fast::hash(payload);
+        bytes.extend_from_slice(&checksum.to_le_bytes());
 
         bytes
     }
@@ -1306,17 +1267,40 @@ impl SparseStorage {
             });
         }
 
-        // Read and validate version
+        // Read and validate version (accept v1 for backward compat, v2 for current)
         let mut version_bytes = [0u8; 4];
         cursor
             .read_exact(&mut version_bytes)
             .map_err(|e| SparseError::CorruptedData(format!("Failed to read version: {e}")))?;
         let version = u32::from_le_bytes(version_bytes);
-        if version != SPARSE_FORMAT_VERSION {
+        if version == 0 || version > SPARSE_MAX_SUPPORTED_VERSION {
             return Err(SparseError::UnsupportedVersion {
                 expected: SPARSE_FORMAT_VERSION,
                 found: version,
             });
+        }
+
+        // For v2+, validate CRC32 checksum before parsing payload.
+        // The checksum covers bytes[8..len-4] (everything after header, before checksum).
+        if version >= 2 {
+            if bytes.len() < 12 {
+                return Err(SparseError::CorruptedData(
+                    "File too short for v2 format (missing checksum)".to_string(),
+                ));
+            }
+            let payload = &bytes[8..bytes.len() - 4];
+            let expected_checksum = u32::from_le_bytes([
+                bytes[bytes.len() - 4],
+                bytes[bytes.len() - 3],
+                bytes[bytes.len() - 2],
+                bytes[bytes.len() - 1],
+            ]);
+            let actual_checksum = crc32fast::hash(payload);
+            if expected_checksum != actual_checksum {
+                return Err(SparseError::CorruptedData(format!(
+                    "CRC32 checksum mismatch: expected {expected_checksum:#010X}, got {actual_checksum:#010X}"
+                )));
+            }
         }
 
         // Read count
@@ -1353,13 +1337,7 @@ impl SparseStorage {
             SparseError::CorruptedData(format!("Failed to read deleted bitmap: {e}"))
         })?;
 
-        let mut deleted = BitVec::with_capacity(count);
-        for i in 0..count {
-            let byte_idx = i / 8;
-            let bit_idx = i % 8;
-            let is_deleted = (deleted_bytes[byte_idx] >> bit_idx) & 1 == 1;
-            deleted.push(is_deleted);
-        }
+        let deleted = Self::unpack_deleted_bits(&deleted_bytes, count);
 
         // Read next_id
         let mut next_id_bytes = [0u8; 8];
@@ -1430,120 +1408,13 @@ impl SparseStorage {
     /// ```
     #[allow(clippy::cast_possible_truncation)]
     pub fn load(path: &Path) -> Result<Self, SparseError> {
-        let file = File::open(path).map_err(|e| SparseError::Io(e.to_string()))?;
-        let mut reader = BufReader::new(file);
-
-        // Read and validate magic number
-        let mut magic = [0u8; 4];
-        reader
-            .read_exact(&mut magic)
+        // Read entire file into memory, then delegate to from_bytes() which
+        // handles version detection, CRC32 validation, and parsing.
+        let mut file = File::open(path).map_err(|e| SparseError::Io(e.to_string()))?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)
             .map_err(|e| SparseError::Io(e.to_string()))?;
-        if magic != SPARSE_MAGIC {
-            return Err(SparseError::InvalidMagic {
-                expected: SPARSE_MAGIC,
-                found: magic,
-            });
-        }
-
-        // Read and validate version
-        let mut version_bytes = [0u8; 4];
-        reader
-            .read_exact(&mut version_bytes)
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-        let version = u32::from_le_bytes(version_bytes);
-        if version != SPARSE_FORMAT_VERSION {
-            return Err(SparseError::UnsupportedVersion {
-                expected: SPARSE_FORMAT_VERSION,
-                found: version,
-            });
-        }
-
-        // Read count
-        let mut count_bytes = [0u8; 8];
-        reader
-            .read_exact(&mut count_bytes)
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-        let count = u64::from_le_bytes(count_bytes) as usize;
-
-        // Read offsets (count+1 elements)
-        let mut offsets = Vec::with_capacity(count + 1);
-        for _ in 0..=count {
-            let mut buf = [0u8; 4];
-            reader
-                .read_exact(&mut buf)
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-            offsets.push(u32::from_le_bytes(buf));
-        }
-
-        // Read dims
-        let mut dims = Vec::with_capacity(count);
-        for _ in 0..count {
-            let mut buf = [0u8; 4];
-            reader
-                .read_exact(&mut buf)
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-            dims.push(u32::from_le_bytes(buf));
-        }
-
-        // Read deleted bitmap
-        let deleted_byte_count = (count + 7) / 8;
-        let mut deleted_bytes = vec![0u8; deleted_byte_count];
-        reader
-            .read_exact(&mut deleted_bytes)
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-        let deleted = Self::unpack_deleted_bits(&deleted_bytes, count);
-
-        // Read next_id
-        let mut next_id_bytes = [0u8; 8];
-        reader
-            .read_exact(&mut next_id_bytes)
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-        let next_id = u64::from_le_bytes(next_id_bytes);
-
-        // Read total_nnz
-        let mut total_nnz_bytes = [0u8; 8];
-        reader
-            .read_exact(&mut total_nnz_bytes)
-            .map_err(|e| SparseError::Io(e.to_string()))?;
-        let total_nnz = u64::from_le_bytes(total_nnz_bytes) as usize;
-
-        // Read indices
-        let mut indices = Vec::with_capacity(total_nnz);
-        for _ in 0..total_nnz {
-            let mut buf = [0u8; 4];
-            reader
-                .read_exact(&mut buf)
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-            indices.push(u32::from_le_bytes(buf));
-        }
-
-        // Read values
-        let mut values = Vec::with_capacity(total_nnz);
-        for _ in 0..total_nnz {
-            let mut buf = [0u8; 4];
-            reader
-                .read_exact(&mut buf)
-                .map_err(|e| SparseError::Io(e.to_string()))?;
-            values.push(f32::from_le_bytes(buf));
-        }
-
-        // Validate consistency
-        if indices.len() != values.len() {
-            return Err(SparseError::CorruptedData(format!(
-                "indices length {} != values length {}",
-                indices.len(),
-                values.len()
-            )));
-        }
-
-        Ok(Self {
-            indices,
-            values,
-            offsets,
-            dims,
-            deleted,
-            next_id,
-        })
+        Self::from_bytes(&bytes)
     }
 
     /// Get the next ID that will be assigned.
@@ -2434,7 +2305,7 @@ mod tests {
 
     #[test]
     fn test_format_version_constant() {
-        assert_eq!(SPARSE_FORMAT_VERSION, 1);
+        assert_eq!(SPARSE_FORMAT_VERSION, 2);
     }
 
     #[test]
@@ -2504,7 +2375,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(SparseError::UnsupportedVersion {
-                expected: 1,
+                expected: 2,
                 found: 999
             })
         ));
@@ -2524,7 +2395,8 @@ mod tests {
         drop(file);
 
         let result = SparseStorage::load(&path);
-        assert!(matches!(result, Err(SparseError::Io(_))));
+        // v2 format detects truncation during CRC32 validation
+        assert!(result.is_err());
     }
 
     #[test]
@@ -2990,5 +2862,69 @@ mod tests {
 
         assert_eq!(storage.iter().count(), storage.active_count());
         assert_eq!(storage.ids().count(), storage.active_count());
+    }
+
+    // ============= Phase 3 Remediation Tests =============
+
+    #[test]
+    fn test_crc32_checksum_present_in_v2() {
+        let mut storage = SparseStorage::new();
+        let v = SparseVector::singleton(0, 1.0, 100).unwrap();
+        storage.insert(&v).unwrap();
+
+        let bytes = storage.to_bytes();
+        // Last 4 bytes should be the CRC32 checksum
+        assert!(bytes.len() >= 12); // at least header + checksum
+        let payload = &bytes[8..bytes.len() - 4];
+        let expected_crc = crc32fast::hash(payload);
+        let stored_crc = u32::from_le_bytes([
+            bytes[bytes.len() - 4],
+            bytes[bytes.len() - 3],
+            bytes[bytes.len() - 2],
+            bytes[bytes.len() - 1],
+        ]);
+        assert_eq!(expected_crc, stored_crc);
+    }
+
+    #[test]
+    fn test_crc32_detects_corruption() {
+        let mut storage = SparseStorage::new();
+        let v = SparseVector::singleton(0, 1.0, 100).unwrap();
+        storage.insert(&v).unwrap();
+
+        let mut bytes = storage.to_bytes();
+        // Corrupt a byte in the payload (not in header or checksum)
+        if bytes.len() > 12 {
+            bytes[10] ^= 0xFF;
+        }
+
+        let result = SparseStorage::from_bytes(&bytes);
+        assert!(matches!(result, Err(SparseError::CorruptedData(_))));
+    }
+
+    #[test]
+    fn test_crc32_roundtrip_via_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test_crc.espv");
+
+        let mut original = SparseStorage::new();
+        let v = SparseVector::new(vec![0, 5, 10], vec![0.1, 0.2, 0.3], 100).unwrap();
+        original.insert(&v).unwrap();
+
+        original.save(&path).unwrap();
+        let loaded = SparseStorage::load(&path).unwrap();
+
+        assert_eq!(loaded.len(), original.len());
+    }
+
+    #[test]
+    fn test_id_overflow_protection() {
+        let mut storage = SparseStorage::new();
+        // Set next_id to u64::MAX to trigger overflow on next insert
+        storage.next_id = u64::MAX;
+
+        let v = SparseVector::singleton(0, 1.0, 100).unwrap();
+        let result = storage.insert(&v);
+        assert!(matches!(result, Err(SparseError::IdOverflow)));
     }
 }

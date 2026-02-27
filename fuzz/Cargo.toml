@@ -19,6 +19,7 @@ serde = { version = "1.0", features = ["derive"] }
 
 [dependencies.edgevec]
 path = ".."
+features = ["sparse"]
 
 # ============================================================================
 # FUZZ TARGETS — Reorganized into corpus-based hierarchy (W10.1)
@@ -94,5 +95,27 @@ doc = false
 [[bin]]
 name = "filter_deep"
 path = "fuzz_targets/filter_deep/target.rs"
+test = false
+doc = false
+
+# ============================================================================
+# v0.9.0 FUZZ TARGETS — Sparse, SparseStorage, FlatIndex (Phase 2)
+# ============================================================================
+
+[[bin]]
+name = "sparse_vector"
+path = "fuzz_targets/sparse_vector/target.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "sparse_storage"
+path = "fuzz_targets/sparse_storage/target.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "flat_index"
+path = "fuzz_targets/flat_index/target.rs"
 test = false
 doc = false

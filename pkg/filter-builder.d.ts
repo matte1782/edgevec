@@ -4,7 +4,7 @@
  * Provides a chainable interface for building complex filters.
  *
  * @module filter-builder
- * @version 0.5.0
+ * @version 0.9.0
  *
  * @example
  * const filter = new FilterBuilder()

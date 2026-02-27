@@ -804,7 +804,8 @@ impl EdgeVec {
 
                 let vec = vector.to_vec();
 
-                #[cfg(debug_assertions)]
+                // C-SRC-3: NaN/Infinity check runs in ALL builds (not just debug).
+                // Without this, non-finite values silently corrupt the index in production WASM.
                 if vec.iter().any(|v| !v.is_finite()) {
                     return Err(EdgeVecError::Validation(
                         "Vector contains non-finite values".to_string(),
@@ -988,7 +989,7 @@ impl EdgeVec {
 
                 let vec = vector.to_vec();
 
-                #[cfg(debug_assertions)]
+                // C-SRC-3: NaN/Infinity check runs in ALL builds (not just debug).
                 if vec.iter().any(|v| !v.is_finite()) {
                     return Err(EdgeVecError::Validation(
                         "Vector contains non-finite values".to_string(),
@@ -1431,7 +1432,8 @@ impl EdgeVec {
 
         let vec_data = vectors.to_vec();
 
-        #[cfg(debug_assertions)]
+        // C-SRC-3: NaN/Infinity check runs in ALL builds (not just debug).
+        // The is_finite() check is cheap relative to batch insert latency.
         if vec_data.iter().any(|v| !v.is_finite()) {
             return Err(
                 EdgeVecError::Validation("Vectors contain non-finite values".to_string()).into(),
@@ -1661,10 +1663,30 @@ impl EdgeVec {
         let writer = (storage, index);
         let iter = writer.export_chunked(size);
 
-        // SAFETY: We transmute the lifetime to 'static to allow returning the iterator to JS.
-        // JS garbage collection manages the lifetime of EdgeVec.
-        // It is the user's responsibility to keep EdgeVec alive while iterating.
-        // This is a common pattern in wasm-bindgen for iterators.
+        // SAFETY: We transmute the lifetime from `'self` to `'static` because
+        // wasm-bindgen cannot express borrowed return types to JavaScript.
+        //
+        // (a) Liveness guard: The returned `PersistenceIterator` holds a clone of
+        //     `self.liveness` (an `Arc<AtomicBool>`). When `EdgeVec` is dropped, it
+        //     sets `liveness` to `false`, allowing consumers to detect invalidation.
+        //     This does NOT prevent use-after-free at the Rust level, but provides a
+        //     JS-visible signal.
+        //
+        // (b) TOCTOU gap: There is a theoretical time-of-check-to-time-of-use gap
+        //     between checking `liveness` and accessing the iterator data. A consumer
+        //     could check `liveness == true`, then `EdgeVec` could be dropped, then
+        //     the consumer calls `next()` on dangling data.
+        //
+        // (c) Why this is acceptable: JavaScript's single-threaded event loop
+        //     guarantees that `EdgeVec` cannot be garbage-collected or dropped
+        //     *during* a synchronous iteration step. The GC only runs between
+        //     microtask boundaries, so as long as the user does not `free()` the
+        //     `EdgeVec` while iterating, the reference remains valid. The doc comment
+        //     on `save_stream` explicitly states this contract.
+        //
+        // If wasm-bindgen gains lifetime support in the future, this transmute
+        // should be removed in favor of a safe borrowed return.
+        #[allow(unsafe_code)]
         let static_iter = unsafe { std::mem::transmute::<ChunkIter<'_>, ChunkIter<'static>>(iter) };
 
         Ok(PersistenceIterator {
@@ -2391,7 +2413,7 @@ impl EdgeVec {
 
         let vec = vector.to_vec();
 
-        #[cfg(debug_assertions)]
+        // C-SRC-3: NaN/Infinity check runs in ALL builds (not just debug).
         if vec.iter().any(|v| !v.is_finite()) {
             return Err(
                 EdgeVecError::Validation("Vector contains non-finite values".to_string()).into(),
@@ -3782,7 +3804,9 @@ impl EdgeVec {
         // Build config
         let fusion = match &options.fusion {
             HybridFusionOption::Rrf => FusionMethod::rrf(),
-            HybridFusionOption::Linear { alpha, .. } => FusionMethod::linear(*alpha),
+            HybridFusionOption::Linear { alpha, .. } => {
+                FusionMethod::linear(*alpha).map_err(|e| JsValue::from_str(&e))?
+            }
         };
 
         let config = HybridSearchConfig::new(

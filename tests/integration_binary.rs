@@ -111,7 +111,7 @@ fn test_binary_quantization_from_f32() {
     assert_eq!(id.0, 1);
 
     // Get the stored binary vector
-    let stored = storage.get_binary_vector(id);
+    let stored = storage.get_binary_vector(id).unwrap();
 
     // Verify the pattern: even indices positive -> bit 1, odd indices negative -> bit 0
     // Each byte should be 0b01010101 = 0x55

@@ -53,7 +53,7 @@ mod binary_wal_recovery {
         // Verify binary data is correct
         for (i, expected) in vectors.iter().enumerate() {
             let id = VectorId((i + 1) as u64);
-            let actual = recovered.get_binary_vector(id);
+            let actual = recovered.get_binary_vector(id).unwrap();
             assert_eq!(actual, expected.as_slice(), "Vector {} should match", i + 1);
         }
     }
@@ -211,7 +211,7 @@ mod binary_metric_validation {
             .expect("Insert should succeed");
 
         // Retrieve and verify
-        let retrieved = storage.get_binary_vector(id);
+        let retrieved = storage.get_binary_vector(id).unwrap();
         assert_eq!(retrieved, binary.as_slice());
     }
 }

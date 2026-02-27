@@ -143,6 +143,8 @@ pub fn read_snapshot(
                 // Alignment issue - copy manually via LittleEndian reads
                 // This is slower but handles arbitrary alignment
                 for chunk in vector_bytes.chunks_exact(4) {
+                    // SAFETY: chunks_exact(4) guarantees each chunk is exactly 4 bytes,
+                    // so try_into() to [u8; 4] is infallible.
                     let bytes: [u8; 4] = chunk.try_into().expect("chunks_exact guarantees 4 bytes");
                     storage.data_f32.push(f32::from_le_bytes(bytes));
                 }

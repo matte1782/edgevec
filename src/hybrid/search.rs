@@ -7,6 +7,7 @@
 use crate::hnsw::{GraphError, HnswIndex, VectorId};
 use crate::sparse::{SparseSearcher, SparseStorage, SparseVector};
 use crate::storage::VectorStorage;
+use thiserror::Error;
 
 use super::fusion::{linear_fusion, rrf_fusion, FusionMethod, FusionResult};
 
@@ -15,13 +16,16 @@ use super::fusion::{linear_fusion, rrf_fusion, FusionMethod, FusionResult};
 // =============================================================================
 
 /// Errors that can occur during hybrid search.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Error)]
 pub enum HybridError {
     /// Configuration validation failed.
+    #[error("Invalid config: {0}")]
     InvalidConfig(String),
     /// Dense search failed.
+    #[error("Dense search error: {0}")]
     DenseSearchError(String),
     /// Dimension mismatch between query and index.
+    #[error("Dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch {
         /// Expected dimensions.
         expected: usize,
@@ -29,20 +33,6 @@ pub enum HybridError {
         actual: usize,
     },
 }
-
-impl std::fmt::Display for HybridError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HybridError::InvalidConfig(msg) => write!(f, "Invalid config: {msg}"),
-            HybridError::DenseSearchError(msg) => write!(f, "Dense search error: {msg}"),
-            HybridError::DimensionMismatch { expected, actual } => {
-                write!(f, "Dimension mismatch: expected {expected}, got {actual}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for HybridError {}
 
 impl From<GraphError> for HybridError {
     fn from(err: GraphError) -> Self {
@@ -82,7 +72,7 @@ impl From<GraphError> for HybridError {
 ///     dense_k: 50,
 ///     sparse_k: 50,
 ///     final_k: 10,
-///     fusion: FusionMethod::linear(0.7), // 70% dense, 30% sparse
+///     fusion: FusionMethod::linear(0.7).unwrap(), // 70% dense, 30% sparse
 /// };
 /// ```
 #[derive(Clone, Debug)]
@@ -150,9 +140,22 @@ impl HybridSearchConfig {
     /// # Arguments
     ///
     /// * `alpha` - Weight for dense scores (0.0 = sparse only, 1.0 = dense only)
-    #[must_use]
-    pub fn linear(dense_k: usize, sparse_k: usize, final_k: usize, alpha: f32) -> Self {
-        Self::new(dense_k, sparse_k, final_k, FusionMethod::linear(alpha))
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(String)` if alpha is not in range [0.0, 1.0].
+    pub fn linear(
+        dense_k: usize,
+        sparse_k: usize,
+        final_k: usize,
+        alpha: f32,
+    ) -> Result<Self, String> {
+        Ok(Self::new(
+            dense_k,
+            sparse_k,
+            final_k,
+            FusionMethod::linear(alpha)?,
+        ))
     }
 
     /// Validate configuration.
@@ -418,7 +421,10 @@ impl<'a> HybridSearcher<'a> {
             fusion: FusionMethod::rrf(), // Doesn't matter for dense-only
         };
 
-        // Sparse query doesn't matter, use empty-ish vector
+        // Sparse query is unused: `sparse_k: 0` causes `search()` to skip sparse
+        // computation entirely (see lines that check `config.sparse_k > 0`).
+        // We still need a valid SparseVector to satisfy the type signature.
+        // The dummy value (index=0, value=0.0, dim=1) is never evaluated.
         let sparse_query = SparseVector::singleton(0, 0.0, 1)
             .map_err(|e| HybridError::InvalidConfig(e.to_string()))?;
 
@@ -509,7 +515,7 @@ mod tests {
 
     #[test]
     fn test_config_linear() {
-        let config = HybridSearchConfig::linear(20, 20, 10, 0.7);
+        let config = HybridSearchConfig::linear(20, 20, 10, 0.7).unwrap();
         match config.fusion {
             FusionMethod::Linear { alpha } => assert!((alpha - 0.7).abs() < 1e-6),
             FusionMethod::Rrf { .. } => panic!("Expected Linear fusion"),

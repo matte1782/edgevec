@@ -4,7 +4,7 @@
  * High-level wrapper for EdgeVec WASM module with filtered search support.
  *
  * @module edgevec-wrapper
- * @version 0.5.0
+ * @version 0.9.0
  */
 import { EdgeVec, EdgeVecConfig, JsMetadataValue } from './edgevec.js';
 // =============================================================================

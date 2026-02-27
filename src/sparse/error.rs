@@ -72,6 +72,10 @@ pub enum SparseError {
     /// Data corruption detected during load.
     #[error("corrupted data: {0}")]
     CorruptedData(String),
+
+    /// ID counter overflow (u64::MAX reached).
+    #[error("ID counter overflow: cannot assign more IDs (u64::MAX reached)")]
+    IdOverflow,
 }
 
 #[cfg(test)]
@@ -132,5 +136,11 @@ mod tests {
     fn test_error_display_zero_norm() {
         let err = SparseError::ZeroNorm;
         assert!(err.to_string().contains("zero"));
+    }
+
+    #[test]
+    fn test_error_display_id_overflow() {
+        let err = SparseError::IdOverflow;
+        assert!(err.to_string().contains("overflow"));
     }
 }

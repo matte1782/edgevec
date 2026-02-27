@@ -4,7 +4,7 @@
  * A WebAssembly-powered vector database for Browser, Node, and Edge environments.
  *
  * @module edgevec
- * @version 0.8.0
+ * @version 0.9.0
  *
  * @example
  * ```typescript
@@ -98,3 +98,18 @@ export {
   IndexConfig,
   SourcePosition,
 } from './edgevec-wrapper.js';
+
+// Re-export sparse/hybrid types from wrapper (re-exported from edgevec-types.js)
+export type {
+  SparseSearchResult,
+  HybridSearchResult,
+  HybridSearchOptions,
+} from './edgevec-wrapper.js';
+
+// Re-export sparse/hybrid search helpers (v0.9.0 -- Week 39 RFC-007)
+export {
+  createSparseVector,
+  parseHybridResults,
+  parseSparseResults,
+  createHybridOptions,
+} from './sparse-helpers.js';

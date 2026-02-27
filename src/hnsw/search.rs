@@ -691,7 +691,9 @@ impl HnswIndex {
             }
 
             // Binary storage: get binary vector directly
-            let stored = storage.get_binary_vector(node.vector_id);
+            let stored = storage
+                .get_binary_vector(node.vector_id)
+                .map_err(|e| GraphError::Storage(e.to_string()))?;
             let dist = Hamming::distance(query, stored);
 
             let candidate = Candidate {
@@ -751,7 +753,9 @@ impl HnswIndex {
                         .ok_or(GraphError::NodeIdOutOfBounds)?;
 
                     // Binary storage: get binary vector directly
-                    let stored = storage.get_binary_vector(neighbor_node.vector_id);
+                    let stored = storage
+                        .get_binary_vector(neighbor_node.vector_id)
+                        .map_err(|e| GraphError::Storage(e.to_string()))?;
                     let dist = Hamming::distance(query, stored);
 
                     let mut should_add = false;

@@ -83,6 +83,10 @@ pub enum FlatIndexError {
     /// Index is empty (no vectors to search).
     #[error("index is empty")]
     EmptyIndex,
+
+    /// ID counter overflow (u64::MAX reached).
+    #[error("ID counter overflow: cannot assign more IDs (u64::MAX reached)")]
+    IdOverflow,
 }
 
 // ============================================================================
@@ -267,6 +271,14 @@ impl FlatIndexConfig {
 /// Stores vectors in row-major layout for simple slicing.
 /// Provides O(1) insertion and O(n·d) search with 100% recall guarantee.
 ///
+/// # ID Convention
+///
+/// `FlatIndex` uses **0-based direct indexing**. The first inserted vector
+/// receives ID `0`, the second receives `1`, and so on. IDs are assigned
+/// by a monotonically increasing `next_id` counter and are never reused
+/// after deletion. This means `vector_id == slot_index` in the contiguous
+/// storage, allowing O(1) retrieval via `&vectors[id * dim..(id+1) * dim]`.
+///
 /// # Memory Layout
 ///
 /// - Vectors: `Vec<f32>` in row-major order (n × d elements)
@@ -409,9 +421,12 @@ impl FlatIndex {
             });
         }
 
-        // Allocate ID (monotonically increasing)
+        // Allocate ID (monotonically increasing, with overflow protection)
         let id = self.next_id;
-        self.next_id += 1;
+        self.next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or(FlatIndexError::IdOverflow)?;
 
         // Store vector (append to contiguous storage)
         self.vectors.extend_from_slice(vector);
@@ -1427,6 +1442,8 @@ impl FlatIndex {
         let vectors: Vec<f32> = vectors_bytes
             .chunks_exact(4)
             .map(|chunk| {
+                // SAFETY: chunks_exact(4) guarantees each chunk is exactly 4 bytes,
+                // so try_into() to [u8; 4] is infallible.
                 f32::from_le_bytes(chunk.try_into().expect("chunks_exact guarantees 4 bytes"))
             })
             .collect();
@@ -2976,5 +2993,17 @@ mod tests {
             avg_recall * 100.0,
             random_chance * 100.0
         );
+    }
+
+    // ============= Phase 3 Remediation: IdOverflow =============
+
+    #[test]
+    fn test_id_overflow_protection() {
+        let mut index = FlatIndex::new(FlatIndexConfig::new(3));
+        // Set next_id to u64::MAX to trigger overflow on next insert
+        index.next_id = u64::MAX;
+
+        let result = index.insert(&[1.0, 2.0, 3.0]);
+        assert!(matches!(result, Err(FlatIndexError::IdOverflow)));
     }
 }

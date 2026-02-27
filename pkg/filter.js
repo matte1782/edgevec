@@ -6,7 +6,7 @@
  * 2. Builder methods: Filter.eq('category', 'gpu')
  *
  * @module filter
- * @version 0.5.0
+ * @version 0.9.0
  */
 import { parse_filter_js, validate_filter_js, try_parse_filter_js, get_filter_info_js, } from './edgevec.js';
 // =============================================================================

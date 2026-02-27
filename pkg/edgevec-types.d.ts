@@ -1,7 +1,7 @@
 /**
  * EdgeVec TypeScript Type Definitions
  *
- * @version 0.5.0
+ * @version 0.9.0
  * @module edgevec
  */
 
@@ -358,6 +358,114 @@ export declare class EdgeVecIndex {
 
   /** Load index from IndexedDB */
   static load(name: string): Promise<EdgeVecIndex>;
+
+  // =========================================================================
+  // SPARSE / HYBRID SEARCH METHODS (v0.9.0 -- Week 39 RFC-007)
+  // =========================================================================
+
+  /**
+   * Initialize sparse storage for hybrid search.
+   * Must be called before using sparse or hybrid search.
+   */
+  initSparseStorage(): void;
+
+  /**
+   * Check if sparse storage is initialized.
+   */
+  hasSparseStorage(): boolean;
+
+  /**
+   * Get the number of sparse vectors stored.
+   */
+  sparseCount(): number;
+
+  /**
+   * Insert a sparse vector (e.g., BM25 scores).
+   *
+   * @param indices - Sorted indices of non-zero elements
+   * @param values - Values corresponding to indices
+   * @param dim - Dimension of sparse space (vocabulary size)
+   * @returns The assigned sparse vector ID
+   */
+  insertSparse(indices: Uint32Array, values: Float32Array, dim: number): number;
+
+  /**
+   * Search sparse vectors by query.
+   *
+   * Note: The wrapper parses the raw JSON internally and returns typed objects.
+   *
+   * @param indices - Query sparse indices (sorted)
+   * @param values - Query sparse values
+   * @param dim - Dimension of sparse space
+   * @param k - Number of results
+   * @returns Parsed sparse search results
+   */
+  searchSparse(indices: Uint32Array, values: Float32Array, dim: number, k: number): SparseSearchResult[];
+
+  /**
+   * Perform hybrid search combining dense and sparse results.
+   *
+   * Note: The wrapper parses the raw JSON internally and returns typed objects.
+   * Pass HybridSearchOptions directly (not as JSON string).
+   *
+   * @param denseQuery - Dense embedding vector
+   * @param sparseIndices - Sparse query indices (sorted)
+   * @param sparseValues - Sparse query values
+   * @param sparseDim - Dimension of sparse space
+   * @param options - Hybrid search options
+   * @returns Hybrid search results with fusion scores
+   */
+  hybridSearch(
+    denseQuery: Float32Array,
+    sparseIndices: Uint32Array,
+    sparseValues: Float32Array,
+    sparseDim: number,
+    options: HybridSearchOptions
+  ): HybridSearchResult[];
+
+  // =========================================================================
+  // BINARY VECTOR METHODS (v0.9.0)
+  // =========================================================================
+
+  /**
+   * Insert a binary vector into the index.
+   *
+   * @param vector - Binary vector as packed bytes
+   * @returns Vector ID
+   */
+  insertBinary(vector: Uint8Array): number;
+
+  /**
+   * Search with a binary query vector.
+   *
+   * @param query - Binary query vector as packed bytes
+   * @param k - Number of results
+   * @returns Search results sorted by Hamming distance
+   */
+  searchBinary(query: Uint8Array, k: number): SearchResult[];
+
+  /**
+   * Search binary with custom ef parameter.
+   *
+   * @param query - Binary query vector
+   * @param k - Number of results
+   * @param efSearch - ef_search parameter for accuracy/speed tradeoff
+   * @returns Search results
+   */
+  searchBinaryWithEf(query: Uint8Array, k: number, efSearch: number): SearchResult[];
+
+  // =========================================================================
+  // BATCH METHODS (v0.9.0)
+  // =========================================================================
+
+  /**
+   * Insert a batch of flat vectors.
+   *
+   * @param vectors - Flat array of vectors (concatenated Float32)
+   * @param count - Number of vectors
+   * @returns Array of assigned vector IDs
+   */
+  insertBatchFlat(vectors: Float32Array, count: number): Uint32Array;
 }
 
 // =============================================================================
@@ -537,6 +645,21 @@ export interface HybridSearchResult {
 
 /**
  * Extended EdgeVec index with sparse/hybrid search support.
+ *
+ * **IMPORTANT: RAW WASM INTERFACE**
+ *
+ * This interface represents the low-level WASM bindings. Methods like
+ * `searchSparse()` and `hybridSearch()` return **raw JSON strings** that
+ * must be parsed manually (e.g., `JSON.parse(result)`).
+ *
+ * For a higher-level API that automatically parses results into typed
+ * objects (`SparseSearchResult[]`, `HybridSearchResult[]`), use the
+ * `EdgeVecIndex` class from `edgevec-wrapper.d.ts` instead. The wrapper
+ * calls these raw methods internally and handles JSON serialization.
+ *
+ * @see {@link EdgeVecIndex} in `edgevec-wrapper.d.ts` for the parsed wrapper API
+ * @see {@link parseSparseResults} in `sparse-helpers.js` for manual parsing
+ * @see {@link parseHybridResults} in `sparse-helpers.js` for manual parsing
  */
 export interface EdgeVecSparseExtensions {
   /**
@@ -585,14 +708,20 @@ export interface EdgeVecSparseExtensions {
    * @param values - Query sparse values
    * @param dim - Dimension of sparse space
    * @param k - Number of results
-   * @returns JSON string of results (parse with JSON.parse)
+   * @returns JSON string of results. Use `JSON.parse()` or `parseSparseResults()` to convert
+   *   to `SparseSearchResult[]`. Note: The `EdgeVecIndex` wrapper does this automatically.
    *
    * @example
    * ```typescript
-   * const indices = new Uint32Array([0, 5, 10]);
-   * const values = new Float32Array([1.0, 2.0, 3.0]);
+   * // Raw WASM interface (this interface)
    * const resultsJson = db.searchSparse(indices, values, 10000, 10);
    * const results: SparseSearchResult[] = JSON.parse(resultsJson);
+   *
+   * // Or use the helper function:
+   * const results = parseSparseResults(resultsJson);
+   *
+   * // Or use EdgeVecIndex wrapper (recommended):
+   * const results = index.searchSparse(indices, values, 10000, 10); // already parsed
    * ```
    */
   searchSparse(indices: Uint32Array, values: Float32Array, dim: number, k: number): string;
@@ -604,30 +733,24 @@ export interface EdgeVecSparseExtensions {
    * @param sparseIndices - Sparse query indices (sorted)
    * @param sparseValues - Sparse query values
    * @param sparseDim - Dimension of sparse space
-   * @param optionsJson - JSON string of HybridSearchOptions
-   * @returns JSON string of results (parse with JSON.parse)
+   * @param optionsJson - JSON string of HybridSearchOptions. Use `createHybridOptions()` or
+   *   `JSON.stringify()` to produce this. Note: The `EdgeVecIndex` wrapper accepts
+   *   `HybridSearchOptions` directly and handles serialization internally.
+   * @returns JSON string of results. Use `JSON.parse()` or `parseHybridResults()` to convert
+   *   to `HybridSearchResult[]`. Note: The `EdgeVecIndex` wrapper does this automatically.
    *
    * @example
    * ```typescript
+   * // Raw WASM interface (this interface)
    * const denseQuery = new Float32Array([0.1, 0.2, ...]);
    * const sparseIndices = new Uint32Array([0, 5, 10]);
    * const sparseValues = new Float32Array([1.0, 2.0, 3.0]);
+   * const optsJson = createHybridOptions({ k: 10, fusion: 'rrf' });
+   * const resultsJson = db.hybridSearch(denseQuery, sparseIndices, sparseValues, 10000, optsJson);
+   * const results: HybridSearchResult[] = parseHybridResults(resultsJson);
    *
-   * const options: HybridSearchOptions = {
-   *   dense_k: 20,
-   *   sparse_k: 20,
-   *   k: 10,
-   *   fusion: 'rrf'
-   * };
-   *
-   * const resultsJson = db.hybridSearch(
-   *   denseQuery,
-   *   sparseIndices,
-   *   sparseValues,
-   *   10000,
-   *   JSON.stringify(options)
-   * );
-   * const results: HybridSearchResult[] = JSON.parse(resultsJson);
+   * // Or use EdgeVecIndex wrapper (recommended):
+   * const results = index.hybridSearch(denseQuery, sparseIndices, sparseValues, 10000, { k: 10 });
    * ```
    */
   hybridSearch(

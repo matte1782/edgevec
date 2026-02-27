@@ -207,7 +207,7 @@ fn test_linear_fusion_recall() {
 
     // Test different alpha values
     for alpha in [0.3, 0.5, 0.7] {
-        let config = HybridSearchConfig::linear(100, 100, k, alpha);
+        let config = HybridSearchConfig::linear(100, 100, k, alpha).unwrap();
 
         // Single query test
         let dense_query: Vec<f32> = (0..64).map(|i| i as f32 / 64.0).collect();

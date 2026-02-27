@@ -70,6 +70,15 @@ const SERIALIZATION_HEADER_SIZE: usize = 8;
 ///
 /// Stores vectors in a contiguous array for cache-friendly linear scan.
 /// Insert is O(1), search is O(n) with SIMD-accelerated Hamming distance.
+///
+/// # ID Convention
+///
+/// `BinaryFlatIndex` follows the `VectorStorage` convention and uses
+/// **1-based IDs** where `0` is reserved as `INVALID_ID`. The first inserted
+/// vector receives `VectorId(1)`, the second `VectorId(2)`, and so on.
+/// This differs from [`FlatIndex`](crate::index::FlatIndex) which uses
+/// 0-based direct indexing. The 1-based convention allows `VectorId(0)` to
+/// serve as a sentinel value in graph structures (e.g., HNSW neighbor lists).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BinaryFlatIndex {
     /// Contiguous storage for all vectors.
@@ -491,5 +500,113 @@ mod tests {
                 actual: 16
             })
         ));
+    }
+
+    // ============= Phase 2 Coverage: vectors_len, serialized_size, shrink_to_fit =============
+
+    #[test]
+    fn test_vectors_len() {
+        let mut index = BinaryFlatIndex::new(64).unwrap(); // 8 bytes per vector
+        assert_eq!(index.vectors_len(), 0);
+
+        index.insert(&[0xAA; 8]).unwrap();
+        assert_eq!(index.vectors_len(), 8);
+        assert_eq!(index.vectors_len(), index.len() * index.bytes_per_vector());
+
+        index.insert(&[0xBB; 8]).unwrap();
+        assert_eq!(index.vectors_len(), 16);
+        assert_eq!(index.vectors_len(), index.len() * index.bytes_per_vector());
+
+        index.insert(&[0xCC; 8]).unwrap();
+        assert_eq!(index.vectors_len(), 24);
+        assert_eq!(index.vectors_len(), index.len() * index.bytes_per_vector());
+
+        // After clear, vectors_len must be 0
+        index.clear();
+        assert_eq!(index.vectors_len(), 0);
+        assert_eq!(index.len(), 0);
+        assert_eq!(index.vectors_len(), index.len() * index.bytes_per_vector());
+    }
+
+    #[test]
+    fn test_serialized_size() {
+        let mut index = BinaryFlatIndex::new(64).unwrap(); // 8 bytes per vector
+                                                           // Empty index: header only (8 bytes for dimensions u32 + count u32)
+        assert_eq!(index.serialized_size(), 8);
+
+        index.insert(&[0xAA; 8]).unwrap();
+        // Header (8) + 1 vector (8 bytes) = 16
+        assert_eq!(index.serialized_size(), 8 + 8);
+
+        index.insert(&[0xBB; 8]).unwrap();
+        assert_eq!(index.serialized_size(), 8 + 16);
+
+        // Verify the formula matches: SERIALIZATION_HEADER_SIZE + vectors.len()
+        assert_eq!(
+            index.serialized_size(),
+            SERIALIZATION_HEADER_SIZE + index.vectors_len()
+        );
+
+        // After clear
+        index.clear();
+        assert_eq!(index.serialized_size(), SERIALIZATION_HEADER_SIZE);
+    }
+
+    #[test]
+    fn test_shrink_to_fit() {
+        // Create with large capacity, insert few vectors, then shrink
+        let mut index = BinaryFlatIndex::with_capacity(1024, 10_000).unwrap();
+        assert!(index.memory_usage() > 100_000); // Pre-allocated ~1.28MB
+
+        // Insert a small number of vectors
+        for _ in 0..10 {
+            index.insert(&[0xAA; 128]).unwrap();
+        }
+
+        let before_shrink = index.memory_usage();
+        index.shrink_to_fit();
+        let after_shrink = index.memory_usage();
+
+        // After shrink, memory usage should be <= before (likely much less)
+        assert!(after_shrink <= before_shrink);
+
+        // Data must still be intact
+        assert_eq!(index.len(), 10);
+        assert_eq!(index.vectors_len(), 10 * 128);
+        for i in 1..=10 {
+            assert_eq!(index.get(VectorId(i as u64)), Some([0xAA; 128].as_slice()));
+        }
+
+        // Shrink on empty index should not panic
+        let mut empty = BinaryFlatIndex::new(64).unwrap();
+        empty.shrink_to_fit();
+        assert_eq!(empty.len(), 0);
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let mut index = BinaryFlatIndex::new(64).unwrap();
+        index.insert(&[0xFF; 8]).unwrap();
+        index.insert(&[0x00; 8]).unwrap();
+        index.insert(&[0xAA; 8]).unwrap();
+
+        // Serialize with serde_json (available as dev-dependency)
+        let json = serde_json::to_string(&index).expect("serialize failed");
+        let restored: BinaryFlatIndex = serde_json::from_str(&json).expect("deserialize failed");
+
+        assert_eq!(restored.dimensions(), index.dimensions());
+        assert_eq!(restored.bytes_per_vector(), index.bytes_per_vector());
+        assert_eq!(restored.len(), index.len());
+        assert_eq!(restored.vectors_len(), index.vectors_len());
+
+        // Verify all vectors match
+        for i in 1..=3u64 {
+            assert_eq!(
+                restored.get(VectorId(i)),
+                index.get(VectorId(i)),
+                "vector {} mismatch after roundtrip",
+                i
+            );
+        }
     }
 }
