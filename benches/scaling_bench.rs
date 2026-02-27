@@ -9,7 +9,6 @@
 //! # Sizes
 //! [10_000, 50_000, 100_000]
 
-use std::hint::black_box;
 use criterion::{
     criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode, Throughput,
 };
@@ -18,6 +17,7 @@ use edgevec::quantization::QuantizerConfig;
 use edgevec::storage::{StorageType, VectorStorage};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 /// Generates deterministic test vectors.

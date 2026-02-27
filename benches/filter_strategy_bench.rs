@@ -36,12 +36,12 @@
 //!   more neighbors than needed, then filter the results.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use std::hint::black_box;
 use edgevec::filter::strategy::{
     calculate_oversample, is_contradiction, is_tautology, select_strategy, FilterStrategy,
     POSTFILTER_THRESHOLD, PREFILTER_THRESHOLD,
 };
 use edgevec::filter::{parse, FilterExpr};
+use std::hint::black_box;
 
 /// Benchmark: Strategy selection overhead
 ///

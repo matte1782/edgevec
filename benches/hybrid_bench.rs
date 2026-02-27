@@ -225,7 +225,7 @@ fn bench_hybrid_search(c: &mut Criterion) {
             &num_vectors,
             |b, _| {
                 let searcher = HybridSearcher::new(&index, &dense_storage, &sparse_storage);
-                let config = HybridSearchConfig::linear(20, 20, 10, 0.5);
+                let config = HybridSearchConfig::linear(20, 20, 10, 0.5).unwrap();
 
                 b.iter(|| {
                     black_box(

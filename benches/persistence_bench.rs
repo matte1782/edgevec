@@ -1,10 +1,10 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::persistence::storage::MemoryBackend;
 use edgevec::persistence::{read_snapshot, write_snapshot};
 use edgevec::storage::VectorStorage;
 use rand::Rng;
+use std::hint::black_box;
 
 fn generate_vectors(count: usize, dim: usize) -> Vec<Vec<f32>> {
     let mut rng = rand::thread_rng();

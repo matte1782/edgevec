@@ -8,12 +8,12 @@
 //! - Compares QuantizedU8 vs Float32.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::hint::black_box;
 use edgevec::hnsw::HnswConfig;
 use edgevec::quantization::QuantizerConfig;
 use edgevec::storage::{StorageType, VectorStorage};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::hint::black_box;
 
 fn bench_storage_memory(c: &mut Criterion) {
     let dims = 768;

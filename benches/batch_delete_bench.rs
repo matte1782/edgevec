@@ -5,9 +5,9 @@
 //! being amortized over many operations.
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex, VectorId};
 use edgevec::storage::VectorStorage;
+use std::hint::black_box;
 
 fn create_test_index(count: usize) -> (HnswIndex, VectorStorage) {
     let config = HnswConfig::new(128);

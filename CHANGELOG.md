@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.9.0] - 2026-03-07 — Sparse Vectors, Hybrid Search, FlatIndex, BinaryFlatIndex
+
+### Added (v0.9.0) — Sparse Vectors (RFC-007)
+
+**Sparse Vector Storage** — Weeks 36-37:
+- **`SparseVector`** struct (CSR format: indices, values, dim)
+- **`SparseStorage`** with inverted index for fast search
+- **`SparseSearcher`** with dot product similarity
+- Insert, search, delete, batch operations
+- WASM bindings: `initSparseStorage()`, `insertSparse()`, `searchSparse()`
+- TypeScript types: `SparseVector`, `SparseSearchResult`
+
+### Added (v0.9.0) — RRF Hybrid Search (RFC-007)
+
+**Hybrid Search Engine** — Weeks 38-39:
+- **`HybridSearchEngine`** combining dense (HNSW) + sparse search
+- Reciprocal Rank Fusion (RRF) with configurable k parameter
+- Linear fusion with alpha parameter
+- **`HybridSearchResult`** with per-source rank/score tracking
+- WASM binding: `hybridSearch()`
+- TypeScript types: `HybridSearchOptions`, `HybridSearchResult`, `FusionMethod`
+
 ### Added (v0.9.0) — FlatIndex Implementation
 
 **FlatIndex** (RFC from @jsonMartin) — Week 40:
@@ -964,6 +988,8 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
+| 0.9.0 | 2026-03-07 | **FlatIndex**, **BinaryFlatIndex** (PR #7), **Sparse Vectors** (RFC-007), **RRF Hybrid Search** |
+| 0.8.0 | 2026-02-02 | **Vue 3 Composables**, **Filter Functions**, **SIMD Euclidean**, Tech Debt |
 | 0.7.0 | 2025-12-27 | **SIMD Acceleration** (2x+), **First Community Contribution** (@jsonMartin — 8.75x Hamming) |
 | 0.6.0 | 2025-12-22 | **RFC-002:** Binary Quantization (32x memory), Metadata Storage, Memory Pressure |
 | 0.5.4 | 2025-12-20 | iOS Safari compatibility fixes |
@@ -990,7 +1016,9 @@ This version was internal only, not published to crates.io or npm.
 
 ---
 
-[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/matte1782/edgevec/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/matte1782/edgevec/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/matte1782/edgevec/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/matte1782/edgevec/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/matte1782/edgevec/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/matte1782/edgevec/compare/v0.5.3...v0.5.4

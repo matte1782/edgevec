@@ -14,7 +14,6 @@
 //! See: `docs/benchmarks/SIMD_TARGETS.md` for full specification.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
 use edgevec::metric::scalar;
 #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
 use edgevec::metric::simd::x86;
@@ -22,6 +21,7 @@ use edgevec::metric::{DotProduct, L2Squared, Metric};
 use edgevec::quantization::binary::QuantizedVector;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::hint::black_box;
 
 fn generate_vectors(count: usize, dims: usize, seed: u64) -> Vec<Vec<f32>> {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);

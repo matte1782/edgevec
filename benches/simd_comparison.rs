@@ -14,13 +14,13 @@
 //! | Hamming Distance (1024-bit) | ~100ns | <40ns | 2.5x |
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex, SearchContext};
 use edgevec::metric::{DotProduct, L2Squared, Metric};
 use edgevec::quantization::binary::QuantizedVector;
 use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::hint::black_box;
 
 // ============================================================================
 // HELPER FUNCTIONS

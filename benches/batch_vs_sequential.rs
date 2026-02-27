@@ -26,15 +26,13 @@
 //! - Sample size: 20 iterations for better statistical significance
 //! - Throughput measured in elements/second
 
-use std::hint::black_box;
-use criterion::{
-    criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use edgevec::batch::BatchInsertable;
 use edgevec::hnsw::{HnswConfig, HnswIndex};
 use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::hint::black_box;
 
 const SEED: u64 = 42;
 const DIMS: usize = 128;

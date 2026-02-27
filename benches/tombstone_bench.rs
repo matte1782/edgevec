@@ -37,11 +37,11 @@
 //! ```
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
-use std::hint::black_box;
 use edgevec::hnsw::{HnswConfig, HnswIndex, VectorId};
 use edgevec::storage::VectorStorage;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 /// Fixed seed for reproducibility (per spec)

@@ -10,10 +10,10 @@
 //! - Distribution: Uniform [-1, 1]
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
 use edgevec::metric::{DotProduct, L2Squared, Metric};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::hint::black_box;
 
 /// Generates deterministic test vectors.
 fn generate_vectors(count: usize, dims: usize, seed: u64) -> Vec<Vec<f32>> {

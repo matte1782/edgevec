@@ -3,10 +3,10 @@
 //! Run with: `cargo bench --bench bench_quantization`
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use std::hint::black_box;
 use edgevec::quantization::binary::{
     BinaryQuantizer, QuantizedVector, BINARY_QUANTIZATION_DIM, QUANTIZED_VECTOR_SIZE,
 };
+use std::hint::black_box;
 
 /// Benchmark binary quantization (f32[768] -> u8[96])
 fn bench_quantize(c: &mut Criterion) {

@@ -3,11 +3,11 @@
 //! Run with: `cargo bench --bench storage_bench`
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use std::hint::black_box;
 use edgevec::hnsw::HnswConfig;
 use edgevec::persistence::storage::file::FileBackend;
 use edgevec::persistence::wal::WalAppender;
 use edgevec::storage::VectorStorage;
+use std::hint::black_box;
 use tempfile::NamedTempFile;
 
 fn bench_storage_insert(c: &mut Criterion) {
