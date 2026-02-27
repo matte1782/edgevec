@@ -271,7 +271,7 @@ config.quantized = true;  // Enable SQ8 quantization
 
 Brute-force exact nearest neighbor search for small datasets. No graph overhead, 100% recall guarantee.
 
-```rust
+```rust,ignore
 use edgevec::{FlatIndex, FlatIndexConfig, DistanceMetric};
 
 let config = FlatIndexConfig::new(768)
@@ -296,7 +296,7 @@ let restored = FlatIndex::from_snapshot(&snapshot)?;
 
 CSR-format sparse vector storage with inverted index for fast keyword-style retrieval.
 
-```rust
+```rust,ignore
 use edgevec::SparseVector;
 use edgevec::sparse::{SparseStorage, SparseSearcher};
 
@@ -319,7 +319,7 @@ let results = searcher.search(&query_sv, 10);
 
 Combine dense (HNSW) and sparse retrieval with Reciprocal Rank Fusion (RRF) or linear fusion.
 
-```rust
+```rust,ignore
 use edgevec::hybrid::{HybridSearcher, HybridSearchConfig, FusionMethod};
 
 // Set up: HNSW index + sparse storage already populated
@@ -343,7 +343,7 @@ for r in &results {
 
 Native binary vector storage with Hamming distance search. 32x memory reduction, sub-microsecond inserts.
 
-```rust
+```rust,ignore
 use edgevec::BinaryFlatIndex;
 
 // 768-bit binary vectors (96 bytes each)
