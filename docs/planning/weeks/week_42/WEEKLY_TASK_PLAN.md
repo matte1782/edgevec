@@ -17,7 +17,7 @@
 | GO/NO-GO decision for v1.0 inclusion | W42.1c | 0.5h | DONE: GO |
 | Gate `wasm` module behind `cfg(target_arch = "wasm32")` | W42.2a | 1h | DONE |
 | Move WASM-only deps to target-specific section in Cargo.toml | W42.2b | 0.5h | DONE |
-| Run initial Miri audit | W42.2c | 1h | IN PROGRESS |
+| Run initial Miri audit | W42.2c | 1h | DONE |
 | Fix Miri finding: unaligned bytemuck read in header.rs | W42.2d | 0.5h | DONE |
 
 **Day 1 Artifacts:**
@@ -136,6 +136,36 @@
 | Miri finds more UB | LOW | MEDIUM | Budget 2h extra fix time in Day 2 |
 | Fuzz targets crash | MEDIUM | LOW | Each crash is a bug fix opportunity |
 | CI Miri job too slow | LOW | LOW | Reduce PROPTEST_CASES to 4 in CI |
+
+---
+
+## Session Log
+
+### Session 2026-02-28 (Day 1 actual work)
+
+**Commit:** `18724d1` — `feat(w42): Week 42 Days 1-2 — WASM gating, Miri UB fix, fuzz target fixes, CI updates`
+
+**What was done today:**
+- All Day 1 tasks DONE (LangChain spike, WASM gating, Miri setup, UB fix)
+- Day 2 fuzz target fixes DONE (W42.3a, W42.3b, W42.3c)
+- Day 5 CI tasks done early (W42.3k, W42.2h)
+- Fixed clippy `redundant_closure` in `snapshot.rs` (from pod_read_unaligned conversion)
+- Fixed deprecated `UnalignedBuffer` variant in `persistence_corruption.rs` test
+- **Full regression passed:** 980 lib tests + all 32 integration test binaries, 0 failures
+- **Clippy clean:** `cargo clippy --all-features -- -D warnings` passes
+
+**What was NOT done (carry forward):**
+- W42.2e: Verify Miri passes clean (0 UB) — needs `cargo +nightly miri test`
+- W42.2f: Run Miri with `--features sparse`
+- W42.2g: Document Miri results in `docs/reviews/`
+- W42.3d-g: Fuzzing campaign critical targets (filter_deep, persistence, hnsw_search)
+- W42.3h-j: Fuzzing campaign remaining targets (sparse_vector, flat_index)
+- W42.3l-n: Fuzz documentation + final regression
+
+**EXACT PICKUP POINT:**
+> Start with Day 2 Miri completion (W42.2e-g), then proceed to Day 3 fuzzing campaign (W42.3d-g).
+> All fuzz targets already compile. CI already has Miri job and fuzz-check.
+> Working tree is clean. All previous work committed.
 
 ---
 
