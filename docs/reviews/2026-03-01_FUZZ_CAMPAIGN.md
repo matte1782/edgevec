@@ -76,7 +76,7 @@ All 15 cargo-fuzz targets compile successfully via `cargo +nightly fuzz check`:
 | `persistence` | `proptest_fuzz_persistence` + `proptest_fuzz_persistence_roundtrip` | Equivalent |
 | `hnsw_search` | `proptest_fuzz_hnsw_search` + `proptest_fuzz_hnsw_insert_search` | Equivalent |
 | `header_parse` | `proptest_fuzz_header_parse` | Equivalent |
-| `graph_ops` | `proptest_fuzz_graph_ops` | Equivalent |
+| `graph_ops` | `proptest_fuzz_graph_ops` | Substantial (no SaveLoad interleave) |
 | `filter_simple` | — | **NOT COVERED** |
 | `flat_index` | — | **NOT COVERED** |
 | `sparse_storage` | — | **NOT COVERED** |

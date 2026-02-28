@@ -23,10 +23,10 @@ Miri found **1 REAL BUG** (undefined behavior) in the persistence header module.
 
 ### What Miri Does NOT Test
 
-- **SIMD unsafe code:** The `src/metric/` module contains 20+ `unsafe` blocks for SIMD intrinsics (`_mm256_*`, `vfmaq_f32`, etc.). Miri does not support SIMD intrinsics and these are excluded from testing. These unsafe blocks require separate audit (manual review or runtime sanitizers like ASan/UBSan on native targets).
+- **SIMD unsafe code:** There are 50+ `unsafe` blocks for SIMD intrinsics across three module trees: `src/metric/simd.rs` (~20), `src/simd/` (popcount.rs, neon.rs, dispatch.rs — ~20), and `src/quantization/simd/` (avx2.rs, mod.rs — ~12). Miri does not support SIMD intrinsics and these are all excluded from testing. These unsafe blocks require separate audit (manual review or runtime sanitizers like ASan/UBSan on native targets).
 - **WASM bindings:** Gated behind `#[cfg(target_arch = "wasm32")]`, not compiled under Miri on native targets.
 - **Integration tests:** Only `--lib` tests were run, not `--tests` (integration tests).
-- **WASM-target unsafe:** `src/wasm/` contains `unsafe` transmute operations for `JsValue` conversion. These are WASM-only and cannot be tested under Miri on native targets.
+- **WASM-target unsafe:** `src/wasm/mod.rs` contains an `unsafe` lifetime erasure transmute (`ChunkIter<'_>` → `ChunkIter<'static>`) for wasm-bindgen return type compatibility. These are WASM-only and cannot be tested under Miri on native targets.
 
 ### Miri Flags Explanation
 
@@ -181,7 +181,7 @@ miri:
 
 ---
 
-## Extended Run (2026-03-01)
+## Extended Run (completed 2026-03-01)
 
 Second Miri run with default features (includes sparse):
 

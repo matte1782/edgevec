@@ -157,6 +157,7 @@ proptest! {
     #[test]
     fn proptest_fuzz_persistence(data in proptest::collection::vec(any::<u8>(), 0..2048)) {
         let backend = MemoryBackend::new();
+        // "" is the default key used by write_snapshot/read_snapshot (MemoryBackend ignores key)
         let _ = backend.atomic_write("", &data);
         let _ = edgevec::persistence::snapshot::read_snapshot(&backend);
     }
@@ -181,7 +182,14 @@ proptest! {
 
         let mut rng = SmallRng::seed_from_u64(seed);
         for _ in 0..num_vectors {
-            let vec: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0f32..1.0)).collect();
+            // Full finite f32 range: subnormals, large magnitudes, negative zero
+            let vec: Vec<f32> = (0..dim)
+                .map(|_| {
+                    let bits: u32 = rng.gen();
+                    let v = f32::from_bits(bits);
+                    if v.is_finite() { v } else { 0.0 }
+                })
+                .collect();
             let _ = index.insert(&vec, &mut storage);
         }
 
@@ -196,8 +204,14 @@ proptest! {
                 );
 
                 // [M3 fix] Verify loaded index is functional — search must not panic
-                if loaded_storage.len() > 0 {
-                    let query: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0f32..1.0)).collect();
+                if !loaded_storage.is_empty() {
+                    let query: Vec<f32> = (0..dim)
+                        .map(|_| {
+                            let bits: u32 = rng.gen();
+                            let v = f32::from_bits(bits);
+                            if v.is_finite() { v } else { 0.0 }
+                        })
+                        .collect();
                     let _ = loaded_index.search(&query, 5, &loaded_storage);
                 }
             }
@@ -388,8 +402,9 @@ proptest! {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Graph ops — mirrors fuzz/fuzz_targets/graph_ops/target.rs
-//    Stateful insert/delete/search sequence with connectivity invariant.
+// 5. Graph ops — partially mirrors fuzz/fuzz_targets/graph_ops/target.rs
+//    Stateful insert/delete/search sequence (no SaveLoad interleave —
+//    that requires the cargo-fuzz target on Linux CI).
 // ---------------------------------------------------------------------------
 
 proptest! {
@@ -424,8 +439,13 @@ proptest! {
             match op {
                 // Insert (60% probability)
                 0..=5 => {
+                    // Full finite f32 range for insert vectors
                     let vec: Vec<f32> = (0..dim)
-                        .map(|_| rng.gen_range(-1.0f32..1.0))
+                        .map(|_| {
+                            let bits: u32 = rng.gen();
+                            let v = f32::from_bits(bits);
+                            if v.is_finite() { v } else { 0.0 }
+                        })
                         .collect();
                     if let Ok(vid) = index.insert(&vec, &mut storage) {
                         live_ids.push(vid);
