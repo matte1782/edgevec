@@ -1,4 +1,4 @@
-# Week 43: LangChain.js Integration — v0.10.0 Phase 10
+# Week 43: LangChain.js Integration
 
 **Status:** [REVISED]
 **Sprint Goal:** Implement `edgevec-langchain` package — full LangChain.js VectorStore adapter
@@ -7,12 +7,14 @@
 **Reference:** `docs/research/LANGCHAIN_SPIKE.md`
 **Test Framework:** Vitest (fast, ESM-native, TypeScript-first)
 
+**Roadmap Note:** This work is an ADDITION to Phase 10 (v0.10.0), not originally in the approved ROADMAP v6.1 (2026-01-08). The LangChain spike (W42.1, 2026-02-28) produced a GO decision after the roadmap was written. The ROADMAP.md must be updated to add a "Milestone 10.0: LangChain.js Integration (Week 43)" before v0.10.0 ships. This update is tracked as a dependency in the Dependencies section below.
+
 ---
 
 ## Estimation Notes
 
 **Spike estimate:** 21-33 hours (optimistic-pessimistic range).
-**3x rule:** Applied to the spike's optimistic estimate: 21h x 3 = 63h theoretical worst case. The plan schedules ~39h of core task work across Days 1-7 (~5.6h/day), plus ~8h overflow on Days 8-9, totaling ~47h across 9 days (~5.2h/day). This represents a 1.4x multiplier on the spike pessimistic estimate (33h), well within the 3x ceiling (63h). Days 8-9 provide 17% schedule buffer beyond the core work.
+**3x rule:** Applied to the spike's optimistic estimate: 21h x 3 = 63h theoretical worst case. The plan schedules ~38h of core task work across Days 1-7 (~5.4h/day), plus ~9.5h overflow on Days 8-9, totaling ~47.5h across 9 days (~5.3h/day). This represents a 1.4x multiplier on the spike pessimistic estimate (33h), well within the 3x ceiling (63h). Days 8-9 provide 17% schedule buffer beyond the core work.
 **Contingency:** Days 8-9 are dedicated overflow/polish days. If Days 1-7 complete on schedule, Days 8-9 are used for additional testing and documentation polish.
 
 ---
@@ -105,7 +107,7 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 | Implement `delete({ ids })` with ID map cleanup | W43.3a | 1h | PENDING |
 | Implement `fromTexts(texts, metadatas, embeddings, config)` static factory | W43.3b | 1h | PENDING |
 | Implement `fromDocuments(docs, embeddings, config)` static factory | W43.3c | 0.5h | PENDING |
-| Implement `SaveableVectorStore` interface: `save(directory)` / `load(directory, embeddings)` | W43.3d | 2h | PENDING |
+| Implement `SaveableVectorStore` interface: map `save(directory)` → `EdgeVecIndex.save(name)` (IndexedDB) | W43.3d | 2h | PENDING |
 | Ensure ID mapping persists across save/load cycles (Spike C3) | W43.3e | 1h | PENDING |
 
 **Day 3 Artifacts:**
@@ -116,6 +118,7 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 - [ ] `fromTexts` creates store, embeds texts, adds vectors in one call
 - [ ] `fromDocuments` handles Documents with existing embeddings
 - [ ] Save/load roundtrip preserves: vectors, metadata, ID mapping, pageContent
+- [ ] `save(directory)` maps directory string to IndexedDB name; `load(directory, embeddings)` reconstructs from IndexedDB. Browser has no filesystem — directory arg is used as IndexedDB key prefix.
 - [ ] Factory methods call `await initEdgeVec()` before creating store (Spike Risk #5)
 - [ ] Double-init is safe: calling `initEdgeVec()` twice does not error
 
@@ -210,7 +213,7 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 - [ ] README has: installation, quick start, full API reference, filter examples, WASM init guide
 - [ ] Quick start example is copy-pasteable and works
 
-**Note on FilterExpression:** The spike recommends supporting both DSL string and `FilterExpression` object (Section 4, line 108). For W43, we implement DSL string only. `FilterExpression` object support is **deferred to W44** because: (1) DSL string covers all use cases, (2) FilterExpression is an internal EdgeVec type not exposed in the WASM API, (3) exposing it requires additional WASM bindings work. This is documented in the README as a "Coming in v0.10.1" note.
+**Note on FilterExpression:** The spike recommends supporting both DSL string and `FilterExpression` object (Section 4, line 108). `FilterExpression` IS exported from the WASM API (`pkg/edgevec-wrapper.d.ts` exports it). For W43, we implement DSL string only and **defer `FilterExpression` object support to W44** because: (1) DSL string covers all user-facing use cases, (2) the adapter's `filter` parameter type would need union handling and validation logic for the object form, (3) keeping scope tight for first release reduces risk. The README documents `FilterExpression` support as "Coming in next release."
 
 ---
 
@@ -306,7 +309,7 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 | Condition | From Spike | Task | Verification |
 |:----------|:-----------|:-----|:-------------|
 | C1 | Separate `edgevec-langchain` package | W43.1b | package.json exists with correct name |
-| C2 | Normalize scores to cosine similarity | W43.2e | W43.4f tests L2/cosine/dot → [0,1] |
+| C2 | Normalize all distance scores to similarity [0,1] (higher = better) | W43.2e | W43.4f tests L2/cosine/dot → [0,1] |
 | C3 | ID mapping survives save/load | W43.3e | W43.4e tests save/reload/search/delete |
 | C4 | Pin `@langchain/core` peer dep | W43.1b | `>=0.3.0 <0.5.0` in package.json |
 | C5 | JSON.stringify unsupported types | W43.1f | W43.1g + W43.4d test round-trips |
@@ -347,6 +350,10 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 |:-----------|:-----|
 | W42.1 LangChain Spike [DONE] | Architecture decisions, C1-C5 conditions |
 | v0.9.0 WASM bindings [DONE] | Runtime dependency |
+
+| Required Update | When |
+|:----------------|:-----|
+| Update `docs/planning/ROADMAP.md` to add Milestone 10.0: LangChain.js Integration | Before v0.10.0 release |
 
 ---
 
