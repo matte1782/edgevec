@@ -135,4 +135,24 @@ miri:
 
 ---
 
+## Extended Run (2026-03-01)
+
+Second Miri run with full `--lib` tests (no `--no-default-features`):
+
+```
+MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test --lib
+```
+
+**Results (in progress):**
+- 132+ tests passed under Miri (filter module complete)
+- 0 new UB found
+- Only warnings: `bitvec` 1.0.1 integer-to-pointer casts (external dependency, not actionable)
+  - `bitvec::ptr::span::BitSpan::address` — integer-to-pointer cast for pointer provenance
+  - `bitvec::ptr::span::BitSpan::set_address` — same pattern in Drop impl
+  - These are in `VectorStorage.deleted` (BitVec field) — not EdgeVec code
+
+**Note:** Full 980-test Miri run takes several hours due to Miri's instruction-level interpretation. CI uses `PROPTEST_CASES=4` to keep Miri job under 15 minutes.
+
+---
+
 **END OF MIRI AUDIT**
