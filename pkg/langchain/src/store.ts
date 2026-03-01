@@ -162,8 +162,7 @@ export class EdgeVecStore extends SaveableVectorStore {
     super(embeddings, config);
     ensureInitialized();
 
-    const { metric, ...indexConfig } = config;
-    this.metric = metric ?? "cosine";
+    this.metric = config.metric ?? "cosine";
     this.dimensions = config.dimensions;
 
     if (_internal) {
@@ -172,6 +171,7 @@ export class EdgeVecStore extends SaveableVectorStore {
       this.idMap = _internal.idMap;
       this.reverseIdMap = _internal.reverseIdMap;
     } else {
+      const { metric: _, ...indexConfig } = config;
       this.index = new EdgeVecIndex(indexConfig);
     }
   }
