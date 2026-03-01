@@ -92,7 +92,7 @@ static async fromTexts(
 
 ### W43.3d — Save/Load (IndexedDB Mapping)
 
-- **`save(directory)`:** `directory` string is used as IndexedDB key prefix (browser has no filesystem)
+- **`save(directory)`:** `directory` string is used as IndexedDB key (browser has no filesystem). The ID map is stored in a separate `edgevec_meta` DB, so no `__idmap` suffix is needed — namespace isolation via separate databases prevents key collision.
 - **`load(directory, embeddings)`:** Reconstructs `EdgeVecStore` from IndexedDB
 - **ID map storage:** Serialized as JSON metadata alongside the EdgeVec index data
 
@@ -108,13 +108,13 @@ async save(directory: string): Promise<void> {
     reverseIdMap: Object.fromEntries(this.reverseIdMap),
     metric: this.metric, // [C2 FIX] persist metric for correct normalization on load
   };
-  await saveToIndexedDB(`${directory}__idmap`, JSON.stringify(idMapData));
+  await saveToIndexedDB(directory, JSON.stringify(idMapData)); // separate DB — no suffix needed
 }
 ```
 
 ### W43.3e — ID Mapping Persistence (Spike C3)
 
-The ID map is stored as a separate IndexedDB entry keyed by `${directory}__idmap`. On load:
+The ID map is stored in the `edgevec_meta` IndexedDB (separate from EdgeVec's internal DB) keyed by `directory`. On load:
 
 1. Load EdgeVec index from IndexedDB
 2. Load ID map JSON from IndexedDB
