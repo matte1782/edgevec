@@ -173,10 +173,11 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 |:-----|:---|:------|:-------|
 | Create integration test with mock embeddings (no external API) | W43.5a | 1.5h | PENDING |
 | Test full RAG pipeline: embed -> store -> search -> retrieve | W43.5b | 1h | PENDING |
-| Test `addDocuments` default implementation (embeds via this.embeddings) | W43.5c | 0.5h | PENDING |
-| Test `maxMarginalRelevanceSearch` default with EdgeVec scores | W43.5d | 0.5h | PENDING |
+| Test `similaritySearch` default (string query → embedQuery → search) | W43.5c | 0.5h | PENDING |
+| Test `similaritySearchWithScore` default (string query variant) | W43.5d | 0.5h | PENDING |
 | Test `asRetriever()` returns functional VectorStoreRetriever | W43.5e | 0.5h | PENDING |
-| Verify build: ESM + CJS dual output | W43.5f | 1h | PENDING |
+| Fix package.json exports to match tsup output paths | W43.5f0 | 0.5h | DONE |
+| Verify build: ESM + CJS dual output via tsup | W43.5f | 1h | PENDING |
 | Verify peer dep: test with `@langchain/core@0.3.x` and `@langchain/core@0.4.x` | W43.5g | 0.5h | PENDING |
 
 **Day 5 Artifacts:**
@@ -186,8 +187,8 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 **Day 5 Acceptance Criteria:**
 - [ ] Integration tests pass with mock embeddings
 - [ ] Full RAG pipeline: text -> embed -> add -> query -> get document back
-- [ ] `addDocuments` default: calls embeddings.embedDocuments, then addVectors — works correctly
-- [ ] `maxMarginalRelevanceSearch`: returns results without error and result count <= k
+- [ ] `similaritySearch` default: calls `embedQuery`, returns `Document[]` without scores
+- [ ] `similaritySearchWithScore` default: calls `embedQuery`, returns `[Document, score][]`
 - [ ] `asRetriever()`: returned retriever can `.invoke(query)` and get Documents
 - [ ] `npm run build` produces both ESM and CJS output
 - [ ] TypeScript strict mode: zero errors
@@ -293,7 +294,7 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 
 ### W43.4: Quality
 - [ ] 15+ unit tests covering all methods, edge cases, and error paths
-- [ ] Integration tests: RAG pipeline, `addDocuments`, `maxMarginalRelevanceSearch`, `asRetriever`
+- [ ] Integration tests: RAG pipeline, `similaritySearch`, `similaritySearchWithScore`, `asRetriever`
 - [ ] TypeScript strict mode: zero errors
 - [ ] Hostile reviewer approval
 

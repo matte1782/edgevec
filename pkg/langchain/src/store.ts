@@ -196,7 +196,13 @@ export class EdgeVecStore extends SaveableVectorStore {
       );
     }
 
-    const ids: string[] = [];
+    // Phase 1: Validate dimensions + serialize metadata (can throw on circular refs)
+    // No state mutation until all entries are validated.
+    const prepared: Array<{
+      stringId: string;
+      vector: Float32Array;
+      metadata: Metadata;
+    }> = [];
 
     for (let i = 0; i < vectors.length; i++) {
       if (vectors[i].length !== this.dimensions) {
@@ -206,19 +212,21 @@ export class EdgeVecStore extends SaveableVectorStore {
       }
 
       const doc = documents[i];
-      const stringId =
-        options?.ids?.[i] ?? generateUUID();
+      const stringId = options?.ids?.[i] ?? generateUUID();
 
-      // Build metadata: pageContent + ID + user metadata
       const metadata: Metadata = {
         [PAGE_CONTENT_KEY]: doc.pageContent,
         [ID_KEY]: stringId,
         ...serializeMetadata(doc.metadata),
       };
 
-      // index.add() is SYNC and returns the numeric ID
-      const numericId = this.index.add(new Float32Array(vectors[i]), metadata);
+      prepared.push({ stringId, vector: new Float32Array(vectors[i]), metadata });
+    }
 
+    // Phase 2: Add to index + commit to ID maps (all validation passed)
+    const ids: string[] = [];
+    for (const { stringId, vector, metadata } of prepared) {
+      const numericId = this.index.add(vector, metadata);
       this.idMap.set(stringId, numericId);
       this.reverseIdMap.set(numericId, stringId);
       ids.push(stringId);
@@ -344,17 +352,26 @@ export class EdgeVecStore extends SaveableVectorStore {
   async save(directory: string): Promise<void> {
     ensureInitialized();
 
-    // Save EdgeVec index (vectors + metadata + graph)
+    // Save EdgeVec index first (larger operation, more likely to fail)
     await this.index.save(directory);
 
-    // Save ID mapping + config separately
-    const data: PersistedIdMapData = {
-      idMap: Object.fromEntries(this.idMap),
-      reverseIdMap: Object.fromEntries(this.reverseIdMap),
-      metric: this.metric,
-      dimensions: this.dimensions,
-    };
-    await saveToIndexedDB(directory, JSON.stringify(data));
+    // Save ID mapping + config. If this fails, the index is saved but the
+    // adapter state is lost — load() will detect "no ID map" and throw.
+    try {
+      const data: PersistedIdMapData = {
+        idMap: Object.fromEntries(this.idMap),
+        reverseIdMap: Object.fromEntries(this.reverseIdMap),
+        metric: this.metric,
+        dimensions: this.dimensions,
+      };
+      await saveToIndexedDB(directory, JSON.stringify(data));
+    } catch (e) {
+      throw new EdgeVecPersistenceError(
+        `Index saved to "${directory}" but ID map save failed. ` +
+        `The store may be in an inconsistent state. ` +
+        `Error: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
   }
 
   /**
@@ -460,7 +477,7 @@ export class EdgeVecStore extends SaveableVectorStore {
    * |:------------|:----------------------------|:--------|
    * | cosine      | `1 - distance`              | [0, 1]  |
    * | l2          | `1 / (1 + distance)`        | (0, 1]  |
-   * | dotproduct  | `1 / (1 + |distance|)`      | (0, 1]  |
+   * | dotproduct  | `1 / (1 + exp(distance))`    | (0, 1)  |
    */
   private normalizeScore(rawScore: number): number {
     switch (this.metric) {
@@ -469,7 +486,9 @@ export class EdgeVecStore extends SaveableVectorStore {
       case "l2":
         return 1 / (1 + rawScore);
       case "dotproduct":
-        return 1 / (1 + Math.abs(rawScore));
+        // Sigmoid: monotonically decreasing for negative inner product distance
+        // More negative rawScore (= higher dot product) → higher similarity
+        return 1 / (1 + Math.exp(rawScore));
       default:
         // Defensive: should never happen if metric is validated
         return 1 - rawScore;

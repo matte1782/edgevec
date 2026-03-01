@@ -1,26 +1,38 @@
 # Week 43 — Day 5: Integration Tests + Default Method Verification + Build
 
 **Date:** 2026-03-11
-**Status:** [REVISED] — Updated after Day 4 completion; removed W43.5d (MMR does not exist on installed @langchain/core)
+**Status:** [REVISED] — Round 2: Addressed hostile review rejection (C1 task ID sync, C2 tsup fix, M1/M2 parent sync, m1-m3 minor fixes)
 **Focus:** End-to-end RAG pipeline tests, verify LangChain default method behavior, validate ESM + CJS dual build
-**Prerequisite:** Day 4 complete (101 tests passing: 40 metadata + 61 store)
+**Prerequisite:** Day 4 complete (103 tests passing: 41 metadata + 62 store), code audit fixes applied
 **Reference:** `docs/research/LANGCHAIN_SPIKE.md` Section 1 (Default Methods)
 
 ---
 
-## Gap Analysis (Post Day 4)
+## Gap Analysis (Post Day 4 + Code Audit)
 
 **Days 1-4 delivered:**
 - `pkg/langchain/src/` — 5 modules (index, store, types, metadata, init)
-- `pkg/langchain/tests/metadata.test.ts` — 40 tests
-- `pkg/langchain/tests/store.test.ts` — 61 tests (0 `as any`, hostile review APPROVED)
+- `pkg/langchain/tests/metadata.test.ts` — 41 tests (added proto-pollution guard test)
+- `pkg/langchain/tests/store.test.ts` — 62 tests (0 `as any`, hostile review APPROVED, dotproduct sigmoid fix)
+
+**Pre-Day 5 fixes applied (from code audit):**
+- CRITICAL: dotproduct normalization changed from `Math.abs` to sigmoid
+- CRITICAL: addVectors restructured to validate-then-commit (atomic)
+- CRITICAL: save() wrapped with proper error handling for partial failure
+- IMPORTANT: `ensureInitialized` removed from public exports
+- IMPORTANT: `initPromise` cleared after successful init
+- IMPORTANT: `__proto__`/`constructor`/`prototype` keys stripped in metadata
+- FIX: package.json exports updated to match tsup output paths (`dist/index.mjs`, `dist/index.cjs`)
 
 **Day 5 must deliver:**
 1. `pkg/langchain/tests/integration.test.ts` — **NEW FILE** (does not exist yet)
 2. `pkg/langchain/dist/` — **NOT YET BUILT** (tsup configured but never run)
 3. Verification of inherited LangChain methods (`similaritySearch`, `similaritySearchWithScore`, `asRetriever`)
 
-**Plan correction:** `maxMarginalRelevanceSearch` does NOT exist on the installed `@langchain/core@0.3.x` VectorStore prototype. Task W43.5d is **DROPPED** and replaced with `similaritySearch` string-query test (the actual default method that calls embedQuery + similaritySearchVectorWithScore).
+**Plan corrections:**
+- `maxMarginalRelevanceSearch` does NOT exist on `@langchain/core@0.3.x` VectorStore prototype — **DROPPED** from all plans
+- `addDocuments` is NOT a default method — EdgeVecStore.addDocuments delegates to embedDocuments+addVectors. Tested as W43.5c2.
+- Parent plan (`WEEKLY_TASK_PLAN.md`) has been synced to remove MMR references and align task IDs
 
 ---
 
@@ -30,22 +42,25 @@
 |:-----|:---|:------|:-------|:-----------|
 | Create integration test with mock embeddings (no external API) | W43.5a | 1.5h | PENDING | Day 4 |
 | Test full RAG pipeline: embed -> store -> search -> retrieve | W43.5b | 1h | PENDING | W43.5a |
-| Test `similaritySearch` default (string query -> embedQuery -> search) | W43.5c | 0.5h | PENDING | Day 3 |
+| Test `similaritySearch` default (string query → embedQuery → search) | W43.5c | 0.5h | PENDING | Day 3 |
+| Test `addDocuments` (embeds via this.embeddings, then addVectors) | W43.5c2 | 0.5h | PENDING | Day 3 |
 | Test `similaritySearchWithScore` default (string query variant) | W43.5d | 0.5h | PENDING | Day 3 |
 | Test `asRetriever()` returns functional `VectorStoreRetriever` | W43.5e | 0.5h | PENDING | Day 3 |
 | Verify build: ESM + CJS dual output via `tsup` | W43.5f | 1h | PENDING | Day 3 |
-| Verify peer dep: test with `@langchain/core@0.3.x` and `@langchain/core@0.4.x` | W43.5g | 0.5h | PENDING | W43.5f |
+| Verify peer dep: test with `@langchain/core@0.3.0` (lower bound) | W43.5g | 0.5h | PENDING | W43.5f |
 
-**Total Estimated Hours:** 5.5h
+**Total Estimated Hours:** 6h
+
+**Note on W43.5g:** `@langchain/core@0.4.x` may not yet exist on npm. If unavailable, test only with `@0.3.0` (lower bound) and `@0.3.x` (latest in range). Do NOT fail the task if 0.4.x is not published.
 
 ---
 
 ## Critical Path
 
 ```
-W43.5a (integration setup) -> W43.5b (RAG pipeline)
-W43.5c + W43.5d + W43.5e (default methods, parallel)
-W43.5f (build) -> W43.5g (peer dep compat)
+W43.5a (integration setup) → W43.5b (RAG pipeline)
+W43.5c + W43.5c2 + W43.5d + W43.5e (default methods, parallel)
+W43.5f (build) → W43.5g (peer dep compat)
 ```
 
 Three independent tracks can run in parallel.
@@ -112,9 +127,17 @@ The `VectorStore` base class provides `similaritySearch(query, k, filter)` which
 
 Verify this chain works correctly with EdgeVecStore.
 
+### W43.5c2 — `addDocuments`
+
+`addDocuments` is an EdgeVecStore method that:
+1. Calls `this.embeddings.embedDocuments(texts)` to get vectors
+2. Calls `this.addVectors(vectors, documents, options)` to store
+
+Verify: embedDocuments is called, vectors stored, IDs returned.
+
 ### W43.5d — Default `similaritySearchWithScore`
 
-Same as `similaritySearch` but returns `[Document, score][]` (preserves scores). Verify scores are normalized.
+Same as `similaritySearch` but returns `[Document, score][]` (preserves scores). Verify scores are normalized via sigmoid for dotproduct, `1-d` for cosine, `1/(1+d)` for L2.
 
 ### W43.5e — `asRetriever()`
 
@@ -135,22 +158,24 @@ Verify:
 cd pkg/langchain && npm run build
 ```
 
-Verify:
-- `dist/index.js` or `dist/index.mjs` exists (ESM output)
+Verify (specific paths from tsup flat output):
+- `dist/index.mjs` exists (ESM output)
 - `dist/index.cjs` exists (CJS output)
-- `dist/index.d.ts` or `dist/index.d.cts` exists (type declarations)
-- No TypeScript errors in strict mode
-- Bundle size < 10KB (excluding edgevec WASM)
-
-**Note:** tsup.config.ts output structure may differ from the `dist/esm/` + `dist/cjs/` layout described in the original plan. Check actual tsup output paths.
+- `dist/index.d.ts` exists (ESM type declarations)
+- `dist/index.d.cts` exists (CJS type declarations)
+- No TypeScript errors in strict mode (`npx tsc --noEmit`)
+- Bundle size of `dist/index.mjs` + `dist/index.cjs` combined < 10KB (excluding edgevec WASM)
+- `package.json` `exports`, `main`, `module`, `types` fields point to correct paths
 
 ### W43.5g — Peer Dep Compatibility
 
 Test installation with:
-- `@langchain/core@0.3.0` (lower bound)
-- `@langchain/core@0.4.x` (latest in range, if available)
+- `@langchain/core@0.3.0` (lower bound of peer dep range)
+- `@langchain/core@latest` within `>=0.3.0 <0.5.0` range
 
 Verify `npm install` succeeds and basic import works. This is a **verification task**, not a separate test suite — run in a temp directory with `npm pack` output.
+
+**Note:** If `@langchain/core@0.4.x` is not yet published on npm, test only `@0.3.0` and `@0.3.x` latest. Do not fail the task for unpublished versions.
 
 ---
 
@@ -186,14 +211,16 @@ From `@langchain/core@0.3.x` VectorStore prototype:
 ## Acceptance Criteria
 
 - [ ] Integration tests pass with mock embeddings (no external API calls)
-- [ ] Full RAG pipeline: text -> embed -> add -> query -> get document back with correct content
+- [ ] Full RAG pipeline: text → embed → add → query → get document back with correct content
 - [ ] `similaritySearch` default: calls `embedQuery`, returns `Document[]` without scores
+- [ ] `addDocuments`: calls `embedDocuments`, then `addVectors`, returns IDs
 - [ ] `similaritySearchWithScore` default: calls `embedQuery`, returns `[Document, score][]`
 - [ ] `asRetriever()`: returned retriever can `.invoke(query)` and get `Document[]`
-- [ ] `npm run build` produces both ESM and CJS output
+- [ ] `npm run build` produces `dist/index.mjs` (ESM), `dist/index.cjs` (CJS), `dist/index.d.ts`, `dist/index.d.cts`
+- [ ] `package.json` exports/main/module/types match tsup output paths (verified in pre-Day 5 fix)
 - [ ] TypeScript strict mode: zero errors (`npx tsc --noEmit`)
 - [ ] Bundle size of langchain adapter < 10KB (excluding edgevec WASM)
-- [ ] Peer dep: installs cleanly with `@langchain/core@0.3.x`
+- [ ] Peer dep: installs cleanly with `@langchain/core@0.3.0` (lower bound)
 
 ---
 
@@ -204,16 +231,17 @@ From `@langchain/core@0.3.x` VectorStore prototype:
 | `asRetriever().invoke()` requires async chain through VectorStoreRetriever | Test with proper await chain; inspect return type |
 | CJS build fails due to ESM-only dependencies | tsup handles dual output; if `@langchain/core` is ESM-only, CJS may need `require()` shim |
 | Bundle size exceeds 10KB | Profile imports; tsup externalizes peer deps already (`edgevec`, `@langchain/core`) |
-| tsup output paths differ from expected `dist/esm/` + `dist/cjs/` | Check actual tsup output after first build; update package.json `exports` if needed |
+| `@langchain/core@0.4.x` not published | Test only with 0.3.x range; do not fail task |
+| `dist/index.d.cts` not generated by tsup | Verify after first build; if missing, add `dts: { resolve: true }` to tsup config |
 
 ---
 
 ## Exit Criteria
 
 **Day 5 is complete when:**
-1. All 7 tasks are DONE
+1. All 8 tasks are DONE
 2. `npx vitest run` passes (all tests: metadata + store + integration)
-3. `npm run build` produces ESM + CJS output
+3. `npm run build` produces ESM + CJS output at correct paths
 4. TypeScript strict mode: zero errors
 5. Bundle size < 10KB
 

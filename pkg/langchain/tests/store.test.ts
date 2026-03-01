@@ -848,7 +848,7 @@ describe("EdgeVecStore", () => {
       expect(results[0][1]).toBe(1);
     });
 
-    it("normalizes dotproduct: 1 / (1 + |distance|)", async () => {
+    it("normalizes dotproduct via sigmoid: 1 / (1 + exp(distance))", async () => {
       searchResults = [{ id: 0, score: -3, metadata: {} }];
       const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
@@ -859,10 +859,11 @@ describe("EdgeVecStore", () => {
         [1, 0, 0],
         1
       );
-      expect(results[0][1]).toBeCloseTo(0.25);
+      // sigmoid(-3) = 1 / (1 + exp(-3)) ≈ 0.9526
+      expect(results[0][1]).toBeCloseTo(1 / (1 + Math.exp(-3)));
     });
 
-    it("normalizes dotproduct: distance=0 → score=1", async () => {
+    it("normalizes dotproduct: distance=0 → score=0.5 (sigmoid midpoint)", async () => {
       searchResults = [{ id: 0, score: 0, metadata: {} }];
       const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
@@ -873,7 +874,28 @@ describe("EdgeVecStore", () => {
         [1, 0, 0],
         1
       );
-      expect(results[0][1]).toBe(1);
+      // sigmoid(0) = 0.5
+      expect(results[0][1]).toBe(0.5);
+    });
+
+    it("normalizes dotproduct: preserves ordering (more negative = more similar)", async () => {
+      searchResults = [
+        { id: 0, score: -5, metadata: {} },
+        { id: 1, score: -1, metadata: {} },
+        { id: 2, score: 3, metadata: {} },
+      ];
+      const store = new EdgeVecStore(new MockEmbeddings(), {
+        dimensions: 3,
+        metric: "dotproduct",
+      });
+
+      const results = await store.similaritySearchVectorWithScore(
+        [1, 0, 0],
+        3
+      );
+      // More negative raw score → higher similarity
+      expect(results[0][1]).toBeGreaterThan(results[1][1]);
+      expect(results[1][1]).toBeGreaterThan(results[2][1]);
     });
 
     it("defaults to cosine when no metric specified", async () => {

@@ -3,18 +3,18 @@
   "version": "0.1.0",
   "description": "LangChain.js VectorStore adapter for EdgeVec — high-performance embedded vector database",
   "type": "module",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.js",
-  "types": "./dist/types/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/types/index.d.ts",
-        "default": "./dist/esm/index.js"
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
       },
       "require": {
-        "types": "./dist/types/index.d.cts",
-        "default": "./dist/cjs/index.js"
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
       }
     }
   },

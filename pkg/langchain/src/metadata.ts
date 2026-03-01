@@ -35,6 +35,9 @@ const RESERVED_KEYS = new Set([
   NULL_KEYS_FIELD,
 ]);
 
+/** Prototype-pollution dangerous keys — silently stripped from metadata */
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 /**
  * Check if a value is a native EdgeVec MetadataValue (no conversion needed).
  *
@@ -85,8 +88,8 @@ export function serializeMetadata(
   const nullKeys: string[] = [];
 
   for (const [key, value] of Object.entries(metadata)) {
-    // Skip reserved internal keys
-    if (RESERVED_KEYS.has(key)) continue;
+    // Skip reserved internal keys and dangerous prototype-pollution keys
+    if (RESERVED_KEYS.has(key) || DANGEROUS_KEYS.has(key)) continue;
 
     if (value === null || value === undefined) {
       // Null/undefined → empty string, tracked for round-trip
@@ -138,8 +141,8 @@ export function deserializeMetadata(
   );
 
   for (const [key, value] of Object.entries(metadata)) {
-    // Skip internal tracking fields
-    if (RESERVED_KEYS.has(key)) continue;
+    // Skip internal tracking fields and dangerous keys
+    if (RESERVED_KEYS.has(key) || DANGEROUS_KEYS.has(key)) continue;
 
     if (nullKeys.has(key)) {
       result[key] = null;

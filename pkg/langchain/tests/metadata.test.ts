@@ -360,4 +360,25 @@ describe("round-trip: serialize → deserialize", () => {
     expect(result.a).toEqual({ x: 1 });
     expect(result.b).toEqual({ x: 1 });
   });
+
+  // Prototype-pollution guard: dangerous keys are stripped
+  it("strips __proto__, constructor, and prototype keys from metadata", () => {
+    const malicious = {
+      __proto__: { isAdmin: true },
+      constructor: "evil",
+      prototype: "bad",
+      safe: "keep me",
+    };
+    const serialized = serializeMetadata(malicious as Record<string, unknown>);
+    expect(serialized).not.toHaveProperty("__proto__");
+    expect(serialized).not.toHaveProperty("constructor");
+    expect(serialized).not.toHaveProperty("prototype");
+    expect(serialized.safe).toBe("keep me");
+
+    const deserialized = deserializeMetadata(serialized);
+    expect(deserialized).not.toHaveProperty("__proto__");
+    expect(deserialized).not.toHaveProperty("constructor");
+    expect(deserialized).not.toHaveProperty("prototype");
+    expect(deserialized.safe).toBe("keep me");
+  });
 });

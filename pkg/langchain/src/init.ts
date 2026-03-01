@@ -56,6 +56,7 @@ export async function initEdgeVec(): Promise<void> {
   })();
 
   await initPromise;
+  initPromise = null; // Release reference after successful init
 }
 
 /**
