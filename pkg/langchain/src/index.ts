@@ -14,3 +14,6 @@ export { MetadataSerializationError, EdgeVecPersistenceError } from "./types.js"
 
 // Metadata serialization
 export { serializeMetadata, deserializeMetadata } from "./metadata.js";
+
+// Core store
+export { EdgeVecStore } from "./store.js";
