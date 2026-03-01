@@ -1,1 +1,11 @@
 *
+# Allow langchain adapter source (not build output)
+!langchain/
+!langchain/package.json
+!langchain/tsconfig.json
+!langchain/tsup.config.ts
+!langchain/vitest.config.ts
+!langchain/src/
+!langchain/src/**
+!langchain/tests/
+!langchain/tests/**

@@ -155,7 +155,7 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 | `test_metadata_circular_ref` | serialize | Throws `MetadataSerializationError` |
 | `test_id_persistence` | save/load | ID map survives roundtrip |
 | `test_score_normalization_l2` | score conversion | L2=0 → sim=1.0 |
-| `test_score_normalization_cosine` | score conversion | cos=1.0 → sim=1.0 |
+| `test_score_normalization_cosine` | score conversion | cosine_distance=0 → sim=1.0; cosine_distance=1 → sim=0.0 |
 | `test_wasm_not_initialized` | ensureInitialized | Throws `EdgeVecNotInitializedError` |
 | `test_dimension_mismatch` | addVectors | Throws on mismatched dims |
 
@@ -261,7 +261,7 @@ Day 1 (scaffold + metadata) → Day 2 (core class) → Day 3 (full API) → Day 
 | Commit and push all work | W43.9f | 0.5h | PENDING |
 
 **Day 9 Acceptance Criteria:**
-- [ ] `cargo test` — all passing (1018+ lib + integration, current baseline)
+- [ ] `cargo test` — all passing (980+ lib + integration, current baseline)
 - [ ] `npx vitest run` in `pkg/langchain/` — all passing (15+ unit + integration)
 - [ ] Clippy clean
 - [ ] TypeScript strict mode clean
