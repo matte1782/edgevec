@@ -158,8 +158,8 @@ Verify:
 cd pkg/langchain && npm run build
 ```
 
-Verify (specific paths from tsup flat output):
-- `dist/index.mjs` exists (ESM output)
+Verify (specific paths from tsup output with `"type": "module"`):
+- `dist/index.js` exists (ESM output — `.js` because package is ESM)
 - `dist/index.cjs` exists (CJS output)
 - `dist/index.d.ts` exists (ESM type declarations)
 - `dist/index.d.cts` exists (CJS type declarations)
@@ -216,8 +216,8 @@ From `@langchain/core@0.3.x` VectorStore prototype:
 - [ ] `addDocuments`: calls `embedDocuments`, then `addVectors`, returns IDs
 - [ ] `similaritySearchWithScore` default: calls `embedQuery`, returns `[Document, score][]`
 - [ ] `asRetriever()`: returned retriever can `.invoke(query)` and get `Document[]`
-- [ ] `npm run build` produces `dist/index.mjs` (ESM), `dist/index.cjs` (CJS), `dist/index.d.ts`, `dist/index.d.cts`
-- [ ] `package.json` exports/main/module/types match tsup output paths (verified in pre-Day 5 fix)
+- [x] `npm run build` produces `dist/index.js` (ESM, 6.76KB), `dist/index.cjs` (CJS, 7.56KB), `dist/index.d.ts`, `dist/index.d.cts`
+- [x] `package.json` exports/main/module/types match tsup output paths
 - [ ] TypeScript strict mode: zero errors (`npx tsc --noEmit`)
 - [ ] Bundle size of langchain adapter < 10KB (excluding edgevec WASM)
 - [ ] Peer dep: installs cleanly with `@langchain/core@0.3.0` (lower bound)

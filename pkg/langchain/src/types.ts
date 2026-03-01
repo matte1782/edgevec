@@ -13,7 +13,7 @@ import type { IndexConfig } from "edgevec/edgevec-wrapper.js";
  *
  * - `"cosine"` — Cosine distance (0 = identical). Normalized via `1 - distance`.
  * - `"l2"` — Euclidean distance (0 = identical). Normalized via `1 / (1 + distance)`.
- * - `"dotproduct"` — Negative inner product. Normalized via `1 / (1 + |distance|)`.
+ * - `"dotproduct"` — Negative inner product. Normalized via sigmoid `1 / (1 + exp(distance))`. Range: (0, 1).
  */
 export type EdgeVecMetric = "cosine" | "l2" | "dotproduct";
 

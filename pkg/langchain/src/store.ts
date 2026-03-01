@@ -182,6 +182,10 @@ export class EdgeVecStore extends SaveableVectorStore {
    * @param documents - Array of LangChain documents (same length as vectors)
    * @param options - Optional: provide string IDs via `options.ids`
    * @returns Array of string IDs assigned to each document
+   * @throws {Error} On dimension mismatch or metadata serialization failure (no state modified)
+   * @remarks If `index.add()` throws mid-batch (e.g., WASM OOM), entries added before
+   * the failure remain in the store. The caller receives the exception but the store
+   * is in a defined partial state.
    */
   async addVectors(
     vectors: number[][],
