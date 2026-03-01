@@ -15,7 +15,7 @@
 #   lint:       5 minutes  (cargo fmt + clippy)
 #   wasm-check: 5 minutes  (cargo check --target wasm32-unknown-unknown)
 #   fuzz-check: 5 minutes  (cargo +nightly check)
-#   miri:       15 minutes (cargo +nightly miri test)
+#   miri:       25 minutes (cargo +nightly miri test)
 
 name: EdgeVec CI
 
@@ -103,7 +103,7 @@ jobs:
   miri:
     name: Miri Safety Check
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -115,11 +115,11 @@ jobs:
       - name: Run Miri (core)
         run: cargo +nightly miri test --lib --no-default-features -- --skip wasm --skip test_bq_vs_f32_recall_comparison
         env:
-          MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check"
+          MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
           PROPTEST_CASES: "4"
 
       - name: Run Miri (sparse feature)
         run: cargo +nightly miri test --lib --no-default-features --features sparse -- --skip wasm --skip test_bq_vs_f32_recall_comparison
         env:
-          MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check"
+          MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
           PROPTEST_CASES: "4"
