@@ -76,6 +76,7 @@ function openMetaDB(): Promise<IDBDatabase> {
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("IndexedDB open blocked — another connection may be open"));
   });
 }
 
@@ -230,10 +231,22 @@ export class EdgeVecStore extends SaveableVectorStore {
     // Phase 2: Add to index + commit to ID maps (all validation passed)
     const ids: string[] = [];
     for (const { stringId, vector, metadata } of prepared) {
-      const numericId = this.index.add(vector, metadata);
-      this.idMap.set(stringId, numericId);
-      this.reverseIdMap.set(numericId, stringId);
-      ids.push(stringId);
+      try {
+        const numericId = this.index.add(vector, metadata);
+        this.idMap.set(stringId, numericId);
+        this.reverseIdMap.set(numericId, stringId);
+        ids.push(stringId);
+      } catch (e) {
+        // Attach partial IDs to the error so callers can identify what was added
+        const err = new Error(
+          `addVectors failed at index ${ids.length}/${prepared.length}. ` +
+          `${ids.length} entries were added before the failure and remain in the store. ` +
+          `Use error.partialIds to identify them. ` +
+          `Cause: ${e instanceof Error ? e.message : String(e)}`
+        );
+        (err as Error & { partialIds: string[] }).partialIds = ids;
+        throw err;
+      }
     }
 
     return ids;
@@ -372,8 +385,10 @@ export class EdgeVecStore extends SaveableVectorStore {
     } catch (e) {
       throw new EdgeVecPersistenceError(
         `Index saved to "${directory}" but ID map save failed. ` +
-        `The store may be in an inconsistent state. ` +
-        `Error: ${e instanceof Error ? e.message : String(e)}`
+        `Recovery: retry save() to write the ID map, or call load() ` +
+        `which will fail with a clear error if the ID map is missing. ` +
+        `The in-memory store remains fully functional. ` +
+        `Cause: ${e instanceof Error ? e.message : String(e)}`
       );
     }
   }
@@ -484,9 +499,13 @@ export class EdgeVecStore extends SaveableVectorStore {
    * | dotproduct  | `1 / (1 + exp(distance))`    | (0, 1)  |
    */
   private normalizeScore(rawScore: number): number {
+    if (!Number.isFinite(rawScore)) {
+      return 0;
+    }
+
     switch (this.metric) {
       case "cosine":
-        return 1 - rawScore;
+        return Math.max(0, Math.min(1, 1 - rawScore));
       case "l2":
         return 1 / (1 + rawScore);
       case "dotproduct":
@@ -495,7 +514,7 @@ export class EdgeVecStore extends SaveableVectorStore {
         return 1 / (1 + Math.exp(rawScore));
       default:
         // Defensive: should never happen if metric is validated
-        return 1 - rawScore;
+        return Math.max(0, Math.min(1, 1 - rawScore));
     }
   }
 
@@ -516,11 +535,18 @@ export class EdgeVecStore extends SaveableVectorStore {
   ): Promise<EdgeVecStore> {
     await initEdgeVec();
 
+    if (Array.isArray(metadatas) && metadatas.length !== texts.length) {
+      throw new Error(
+        `Mismatched lengths: ${texts.length} texts vs ${metadatas.length} metadata entries. ` +
+        `Provide one metadata object per text, or a single object to apply to all.`
+      );
+    }
+
     const docs = texts.map(
       (text, i) =>
         new Document({
           pageContent: text,
-          metadata: Array.isArray(metadatas) ? metadatas[i] ?? {} : metadatas,
+          metadata: Array.isArray(metadatas) ? metadatas[i] : metadatas,
         })
     );
 

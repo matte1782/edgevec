@@ -363,13 +363,18 @@ describe("round-trip: serialize → deserialize", () => {
 
   // Prototype-pollution guard: dangerous keys are stripped
   it("strips __proto__, constructor, and prototype keys from metadata", () => {
-    const malicious = {
-      __proto__: { isAdmin: true },
-      constructor: "evil",
-      prototype: "bad",
-      safe: "keep me",
-    };
-    const serialized = serializeMetadata(malicious as Record<string, unknown>);
+    // Use Object.create(null) so __proto__ is an own enumerable property,
+    // not silently absorbed into the prototype chain.
+    const malicious = Object.create(null) as Record<string, unknown>;
+    malicious["__proto__"] = { isAdmin: true };
+    malicious["constructor"] = "evil";
+    malicious["prototype"] = "bad";
+    malicious["safe"] = "keep me";
+
+    // Verify __proto__ is actually an own property being tested
+    expect(Object.keys(malicious)).toContain("__proto__");
+
+    const serialized = serializeMetadata(malicious);
     expect(serialized).not.toHaveProperty("__proto__");
     expect(serialized).not.toHaveProperty("constructor");
     expect(serialized).not.toHaveProperty("prototype");

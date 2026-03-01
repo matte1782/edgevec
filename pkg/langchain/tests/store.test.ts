@@ -98,7 +98,13 @@ async function readIdMapFromIDB(key: string): Promise<string> {
   const result = await new Promise<string>((resolve, reject) => {
     const tx = db.transaction("idmaps", "readonly");
     const req = tx.objectStore("idmaps").get(key);
-    req.onsuccess = () => resolve(String(req.result));
+    req.onsuccess = () => {
+      if (req.result === undefined) {
+        reject(new Error(`Key "${key}" not found in edgevec_meta IndexedDB`));
+      } else {
+        resolve(String(req.result));
+      }
+    };
     req.onerror = () => reject(req.error);
   });
   db.close();
@@ -146,11 +152,18 @@ describe("EdgeVecStore", () => {
     _resetForTesting();
     await initEdgeVec();
 
-    // Clean up IndexedDB between tests
+    // Clean up IndexedDB between tests (properly awaited)
     const dbs = await indexedDB.databases();
-    for (const db of dbs) {
-      if (db.name) indexedDB.deleteDatabase(db.name);
-    }
+    await Promise.all(
+      dbs.filter((db) => db.name).map((db) =>
+        new Promise<void>((resolve) => {
+          const req = indexedDB.deleteDatabase(db.name!);
+          req.onsuccess = () => resolve();
+          req.onerror = () => resolve();
+          req.onblocked = () => resolve();
+        })
+      )
+    );
   });
 
   describe("constructor", () => {
@@ -942,16 +955,15 @@ describe("EdgeVecStore", () => {
       }
     });
 
-    it("handles empty metadata array elements with fallback", async () => {
-      await EdgeVecStore.fromTexts(
-        ["a", "b"],
-        [{ x: 1 }],
-        new MockEmbeddings(),
-        { dimensions: 3 }
-      );
-
-      expect(addedVectors).toHaveLength(2);
-      expect(addedVectors[0].metadata.x).toBe(1);
+    it("throws on mismatched metadata array length", async () => {
+      await expect(
+        EdgeVecStore.fromTexts(
+          ["a", "b"],
+          [{ x: 1 }],
+          new MockEmbeddings(),
+          { dimensions: 3 }
+        )
+      ).rejects.toThrow(/Mismatched lengths/);
     });
   });
 

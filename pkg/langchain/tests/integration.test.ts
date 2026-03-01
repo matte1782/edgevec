@@ -144,18 +144,22 @@ async function cleanupIDB(): Promise<void> {
   );
 }
 
-// --- Test suite ---
+/** Shared setup for all integration tests. */
+async function resetState(): Promise<void> {
+  addCounter = 0;
+  storedEntries = [];
+  _resetForTesting();
+  await initEdgeVec();
+  await cleanupIDB();
+}
 
-describe("Integration: RAG Pipeline", () => {
-  beforeEach(async () => {
-    addCounter = 0;
-    storedEntries = [];
-    _resetForTesting();
-    await initEdgeVec();
-    await cleanupIDB();
-  });
+// --- Test suite (shared beforeEach via resetState) ---
 
-  describe("end-to-end pipeline", () => {
+describe("Integration", () => {
+  beforeEach(resetState);
+
+  // W43.5b: Full RAG pipeline
+  describe("RAG Pipeline: end-to-end", () => {
     it("embeds texts, stores, queries, and retrieves correct documents", async () => {
       const embeddings = new DeterministicEmbeddings();
       const store = new EdgeVecStore(embeddings, { dimensions: 32 });
@@ -191,7 +195,7 @@ describe("Integration: RAG Pipeline", () => {
       }
     });
 
-    it("returns results ordered by similarity (most similar first)", async () => {
+    it("returns results ordered by similarity (best first, strictly decreasing)", async () => {
       const embeddings = new DeterministicEmbeddings();
       const store = new EdgeVecStore(embeddings, { dimensions: 32 });
 
@@ -212,6 +216,9 @@ describe("Integration: RAG Pipeline", () => {
       for (let i = 1; i < results.length; i++) {
         expect(results[i - 1][1]).toBeGreaterThanOrEqual(results[i][1]);
       }
+
+      // At least first vs last must be strictly different (proves ordering is real)
+      expect(results[0][1]).toBeGreaterThan(results[results.length - 1][1]);
     });
 
     it("preserves document IDs through the pipeline", async () => {
@@ -283,388 +290,379 @@ describe("Integration: RAG Pipeline", () => {
       expect(results).toEqual([]);
     });
   });
-});
 
-// W43.5c: similaritySearch default method
-describe("Integration: Default similaritySearch", () => {
-  beforeEach(async () => {
-    addCounter = 0;
-    storedEntries = [];
-    _resetForTesting();
-    await initEdgeVec();
-    await cleanupIDB();
-  });
+  // W43.5c: similaritySearch default method
+  describe("Default similaritySearch", () => {
+    it("accepts string query, calls embedQuery, returns Document[] without scores", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const embedQuerySpy = vi.spyOn(embeddings, "embedQuery");
 
-  it("accepts string query, calls embedQuery, returns Document[] without scores", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const embedQuerySpy = vi.spyOn(embeddings, "embedQuery");
-
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
-    await store.addDocuments([
-      new Document({ pageContent: "Hello world", metadata: { src: "a" } }),
-      new Document({ pageContent: "Goodbye world", metadata: { src: "b" } }),
-    ]);
-
-    const results = await store.similaritySearch("Hello", 2);
-
-    // Verify embedQuery was called with the string query
-    expect(embedQuerySpy).toHaveBeenCalledWith("Hello");
-
-    // Exactly 2 results (2 docs, k=2)
-    expect(results).toHaveLength(2);
-
-    for (const doc of results) {
-      expect(doc).toBeInstanceOf(Document);
-      expect(typeof doc.pageContent).toBe("string");
-      expect(doc.metadata).toBeDefined();
-    }
-
-    embedQuerySpy.mockRestore();
-  });
-
-  it("respects k parameter (returns exactly min(k, count))", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
-
-    for (let i = 0; i < 5; i++) {
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
       await store.addDocuments([
-        new Document({ pageContent: `Document number ${i}`, metadata: { i } }),
+        new Document({ pageContent: "Hello world", metadata: { src: "a" } }),
+        new Document({ pageContent: "Goodbye world", metadata: { src: "b" } }),
       ]);
-    }
 
-    const results = await store.similaritySearch("Document", 2);
-    expect(results).toHaveLength(2);
-  });
-});
+      const results = await store.similaritySearch("Hello", 2);
 
-// W43.5c2: addDocuments
-describe("Integration: addDocuments", () => {
-  beforeEach(async () => {
-    addCounter = 0;
-    storedEntries = [];
-    _resetForTesting();
-    await initEdgeVec();
-    await cleanupIDB();
-  });
+      // Verify embedQuery was called with the string query
+      expect(embedQuerySpy).toHaveBeenCalledWith("Hello");
 
-  it("calls embedDocuments then addVectors, returns IDs", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const embedDocsSpy = vi.spyOn(embeddings, "embedDocuments");
+      // Exactly 2 results (2 docs, k=2)
+      expect(results).toHaveLength(2);
 
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
-    const docs = [
-      new Document({ pageContent: "First", metadata: {} }),
-      new Document({ pageContent: "Second", metadata: {} }),
-    ];
+      for (const doc of results) {
+        expect(doc).toBeInstanceOf(Document);
+        expect(typeof doc.pageContent).toBe("string");
+        expect(doc.metadata).toBeDefined();
+      }
 
-    const ids = await store.addDocuments(docs);
+      embedQuerySpy.mockRestore();
+    });
 
-    expect(embedDocsSpy).toHaveBeenCalledWith(["First", "Second"]);
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids).size).toBe(2);
-    expect(storedEntries).toHaveLength(2);
+    it("respects k parameter (returns exactly min(k, count))", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
 
-    embedDocsSpy.mockRestore();
+      for (let i = 0; i < 5; i++) {
+        await store.addDocuments([
+          new Document({ pageContent: `Document number ${i}`, metadata: { i } }),
+        ]);
+      }
+
+      const results = await store.similaritySearch("Document", 2);
+      expect(results).toHaveLength(2);
+    });
   });
 
-  it("passes custom IDs through to addVectors", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
+  // W43.5c2: addDocuments
+  describe("addDocuments", () => {
+    it("calls embedDocuments then addVectors, returns IDs", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const embedDocsSpy = vi.spyOn(embeddings, "embedDocuments");
 
-    const ids = await store.addDocuments(
-      [new Document({ pageContent: "Test", metadata: {} })],
-      { ids: ["custom-id-1"] }
-    );
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
+      const docs = [
+        new Document({ pageContent: "First", metadata: {} }),
+        new Document({ pageContent: "Second", metadata: {} }),
+      ];
 
-    expect(ids).toEqual(["custom-id-1"]);
-  });
-});
+      const ids = await store.addDocuments(docs);
 
-// W43.5d: similaritySearchWithScore default method
-describe("Integration: Default similaritySearchWithScore", () => {
-  beforeEach(async () => {
-    addCounter = 0;
-    storedEntries = [];
-    _resetForTesting();
-    await initEdgeVec();
-    await cleanupIDB();
-  });
+      expect(embedDocsSpy).toHaveBeenCalledWith(["First", "Second"]);
+      expect(ids).toHaveLength(2);
+      expect(new Set(ids).size).toBe(2);
+      expect(storedEntries).toHaveLength(2);
 
-  it("accepts string query, returns [Document, score][] with normalized scores", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const embedQuerySpy = vi.spyOn(embeddings, "embedQuery");
+      embedDocsSpy.mockRestore();
+    });
 
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
-    await store.addDocuments([
-      new Document({ pageContent: "Machine learning is exciting", metadata: {} }),
-      new Document({ pageContent: "Deep learning uses neural networks", metadata: {} }),
-    ]);
+    it("passes custom IDs through to addVectors", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
 
-    const results = await store.similaritySearchWithScore("machine learning", 2);
+      const ids = await store.addDocuments(
+        [new Document({ pageContent: "Test", metadata: {} })],
+        { ids: ["custom-id-1"] }
+      );
 
-    expect(embedQuerySpy).toHaveBeenCalledWith("machine learning");
-    expect(results).toHaveLength(2);
-
-    for (const entry of results) {
-      expect(Array.isArray(entry)).toBe(true);
-      expect(entry).toHaveLength(2);
-
-      const [doc, score] = entry;
-      expect(doc).toBeInstanceOf(Document);
-      expect(typeof score).toBe("number");
-      expect(score).toBeGreaterThanOrEqual(0);
-      expect(score).toBeLessThanOrEqual(1);
-    }
-
-    embedQuerySpy.mockRestore();
-  });
-});
-
-// W43.5e: asRetriever()
-describe("Integration: asRetriever", () => {
-  beforeEach(async () => {
-    addCounter = 0;
-    storedEntries = [];
-    _resetForTesting();
-    await initEdgeVec();
-    await cleanupIDB();
+      expect(ids).toEqual(["custom-id-1"]);
+    });
   });
 
-  it("returns a functional VectorStoreRetriever", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
+  // W43.5d: similaritySearchWithScore default method
+  describe("Default similaritySearchWithScore", () => {
+    it("accepts string query, returns [Document, score][] with normalized scores", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const embedQuerySpy = vi.spyOn(embeddings, "embedQuery");
 
-    await store.addDocuments([
-      new Document({ pageContent: "Retriever test document one", metadata: { n: 1 } }),
-      new Document({ pageContent: "Retriever test document two", metadata: { n: 2 } }),
-      new Document({ pageContent: "Retriever test document three", metadata: { n: 3 } }),
-    ]);
-
-    const retriever = store.asRetriever({ k: 2 });
-    const results = await retriever.invoke("Retriever test");
-
-    expect(results).toHaveLength(2);
-
-    for (const doc of results) {
-      expect(doc).toBeInstanceOf(Document);
-      expect(typeof doc.pageContent).toBe("string");
-      expect(doc.pageContent.length).toBeGreaterThan(0);
-      expect(doc.metadata).toBeDefined();
-    }
-  });
-
-  it("asRetriever with no args defaults to k=4", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
-
-    for (let i = 0; i < 6; i++) {
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
       await store.addDocuments([
-        new Document({ pageContent: `Test doc ${i}`, metadata: {} }),
+        new Document({ pageContent: "Machine learning is exciting", metadata: {} }),
+        new Document({ pageContent: "Deep learning uses neural networks", metadata: {} }),
       ]);
-    }
 
-    const retriever = store.asRetriever();
-    const results = await retriever.invoke("test");
+      const results = await store.similaritySearchWithScore("machine learning", 2);
 
-    // Default k=4, 6 docs in store
-    expect(results).toHaveLength(4);
+      expect(embedQuerySpy).toHaveBeenCalledWith("machine learning");
+      expect(results).toHaveLength(2);
+
+      for (const entry of results) {
+        expect(Array.isArray(entry)).toBe(true);
+        expect(entry).toHaveLength(2);
+
+        const [doc, score] = entry;
+        expect(doc).toBeInstanceOf(Document);
+        expect(typeof score).toBe("number");
+        expect(score).toBeGreaterThanOrEqual(0);
+        expect(score).toBeLessThanOrEqual(1);
+      }
+
+      embedQuerySpy.mockRestore();
+    });
   });
 
-  it("retriever results have pageContent and metadata", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
+  // W43.5e: asRetriever()
+  describe("asRetriever", () => {
+    it("returns a functional VectorStoreRetriever", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
 
-    await store.addDocuments([
-      new Document({
-        pageContent: "Important document with metadata",
-        metadata: { importance: "high", category: "test" },
-      }),
-    ]);
+      await store.addDocuments([
+        new Document({ pageContent: "Retriever test document one", metadata: { n: 1 } }),
+        new Document({ pageContent: "Retriever test document two", metadata: { n: 2 } }),
+        new Document({ pageContent: "Retriever test document three", metadata: { n: 3 } }),
+      ]);
 
-    const retriever = store.asRetriever({ k: 1 });
-    const results = await retriever.invoke("important");
+      const retriever = store.asRetriever({ k: 2 });
+      const results = await retriever.invoke("Retriever test");
 
-    expect(results).toHaveLength(1);
-    expect(results[0].pageContent).toBe("Important document with metadata");
-    expect(results[0].metadata.importance).toBe("high");
-    expect(results[0].metadata.category).toBe("test");
-  });
-});
+      expect(results).toHaveLength(2);
 
-// Score normalization: concrete expected values, not just range checks
-describe("Integration: Score normalization correctness", () => {
-  beforeEach(async () => {
-    addCounter = 0;
-    storedEntries = [];
-    _resetForTesting();
-    await initEdgeVec();
-    await cleanupIDB();
-  });
+      for (const doc of results) {
+        expect(doc).toBeInstanceOf(Document);
+        expect(typeof doc.pageContent).toBe("string");
+        expect(doc.pageContent.length).toBeGreaterThan(0);
+        expect(doc.metadata).toBeDefined();
+      }
+    });
 
-  it("cosine: self-query returns score = 1.0 (distance 0 → similarity 1)", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "cosine" });
+    it("asRetriever with no args defaults to k=4", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
 
-    await store.addDocuments([
-      new Document({ pageContent: "exact match test", metadata: {} }),
-    ]);
+      for (let i = 0; i < 6; i++) {
+        await store.addDocuments([
+          new Document({ pageContent: `Test doc ${i}`, metadata: {} }),
+        ]);
+      }
 
-    // Query with the EXACT same text → mock returns cosine distance ≈ 0
-    const results = await store.similaritySearchVectorWithScore(
-      await embeddings.embedQuery("exact match test"),
-      1
-    );
+      const retriever = store.asRetriever();
+      const results = await retriever.invoke("test");
 
-    expect(results).toHaveLength(1);
-    // cosine distance of identical vectors = 0, normalized = 1 - 0 = 1.0
-    expect(results[0][1]).toBeCloseTo(1.0, 5);
-  });
+      // Default k=4, 6 docs in store
+      expect(results).toHaveLength(4);
+    });
 
-  it("l2: self-query returns score = 1.0 (distance 0 → 1/(1+0) = 1)", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "l2" });
+    it("retriever results have pageContent and metadata", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
 
-    await store.addDocuments([
-      new Document({ pageContent: "exact match test", metadata: {} }),
-    ]);
+      await store.addDocuments([
+        new Document({
+          pageContent: "Important document with metadata",
+          metadata: { importance: "high", category: "test" },
+        }),
+      ]);
 
-    const results = await store.similaritySearchVectorWithScore(
-      await embeddings.embedQuery("exact match test"),
-      1
-    );
+      const retriever = store.asRetriever({ k: 1 });
+      const results = await retriever.invoke("important");
 
-    expect(results).toHaveLength(1);
-    // l2 distance of identical vectors = 0, normalized = 1/(1+0) = 1.0
-    expect(results[0][1]).toBeCloseTo(1.0, 5);
+      expect(results).toHaveLength(1);
+      expect(results[0].pageContent).toBe("Important document with metadata");
+      expect(results[0].metadata.importance).toBe("high");
+      expect(results[0].metadata.category).toBe("test");
+    });
   });
 
-  it("dotproduct: self-query returns score > 0.5 (negative distance → sigmoid > 0.5)", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "dotproduct" });
+  // Score normalization: concrete expected values
+  describe("Score normalization correctness", () => {
+    it("cosine: self-query returns score = 1.0 (distance 0 → similarity 1)", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "cosine" });
 
-    await store.addDocuments([
-      new Document({ pageContent: "exact match test", metadata: {} }),
-    ]);
+      await store.addDocuments([
+        new Document({ pageContent: "exact match test", metadata: {} }),
+      ]);
 
-    // Mock returns cosine distance (not raw dot product), so identical → distance 0
-    // sigmoid(0) = 0.5. For real EdgeVec with dot product, self-query would have
-    // very negative distance → sigmoid → close to 1. Here we verify the formula works.
-    const results = await store.similaritySearchVectorWithScore(
-      await embeddings.embedQuery("exact match test"),
-      1
-    );
+      const results = await store.similaritySearchVectorWithScore(
+        await embeddings.embedQuery("exact match test"),
+        1
+      );
 
-    expect(results).toHaveLength(1);
-    // sigmoid(0) = 0.5 exactly
-    expect(results[0][1]).toBeCloseTo(0.5, 5);
+      expect(results).toHaveLength(1);
+      // cosine distance of identical vectors = 0, normalized = 1 - 0 = 1.0
+      expect(results[0][1]).toBeCloseTo(1.0, 5);
+    });
+
+    it("l2: self-query returns score = 1.0 (distance 0 → 1/(1+0) = 1)", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "l2" });
+
+      await store.addDocuments([
+        new Document({ pageContent: "exact match test", metadata: {} }),
+      ]);
+
+      const results = await store.similaritySearchVectorWithScore(
+        await embeddings.embedQuery("exact match test"),
+        1
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0][1]).toBeCloseTo(1.0, 5);
+    });
+
+    it("dotproduct: self-query returns score = 0.5 (distance 0 → sigmoid(0) = 0.5)", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "dotproduct" });
+
+      await store.addDocuments([
+        new Document({ pageContent: "exact match test", metadata: {} }),
+      ]);
+
+      // Mock returns cosine distance = 0 for identical vectors. sigmoid(0) = 0.5.
+      const results = await store.similaritySearchVectorWithScore(
+        await embeddings.embedQuery("exact match test"),
+        1
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0][1]).toBeCloseTo(0.5, 5);
+    });
+
+    it("cosine: different texts produce strictly lower scores than self-query", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "cosine" });
+
+      await store.addDocuments([
+        new Document({ pageContent: "exact match test", metadata: {} }),
+        new Document({ pageContent: "completely different unrelated content", metadata: {} }),
+      ]);
+
+      const results = await store.similaritySearchVectorWithScore(
+        await embeddings.embedQuery("exact match test"),
+        2
+      );
+
+      expect(results).toHaveLength(2);
+      expect(results[0][1]).toBeGreaterThan(results[1][1]);
+      expect(results[0][1]).toBeCloseTo(1.0, 5);
+      expect(results[1][1]).toBeLessThan(1.0);
+    });
+
+    it("normalizeScore returns 0 for NaN input (all metrics)", async () => {
+      const embeddings = new DeterministicEmbeddings();
+
+      for (const metric of ["cosine", "l2", "dotproduct"] as const) {
+        const store = new EdgeVecStore(embeddings, { dimensions: 32, metric });
+
+        // Manually inject a NaN result via the mock
+        storedEntries = [{
+          id: 0, vector: new Float32Array(32), metadata: {}, deleted: false,
+        }];
+        addCounter = 1;
+
+        // Override mock search to return NaN score
+        const idx = store as unknown as { index: { search: ReturnType<typeof vi.fn> } };
+        idx.index.search.mockResolvedValueOnce([{ id: 0, score: NaN, metadata: {} }]);
+
+        const results = await store.similaritySearchVectorWithScore(new Array(32).fill(0), 1);
+        expect(results).toHaveLength(1);
+        expect(results[0][1]).toBe(0);
+      }
+    });
+
+    it("normalizeScore returns 0 for Infinity input (all metrics)", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "cosine" });
+
+      storedEntries = [{
+        id: 0, vector: new Float32Array(32), metadata: {}, deleted: false,
+      }];
+      addCounter = 1;
+
+      const idx = store as unknown as { index: { search: ReturnType<typeof vi.fn> } };
+      idx.index.search.mockResolvedValueOnce([{ id: 0, score: Infinity, metadata: {} }]);
+
+      const results = await store.similaritySearchVectorWithScore(new Array(32).fill(0), 1);
+      expect(results).toHaveLength(1);
+      expect(results[0][1]).toBe(0);
+    });
   });
 
-  it("cosine: different texts produce lower scores than self-query", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32, metric: "cosine" });
+  // DeterministicEmbeddings correctness
+  describe("DeterministicEmbeddings", () => {
+    it("produces identical vectors for identical texts", async () => {
+      const emb = new DeterministicEmbeddings();
+      const v1 = await emb.embedQuery("hello world");
+      const v2 = await emb.embedQuery("hello world");
+      expect(v1).toEqual(v2);
+    });
 
-    await store.addDocuments([
-      new Document({ pageContent: "exact match test", metadata: {} }),
-      new Document({ pageContent: "completely different unrelated content", metadata: {} }),
-    ]);
-
-    const results = await store.similaritySearchVectorWithScore(
-      await embeddings.embedQuery("exact match test"),
-      2
-    );
-
-    expect(results).toHaveLength(2);
-    // Self-match should have higher score than non-match
-    expect(results[0][1]).toBeGreaterThan(results[1][1]);
-    // Self-match should be very close to 1.0
-    expect(results[0][1]).toBeCloseTo(1.0, 5);
-    // Non-match should be strictly less than 1.0
-    expect(results[1][1]).toBeLessThan(1.0);
-  });
-});
-
-// DeterministicEmbeddings correctness
-describe("Integration: DeterministicEmbeddings", () => {
-  it("produces identical vectors for identical texts", async () => {
-    const emb = new DeterministicEmbeddings();
-    const v1 = await emb.embedQuery("hello world");
-    const v2 = await emb.embedQuery("hello world");
-    expect(v1).toEqual(v2);
+    it("produces distinct vectors for distinct texts", async () => {
+      const emb = new DeterministicEmbeddings();
+      const v1 = await emb.embedQuery("hello");
+      const v2 = await emb.embedQuery("goodbye");
+      expect(v1).not.toEqual(v2);
+    });
   });
 
-  it("produces distinct vectors for distinct texts", async () => {
-    const emb = new DeterministicEmbeddings();
-    const v1 = await emb.embedQuery("hello");
-    const v2 = await emb.embedQuery("goodbye");
-    expect(v1).not.toEqual(v2);
-  });
-});
+  // Multi-step workflows
+  describe("Multi-step workflows", () => {
+    it("add → search → delete → search returns fewer results", async () => {
+      const embeddings = new DeterministicEmbeddings();
+      const store = new EdgeVecStore(embeddings, { dimensions: 32 });
 
-// Multi-step workflow — add, search, delete, search again
-describe("Integration: Multi-step workflows", () => {
-  beforeEach(async () => {
-    addCounter = 0;
-    storedEntries = [];
-    _resetForTesting();
-    await initEdgeVec();
-    await cleanupIDB();
-  });
+      const ids = await store.addDocuments([
+        new Document({ pageContent: "Keep this document", metadata: {} }),
+        new Document({ pageContent: "Delete this document", metadata: {} }),
+      ]);
 
-  it("add → search → delete → search returns fewer results", async () => {
-    const embeddings = new DeterministicEmbeddings();
-    const store = new EdgeVecStore(embeddings, { dimensions: 32 });
+      const before = await store.similaritySearchVectorWithScore(
+        await embeddings.embedQuery("document"),
+        10
+      );
+      expect(before).toHaveLength(2);
 
-    const ids = await store.addDocuments([
-      new Document({ pageContent: "Keep this document", metadata: {} }),
-      new Document({ pageContent: "Delete this document", metadata: {} }),
-    ]);
+      await store.delete({ ids: [ids[1]] });
 
-    // First search: both documents exist
-    const before = await store.similaritySearchVectorWithScore(
-      await embeddings.embedQuery("document"),
-      10
-    );
-    expect(before).toHaveLength(2);
+      const after = await store.similaritySearchVectorWithScore(
+        await embeddings.embedQuery("document"),
+        10
+      );
+      expect(after).toHaveLength(1);
+    });
 
-    // Delete one — mock now properly marks entry as deleted
-    await store.delete({ ids: [ids[1]] });
+    it("fromTexts factory: creates store, embeds, and allows search", async () => {
+      const store = await EdgeVecStore.fromTexts(
+        ["First text", "Second text", "Third text"],
+        [{ src: "a" }, { src: "b" }, { src: "c" }],
+        new DeterministicEmbeddings(),
+        { dimensions: 32 }
+      );
 
-    // Second search: only one remains (mock filters deleted entries)
-    const after = await store.similaritySearchVectorWithScore(
-      await embeddings.embedQuery("document"),
-      10
-    );
-    expect(after).toHaveLength(1);
-  });
+      const results = await store.similaritySearch("First", 2);
+      expect(results).toHaveLength(2);
+      expect(results[0]).toBeInstanceOf(Document);
+    });
 
-  it("fromTexts factory: creates store, embeds, and allows search", async () => {
-    const store = await EdgeVecStore.fromTexts(
-      ["First text", "Second text", "Third text"],
-      [{ src: "a" }, { src: "b" }, { src: "c" }],
-      new DeterministicEmbeddings(),
-      { dimensions: 32 }
-    );
+    it("fromDocuments factory: creates store from Document objects", async () => {
+      const docs = [
+        new Document({ pageContent: "Doc A", metadata: { type: "a" } }),
+        new Document({ pageContent: "Doc B", metadata: { type: "b" } }),
+      ];
 
-    const results = await store.similaritySearch("First", 2);
-    expect(results).toHaveLength(2);
-    expect(results[0]).toBeInstanceOf(Document);
-  });
+      const store = await EdgeVecStore.fromDocuments(
+        docs,
+        new DeterministicEmbeddings(),
+        { dimensions: 32 }
+      );
 
-  it("fromDocuments factory: creates store from Document objects", async () => {
-    const docs = [
-      new Document({ pageContent: "Doc A", metadata: { type: "a" } }),
-      new Document({ pageContent: "Doc B", metadata: { type: "b" } }),
-    ];
+      const results = await store.similaritySearchWithScore("Doc A", 1);
+      expect(results).toHaveLength(1);
+      expect(results[0][0]).toBeInstanceOf(Document);
+      expect(typeof results[0][1]).toBe("number");
+    });
 
-    const store = await EdgeVecStore.fromDocuments(
-      docs,
-      new DeterministicEmbeddings(),
-      { dimensions: 32 }
-    );
-
-    const results = await store.similaritySearchWithScore("Doc A", 1);
-    expect(results).toHaveLength(1);
-    expect(results[0][0]).toBeInstanceOf(Document);
-    expect(typeof results[0][1]).toBe("number");
+    it("fromTexts throws on mismatched metadata array length", async () => {
+      await expect(
+        EdgeVecStore.fromTexts(
+          ["text1", "text2", "text3"],
+          [{ a: 1 }], // 1 metadata for 3 texts
+          new DeterministicEmbeddings(),
+          { dimensions: 32 }
+        )
+      ).rejects.toThrow(/Mismatched lengths/);
+    });
   });
 });
