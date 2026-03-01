@@ -7,8 +7,6 @@
 
 // WASM initialization
 export { initEdgeVec, EdgeVecNotInitializedError } from "./init.js";
-/** @internal Testing helper — not part of the public API */
-export { isInitialized } from "./init.js";
 
 // Types
 export type { EdgeVecStoreConfig, EdgeVecMetric } from "./types.js";

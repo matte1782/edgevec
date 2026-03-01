@@ -14,7 +14,7 @@
 | Metadata filtering (DSL) | Yes | No | No |
 | Binary quantization | Yes | No | No |
 | Maintained (2026) | Yes | Yes | No (archived) |
-| Bundle size | <10KB (adapter) | Built-in | ~50KB |
+| Bundle size | ~8KB (adapter) | Built-in | ~50KB |
 
 ## Installation
 
@@ -28,6 +28,8 @@ npm install edgevec-langchain edgevec @langchain/core
 |:--------|:--------|
 | `edgevec` | `^0.9.0` |
 | `@langchain/core` | `>=0.3.0 <0.5.0` |
+
+**Requires** Node.js >= 20.0.0.
 
 ## Quick Start
 
@@ -160,7 +162,7 @@ async similaritySearch(
 ): Promise<DocumentInterface[]>
 ```
 
-Search for documents similar to a text query. Inherited from LangChain `VectorStore`.
+Search for documents similar to a text query. Returns `Document` instances (which implement `DocumentInterface`). Inherited from LangChain `VectorStore`.
 
 ##### `similaritySearchVectorWithScore(query, k, filter?)`
 
@@ -180,7 +182,7 @@ Search by embedding vector. Returns `[document, score]` tuples where score is a 
 async delete(params: { ids: string[] }): Promise<void>
 ```
 
-Delete documents by their string IDs. Unknown IDs are silently ignored.
+Delete documents by their string IDs. Unknown IDs are silently ignored. Call `save()` after deletion to persist the change to IndexedDB.
 
 ##### `save(directory)`
 
@@ -190,12 +192,17 @@ async save(directory: string): Promise<void>
 
 Persist the store to IndexedDB. The `directory` string is used as the IndexedDB key.
 
-##### `asRetriever(k?)`
+##### `asRetriever(kOrFields?)`
 
 Returns a LangChain `VectorStoreRetriever`. Inherited from `VectorStore`.
 
 ```typescript
+// Simple form — pass k directly
 const retriever = store.asRetriever(5);
+const docs = await retriever.invoke("search query");
+
+// Object form — pass k, filter, tags, callbacks, etc.
+const retriever = store.asRetriever({ k: 5, filter: 'category = "gpu"' });
 const docs = await retriever.invoke("search query");
 ```
 
@@ -235,6 +242,19 @@ Most users do not need these — `EdgeVecStore` handles serialization internally
 ## Filter Syntax
 
 Filters use EdgeVec's DSL, passed as a string to `similaritySearch` or `similaritySearchVectorWithScore`.
+
+### Operator Reference
+
+| Category | Operators |
+|:---------|:----------|
+| Comparison | `=`, `!=`, `<`, `>`, `<=`, `>=` |
+| String | `CONTAINS`, `STARTS_WITH`, `ENDS_WITH`, `LIKE` |
+| Array / Set | `IN`, `NOT IN`, `ANY`, `ALL`, `NONE` |
+| Range | `BETWEEN ... AND ...` |
+| Logical | `AND`, `OR`, `NOT` |
+| Null | `IS NULL`, `IS NOT NULL` |
+
+All string operators are **case-sensitive**.
 
 ### Comparison
 
@@ -337,8 +357,7 @@ const docs = await store.similaritySearch(
 const docs = await store.similaritySearch("query", 5, "price BETWEEN 100 AND 500");
 ```
 
-> **Coming in next release:** `FilterExpression` object support for programmatic filter construction.
-> Currently, filters are passed as EdgeVec DSL strings.
+> Filters are currently passed as EdgeVec DSL strings. Object-based `FilterExpression` support is planned — see [Coming Next](#coming-next).
 
 ## WASM Initialization
 
@@ -419,11 +438,13 @@ Raw distances from EdgeVec are normalized to similarity scores where **higher = 
 | `l2` | `1 / (1 + distance)` | (0, 1] |
 | `dotproduct` | `1 / (1 + exp(distance))` | (0, 1) |
 
+For `dotproduct`, EdgeVec returns the negative inner product as the "distance", so this formula yields higher scores for higher dot products (sigmoid of the negated distance).
+
 Non-finite scores (NaN, Infinity) are clamped to `0`.
 
 ## Coming Next
 
-- `FilterExpression` object support for programmatic filter construction (W44)
+- `FilterExpression` object support for programmatic filter construction
 
 ## License
 
