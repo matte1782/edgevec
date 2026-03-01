@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Document } from "@langchain/core/documents";
-import type { EmbeddingsInterface } from "@langchain/core/embeddings";
+import { Embeddings } from "@langchain/core/embeddings";
 
 // Polyfill IndexedDB for Node.js tests
 import "fake-indexeddb/auto";
@@ -64,7 +64,7 @@ vi.mock("edgevec/edgevec-wrapper.js", () => {
 import { EdgeVecStore } from "../src/store.js";
 import { initEdgeVec, _resetForTesting } from "../src/init.js";
 import { EdgeVecNotInitializedError } from "../src/init.js";
-import { EdgeVecPersistenceError } from "../src/types.js";
+import { EdgeVecPersistenceError, MetadataSerializationError } from "../src/types.js";
 import { PAGE_CONTENT_KEY, ID_KEY } from "../src/metadata.js";
 
 /** Write a string value to the edgevec_meta IndexedDB for test setup. */
@@ -98,20 +98,39 @@ async function readIdMapFromIDB(key: string): Promise<string> {
   const result = await new Promise<string>((resolve, reject) => {
     const tx = db.transaction("idmaps", "readonly");
     const req = tx.objectStore("idmaps").get(key);
-    req.onsuccess = () => resolve(req.result as string);
+    req.onsuccess = () => resolve(String(req.result));
     req.onerror = () => reject(req.error);
   });
   db.close();
   return result;
 }
 
-function makeMockEmbeddings(): EmbeddingsInterface {
-  return {
-    embedDocuments: vi.fn().mockImplementation((texts: string[]) =>
-      Promise.resolve(texts.map(() => [0.1, 0.2, 0.3]))
-    ),
-    embedQuery: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
-  } as unknown as EmbeddingsInterface;
+class MockEmbeddings extends Embeddings {
+  private dims: number;
+  constructor(dims = 3) {
+    super({});
+    this.dims = dims;
+  }
+  async embedDocuments(texts: string[]): Promise<number[][]> {
+    return texts.map((_, i) =>
+      Array.from({ length: this.dims }, (__, d) => (i + 1) * 0.1 + d * 0.01)
+    );
+  }
+  async embedQuery(_text: string): Promise<number[]> {
+    return Array.from({ length: this.dims }, (_, d) => 0.1 + d * 0.01);
+  }
+}
+
+/** Typed test accessor for EdgeVecStore private fields — avoids `as any`. */
+interface StoreTestAccess {
+  idMap: Map<string, number>;
+  reverseIdMap: Map<number, string>;
+  metric: string;
+  index: { search: ReturnType<typeof vi.fn> };
+}
+
+function testInternals(store: EdgeVecStore): StoreTestAccess {
+  return store as unknown as StoreTestAccess;
 }
 
 describe("EdgeVecStore", () => {
@@ -136,19 +155,19 @@ describe("EdgeVecStore", () => {
 
   describe("constructor", () => {
     it("creates instance when WASM is initialized", () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       expect(store._vectorstoreType()).toBe("edgevec");
     });
 
     it("throws EdgeVecNotInitializedError when WASM not initialized", () => {
       _resetForTesting();
       expect(
-        () => new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 })
+        () => new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 })
       ).toThrow(EdgeVecNotInitializedError);
     });
 
     it("sets lc_namespace correctly", () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       expect(store.lc_namespace).toEqual([
         "langchain",
         "vectorstores",
@@ -159,14 +178,14 @@ describe("EdgeVecStore", () => {
 
   describe("addVectors", () => {
     it("adds zero documents without error", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const ids = await store.addVectors([], []);
       expect(ids).toEqual([]);
       expect(addedVectors).toHaveLength(0);
     });
 
     it("adds single document and returns string ID", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "hello", metadata: { source: "test" } });
       const ids = await store.addVectors([[0.1, 0.2, 0.3]], [doc]);
 
@@ -179,7 +198,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("adds multiple documents with correct metadata", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const docs = [
         new Document({ pageContent: "first", metadata: { idx: 0 } }),
         new Document({ pageContent: "second", metadata: { idx: 1 } }),
@@ -206,7 +225,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("uses provided IDs when options.ids is given", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "test", metadata: {} });
       const ids = await store.addVectors([[1, 2, 3]], [doc], {
         ids: ["custom-id-123"],
@@ -217,7 +236,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("throws on mismatched vectors/documents length", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "test", metadata: {} });
 
       await expect(
@@ -226,7 +245,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("throws on dimension mismatch", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "test", metadata: {} });
 
       await expect(
@@ -235,7 +254,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("passes Float32Array to index.add()", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "test", metadata: {} });
       await store.addVectors([[0.5, 0.6, 0.7]], [doc]);
 
@@ -248,7 +267,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("serializes complex metadata through serializeMetadata", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({
         pageContent: "test",
         metadata: { nested: { a: 1 }, tags: ["x", "y"] },
@@ -264,7 +283,8 @@ describe("EdgeVecStore", () => {
 
   describe("addDocuments", () => {
     it("embeds documents and delegates to addVectors", async () => {
-      const embeddings = makeMockEmbeddings();
+      const embeddings = new MockEmbeddings();
+      const embedSpy = vi.spyOn(embeddings, "embedDocuments");
       const store = new EdgeVecStore(embeddings, { dimensions: 3 });
       const docs = [
         new Document({ pageContent: "hello", metadata: {} }),
@@ -273,7 +293,7 @@ describe("EdgeVecStore", () => {
 
       const ids = await store.addDocuments(docs);
 
-      expect(embeddings.embedDocuments).toHaveBeenCalledWith([
+      expect(embedSpy).toHaveBeenCalledWith([
         "hello",
         "world",
       ]);
@@ -284,7 +304,7 @@ describe("EdgeVecStore", () => {
 
   describe("delete", () => {
     it("deletes a single document and cleans ID maps", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "test", metadata: {} });
       const ids = await store.addVectors([[1, 2, 3]], [doc]);
 
@@ -294,14 +314,13 @@ describe("EdgeVecStore", () => {
       expect(deletedIds).toEqual([0]);
 
       // Verify maps are cleaned
-      const idMap: Map<string, number> = (store as any).idMap;
-      const reverseIdMap: Map<number, string> = (store as any).reverseIdMap;
+      const { idMap, reverseIdMap } = testInternals(store);
       expect(idMap.size).toBe(0);
       expect(reverseIdMap.size).toBe(0);
     });
 
     it("deletes multiple documents", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const docs = [
         new Document({ pageContent: "a", metadata: {} }),
         new Document({ pageContent: "b", metadata: {} }),
@@ -317,8 +336,7 @@ describe("EdgeVecStore", () => {
 
       expect(deletedIds).toEqual([0, 2]);
 
-      const idMap: Map<string, number> = (store as any).idMap;
-      const reverseIdMap: Map<number, string> = (store as any).reverseIdMap;
+      const { idMap, reverseIdMap } = testInternals(store);
       expect(idMap.size).toBe(1);
       expect(reverseIdMap.size).toBe(1);
       // Middle one still exists
@@ -326,7 +344,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("silently ignores unknown IDs", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
 
       // Delete a non-existent ID — should not throw
       await store.delete({ ids: ["non-existent-id"] });
@@ -334,13 +352,13 @@ describe("EdgeVecStore", () => {
     });
 
     it("handles empty ids array", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       await store.delete({ ids: [] });
       expect(deletedIds).toHaveLength(0);
     });
 
     it("warns when index.delete returns false and still cleans maps", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "test", metadata: {} });
       const ids = await store.addVectors([[1, 2, 3]], [doc]);
 
@@ -355,14 +373,13 @@ describe("EdgeVecStore", () => {
       warnSpy.mockRestore();
 
       // Maps should still be cleaned
-      const idMap: Map<string, number> = (store as any).idMap;
-      const reverseIdMap: Map<number, string> = (store as any).reverseIdMap;
+      const { idMap, reverseIdMap } = testInternals(store);
       expect(idMap.size).toBe(0);
       expect(reverseIdMap.size).toBe(0);
     });
 
     it("throws on delete when WASM not initialized", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       _resetForTesting();
 
       await expect(
@@ -373,7 +390,7 @@ describe("EdgeVecStore", () => {
 
   describe("save", () => {
     it("saves index and ID map to IndexedDB", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "test", metadata: { x: 1 } });
       await store.addVectors([[1, 2, 3]], [doc]);
 
@@ -389,7 +406,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("persists metric for correct normalization on load", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "l2",
       });
@@ -400,7 +417,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("serializes reverseIdMap with string keys", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const docs = [
         new Document({ pageContent: "a", metadata: {} }),
         new Document({ pageContent: "b", metadata: {} }),
@@ -421,7 +438,7 @@ describe("EdgeVecStore", () => {
   describe("load", () => {
     it("loads index and restores ID maps from IndexedDB", async () => {
       // First save a store
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const doc = new Document({ pageContent: "hello", metadata: {} });
       const ids = await store.addVectors([[1, 2, 3]], [doc]);
       await store.save("load-test");
@@ -432,68 +449,61 @@ describe("EdgeVecStore", () => {
       loadedNames = [];
 
       // Load it back
-      const loaded = await EdgeVecStore.load("load-test", makeMockEmbeddings());
+      const loaded = await EdgeVecStore.load("load-test", new MockEmbeddings());
 
       expect(loadedNames).toEqual(["load-test"]);
       expect(loaded._vectorstoreType()).toBe("edgevec");
 
       // Verify ID maps were restored
-      const idMap: Map<string, number> = (loaded as any).idMap;
-      const reverseIdMap: Map<number, string> = (loaded as any).reverseIdMap;
+      const { idMap, reverseIdMap } = testInternals(loaded);
       expect(idMap.size).toBe(1);
       expect(reverseIdMap.size).toBe(1);
       expect(idMap.has(ids[0])).toBe(true);
     });
 
     it("restores metric from saved data", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "dotproduct",
       });
       await store.save("metric-test");
 
-      const loaded = await EdgeVecStore.load("metric-test", makeMockEmbeddings());
-      const metric: string = (loaded as any).metric;
+      const loaded = await EdgeVecStore.load("metric-test", new MockEmbeddings());
+      const { metric } = testInternals(loaded);
       expect(metric).toBe("dotproduct");
     });
 
     it("throws EdgeVecPersistenceError when ID map is missing", async () => {
       // Don't save any ID map data, just try to load
-      await expect(
-        EdgeVecStore.load("non-existent-db", makeMockEmbeddings())
-      ).rejects.toThrow(EdgeVecPersistenceError);
-      await expect(
-        EdgeVecStore.load("non-existent-db", makeMockEmbeddings())
-      ).rejects.toThrow(/No ID map data found/);
+      const err = await EdgeVecStore.load("non-existent-db", new MockEmbeddings())
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(EdgeVecPersistenceError);
+      expect((err as Error).message).toMatch(/No ID map data found/);
     });
 
     it("throws EdgeVecPersistenceError on corrupted JSON", async () => {
       await writeIdMapToIDB("corrupted-test", "not-valid-json{{{");
 
-      await expect(
-        EdgeVecStore.load("corrupted-test", makeMockEmbeddings())
-      ).rejects.toThrow(EdgeVecPersistenceError);
-      await expect(
-        EdgeVecStore.load("corrupted-test", makeMockEmbeddings())
-      ).rejects.toThrow(/Failed to parse/);
+      const err = await EdgeVecStore.load("corrupted-test", new MockEmbeddings())
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(EdgeVecPersistenceError);
+      expect((err as Error).message).toMatch(/Failed to parse/);
     });
 
     it("throws EdgeVecPersistenceError on invalid data structure", async () => {
       await writeIdMapToIDB("invalid-test", JSON.stringify({ foo: "bar" }));
 
-      await expect(
-        EdgeVecStore.load("invalid-test", makeMockEmbeddings())
-      ).rejects.toThrow(EdgeVecPersistenceError);
-      await expect(
-        EdgeVecStore.load("invalid-test", makeMockEmbeddings())
-      ).rejects.toThrow(/Missing required fields/);
+      const err = await EdgeVecStore.load("invalid-test", new MockEmbeddings())
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(EdgeVecPersistenceError);
+      expect((err as Error).message).toMatch(/Missing required fields/);
     });
   });
 
   describe("save/load roundtrip", () => {
     it("loaded store supports add, search, and delete operations", async () => {
       // Save a store with one document
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "l2",
       });
@@ -507,10 +517,10 @@ describe("EdgeVecStore", () => {
       deletedIds = [];
 
       // Load it back
-      const loaded = await EdgeVecStore.load("roundtrip-test", makeMockEmbeddings());
+      const loaded = await EdgeVecStore.load("roundtrip-test", new MockEmbeddings());
 
       // Verify metric was restored
-      expect((loaded as any).metric).toBe("l2");
+      expect(testInternals(loaded).metric).toBe("l2");
 
       // Add a new document to the loaded store
       const newDoc = new Document({ pageContent: "new", metadata: { v: 2 } });
@@ -529,14 +539,14 @@ describe("EdgeVecStore", () => {
 
       // Delete from the loaded store
       await loaded.delete({ ids: [origIds[0]] });
-      const idMap: Map<string, number> = (loaded as any).idMap;
+      const { idMap } = testInternals(loaded);
       expect(idMap.has(origIds[0])).toBe(false);
     });
   });
 
   describe("save WASM guard", () => {
     it("throws on save when WASM not initialized", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       _resetForTesting();
 
       await expect(store.save("should-fail")).rejects.toThrow(
@@ -556,11 +566,11 @@ describe("EdgeVecStore", () => {
       await writeIdMapToIDB("invalid-metric", JSON.stringify(data));
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const loaded = await EdgeVecStore.load("invalid-metric", makeMockEmbeddings());
+      const loaded = await EdgeVecStore.load("invalid-metric", new MockEmbeddings());
 
       expect(warnSpy).toHaveBeenCalledOnce();
       expect(warnSpy.mock.calls[0][0]).toMatch(/unknown metric/);
-      expect((loaded as any).metric).toBe("cosine");
+      expect(testInternals(loaded).metric).toBe("cosine");
       warnSpy.mockRestore();
     });
 
@@ -573,12 +583,10 @@ describe("EdgeVecStore", () => {
       };
       await writeIdMapToIDB("float-dims", JSON.stringify(data));
 
-      await expect(
-        EdgeVecStore.load("float-dims", makeMockEmbeddings())
-      ).rejects.toThrow(EdgeVecPersistenceError);
-      await expect(
-        EdgeVecStore.load("float-dims", makeMockEmbeddings())
-      ).rejects.toThrow(/Missing required fields/);
+      const err = await EdgeVecStore.load("float-dims", new MockEmbeddings())
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(EdgeVecPersistenceError);
+      expect((err as Error).message).toMatch(/Missing required fields/);
     });
 
     it("throws EdgeVecPersistenceError on zero dimensions", async () => {
@@ -591,7 +599,7 @@ describe("EdgeVecStore", () => {
       await writeIdMapToIDB("zero-dims", JSON.stringify(data));
 
       await expect(
-        EdgeVecStore.load("zero-dims", makeMockEmbeddings())
+        EdgeVecStore.load("zero-dims", new MockEmbeddings())
       ).rejects.toThrow(EdgeVecPersistenceError);
     });
 
@@ -605,7 +613,7 @@ describe("EdgeVecStore", () => {
       await writeIdMapToIDB("neg-dims", JSON.stringify(data));
 
       await expect(
-        EdgeVecStore.load("neg-dims", makeMockEmbeddings())
+        EdgeVecStore.load("neg-dims", new MockEmbeddings())
       ).rejects.toThrow(EdgeVecPersistenceError);
     });
 
@@ -618,12 +626,10 @@ describe("EdgeVecStore", () => {
       };
       await writeIdMapToIDB("nan-idmap", JSON.stringify(data));
 
-      await expect(
-        EdgeVecStore.load("nan-idmap", makeMockEmbeddings())
-      ).rejects.toThrow(EdgeVecPersistenceError);
-      await expect(
-        EdgeVecStore.load("nan-idmap", makeMockEmbeddings())
-      ).rejects.toThrow(/Invalid numeric ID/);
+      const err = await EdgeVecStore.load("nan-idmap", new MockEmbeddings())
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(EdgeVecPersistenceError);
+      expect((err as Error).message).toMatch(/Invalid numeric ID/);
     });
 
     it("throws EdgeVecPersistenceError on NaN in reverseIdMap keys", async () => {
@@ -635,19 +641,17 @@ describe("EdgeVecStore", () => {
       };
       await writeIdMapToIDB("nan-reverse", JSON.stringify(data));
 
-      await expect(
-        EdgeVecStore.load("nan-reverse", makeMockEmbeddings())
-      ).rejects.toThrow(EdgeVecPersistenceError);
-      await expect(
-        EdgeVecStore.load("nan-reverse", makeMockEmbeddings())
-      ).rejects.toThrow(/Invalid numeric key/);
+      const err = await EdgeVecStore.load("nan-reverse", new MockEmbeddings())
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(EdgeVecPersistenceError);
+      expect((err as Error).message).toMatch(/Invalid numeric key/);
     });
   });
 
   describe("similaritySearchVectorWithScore", () => {
     it("returns empty array when no results", async () => {
       searchResults = [];
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const results = await store.similaritySearchVectorWithScore(
         [0.1, 0.2, 0.3],
         5
@@ -668,7 +672,7 @@ describe("EdgeVecStore", () => {
         },
       ];
 
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const results = await store.similaritySearchVectorWithScore(
         [0.1, 0.2, 0.3],
         1
@@ -685,7 +689,7 @@ describe("EdgeVecStore", () => {
     });
 
     it("falls back to reverseIdMap when ID_KEY not in metadata", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
 
       // Add a document to populate the reverse map
       const doc = new Document({ pageContent: "test", metadata: {} });
@@ -711,7 +715,7 @@ describe("EdgeVecStore", () => {
 
     it("passes filter to search options", async () => {
       searchResults = [];
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
 
       await store.similaritySearchVectorWithScore(
         [0.1, 0.2, 0.3],
@@ -719,7 +723,7 @@ describe("EdgeVecStore", () => {
         'category = "gpu"'
       );
 
-      const mockIndex = (store as any).index;
+      const mockIndex = testInternals(store).index;
       expect(mockIndex.search).toHaveBeenCalledWith(
         expect.any(Float32Array),
         5,
@@ -729,11 +733,11 @@ describe("EdgeVecStore", () => {
 
     it("omits filter from search options when undefined", async () => {
       searchResults = [];
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
 
       await store.similaritySearchVectorWithScore([0.1, 0.2, 0.3], 5);
 
-      const mockIndex = (store as any).index;
+      const mockIndex = testInternals(store).index;
       expect(mockIndex.search).toHaveBeenCalledWith(
         expect.any(Float32Array),
         5,
@@ -743,7 +747,7 @@ describe("EdgeVecStore", () => {
 
     it("handles missing metadata gracefully", async () => {
       searchResults = [{ id: 0, score: 0.2, metadata: undefined }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
 
       const results = await store.similaritySearchVectorWithScore(
         [0.1, 0.2, 0.3],
@@ -759,7 +763,7 @@ describe("EdgeVecStore", () => {
 
   describe("ID mapping bidirectional correctness", () => {
     it("maps string IDs to numeric IDs from index.add() return", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       const docs = [
         new Document({ pageContent: "a", metadata: {} }),
         new Document({ pageContent: "b", metadata: {} }),
@@ -775,8 +779,7 @@ describe("EdgeVecStore", () => {
         docs
       );
 
-      const idMap: Map<string, number> = (store as any).idMap;
-      const reverseIdMap: Map<number, string> = (store as any).reverseIdMap;
+      const { idMap, reverseIdMap } = testInternals(store);
 
       expect(idMap.size).toBe(3);
       expect(reverseIdMap.size).toBe(3);
@@ -791,7 +794,7 @@ describe("EdgeVecStore", () => {
   describe("score normalization", () => {
     it("normalizes cosine: 1 - distance", async () => {
       searchResults = [{ id: 0, score: 0.3, metadata: {} }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "cosine",
       });
@@ -805,7 +808,7 @@ describe("EdgeVecStore", () => {
 
     it("normalizes cosine: distance=0 → score=1", async () => {
       searchResults = [{ id: 0, score: 0, metadata: {} }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "cosine",
       });
@@ -819,7 +822,7 @@ describe("EdgeVecStore", () => {
 
     it("normalizes l2: 1 / (1 + distance)", async () => {
       searchResults = [{ id: 0, score: 4, metadata: {} }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "l2",
       });
@@ -833,7 +836,7 @@ describe("EdgeVecStore", () => {
 
     it("normalizes l2: distance=0 → score=1", async () => {
       searchResults = [{ id: 0, score: 0, metadata: {} }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "l2",
       });
@@ -847,7 +850,7 @@ describe("EdgeVecStore", () => {
 
     it("normalizes dotproduct: 1 / (1 + |distance|)", async () => {
       searchResults = [{ id: 0, score: -3, metadata: {} }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "dotproduct",
       });
@@ -861,7 +864,7 @@ describe("EdgeVecStore", () => {
 
     it("normalizes dotproduct: distance=0 → score=1", async () => {
       searchResults = [{ id: 0, score: 0, metadata: {} }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), {
+      const store = new EdgeVecStore(new MockEmbeddings(), {
         dimensions: 3,
         metric: "dotproduct",
       });
@@ -875,7 +878,7 @@ describe("EdgeVecStore", () => {
 
     it("defaults to cosine when no metric specified", async () => {
       searchResults = [{ id: 0, score: 0.4, metadata: {} }];
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
 
       const results = await store.similaritySearchVectorWithScore(
         [1, 0, 0],
@@ -887,7 +890,7 @@ describe("EdgeVecStore", () => {
 
   describe("fromTexts", () => {
     it("creates store and adds documents from text strings", async () => {
-      const embeddings = makeMockEmbeddings();
+      const embeddings = new MockEmbeddings();
       const store = await EdgeVecStore.fromTexts(
         ["hello", "world"],
         [{ source: "a" }, { source: "b" }],
@@ -907,7 +910,7 @@ describe("EdgeVecStore", () => {
       await EdgeVecStore.fromTexts(
         ["one", "two", "three"],
         { shared: true },
-        makeMockEmbeddings(),
+        new MockEmbeddings(),
         { dimensions: 3 }
       );
 
@@ -921,7 +924,7 @@ describe("EdgeVecStore", () => {
       await EdgeVecStore.fromTexts(
         ["a", "b"],
         [{ x: 1 }],
-        makeMockEmbeddings(),
+        new MockEmbeddings(),
         { dimensions: 3 }
       );
 
@@ -936,14 +939,15 @@ describe("EdgeVecStore", () => {
         new Document({ pageContent: "doc1", metadata: { idx: 0 } }),
         new Document({ pageContent: "doc2", metadata: { idx: 1 } }),
       ];
-      const embeddings = makeMockEmbeddings();
+      const embeddings = new MockEmbeddings();
+      const embedSpy = vi.spyOn(embeddings, "embedDocuments");
       const store = await EdgeVecStore.fromDocuments(docs, embeddings, {
         dimensions: 3,
       });
 
       expect(store._vectorstoreType()).toBe("edgevec");
       expect(addedVectors).toHaveLength(2);
-      expect(embeddings.embedDocuments).toHaveBeenCalledWith(["doc1", "doc2"]);
+      expect(embedSpy).toHaveBeenCalledWith(["doc1", "doc2"]);
     });
 
     it("returns a functional store instance", async () => {
@@ -957,7 +961,7 @@ describe("EdgeVecStore", () => {
 
       const store = await EdgeVecStore.fromDocuments(
         [new Document({ pageContent: "found", metadata: {} })],
-        makeMockEmbeddings(),
+        new MockEmbeddings(),
         { dimensions: 3 }
       );
 
@@ -972,7 +976,7 @@ describe("EdgeVecStore", () => {
 
   describe("ensureInitialized guard", () => {
     it("throws on addVectors when WASM not initialized", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       _resetForTesting();
 
       await expect(
@@ -984,12 +988,151 @@ describe("EdgeVecStore", () => {
     });
 
     it("throws on similaritySearchVectorWithScore when WASM not initialized", async () => {
-      const store = new EdgeVecStore(makeMockEmbeddings(), { dimensions: 3 });
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
       _resetForTesting();
 
       await expect(
         store.similaritySearchVectorWithScore([1, 2, 3], 5)
       ).rejects.toThrow(EdgeVecNotInitializedError);
+    });
+  });
+
+  describe("addVectors batch", () => {
+    it("adds 100 documents with all unique IDs", async () => {
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+      const docs = Array.from({ length: 100 }, (_, i) =>
+        new Document({ pageContent: `doc-${i}`, metadata: { idx: i } })
+      );
+      const vectors = docs.map(() => [0.1, 0.2, 0.3]);
+
+      const ids = await store.addVectors(vectors, docs);
+
+      expect(ids).toHaveLength(100);
+      expect(new Set(ids).size).toBe(100); // all unique
+      expect(addedVectors).toHaveLength(100);
+    });
+  });
+
+  describe("search k exceeds count", () => {
+    it("returns min(k, count) when k exceeds stored count", async () => {
+      // Only 3 results available, but k=10
+      searchResults = [
+        { id: 0, score: 0.1, metadata: { [PAGE_CONTENT_KEY]: "a" } },
+        { id: 1, score: 0.2, metadata: { [PAGE_CONTENT_KEY]: "b" } },
+        { id: 2, score: 0.3, metadata: { [PAGE_CONTENT_KEY]: "c" } },
+      ];
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      const results = await store.similaritySearchVectorWithScore(
+        [0.1, 0.2, 0.3],
+        10
+      );
+
+      // Mock returns 3 results regardless of k — store returns what engine gives
+      expect(results).toHaveLength(3);
+      expect(testInternals(store).index.search).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        10,
+        { includeMetadata: true }
+      );
+    });
+  });
+
+  describe("metadata edge cases (store-level)", () => {
+    it("throws MetadataSerializationError on circular reference in metadata", async () => {
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+      const circular: Record<string, unknown> = { name: "loop" };
+      circular.self = circular;
+
+      const doc = new Document({ pageContent: "test", metadata: circular });
+
+      await expect(
+        store.addVectors([[1, 2, 3]], [doc])
+      ).rejects.toThrow(MetadataSerializationError);
+    });
+
+    it("handles 10KB+ pageContent through add and search roundtrip", async () => {
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+      const largeContent = "x".repeat(10_240); // 10KB
+
+      const doc = new Document({ pageContent: largeContent, metadata: { size: "large" } });
+      const ids = await store.addVectors([[1, 2, 3]], [doc]);
+
+      expect(ids).toHaveLength(1);
+      // Verify the large pageContent was stored in metadata
+      expect(addedVectors[0].metadata[PAGE_CONTENT_KEY]).toBe(largeContent);
+
+      // Simulate search returning this document
+      searchResults = [
+        {
+          id: 0,
+          score: 0.05,
+          metadata: {
+            [PAGE_CONTENT_KEY]: largeContent,
+            [ID_KEY]: ids[0],
+            size: "large",
+          },
+        },
+      ];
+
+      const results = await store.similaritySearchVectorWithScore([1, 2, 3], 1);
+      expect(results).toHaveLength(1);
+      expect(results[0][0].pageContent).toBe(largeContent);
+      expect(results[0][0].pageContent.length).toBe(10_240);
+      expect(results[0][0].metadata.size).toBe("large");
+    });
+
+    it("preserves unicode and emoji in metadata through add and search roundtrip", async () => {
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+      const unicodeMetadata = {
+        title: "日本語テスト 🎌",
+        tags: ["émoji", "über", "中文"],
+        emoji: "🚀🔥💯",
+      };
+
+      const doc = new Document({ pageContent: "unicode test 🦀", metadata: unicodeMetadata });
+      const ids = await store.addVectors([[1, 2, 3]], [doc]);
+
+      expect(ids).toHaveLength(1);
+      expect(addedVectors[0].metadata[PAGE_CONTENT_KEY]).toBe("unicode test 🦀");
+      expect(addedVectors[0].metadata.title).toBe("日本語テスト 🎌");
+      expect(addedVectors[0].metadata.tags).toEqual(["émoji", "über", "中文"]);
+      expect(addedVectors[0].metadata.emoji).toBe("🚀🔥💯");
+
+      // Simulate search returning this document
+      searchResults = [
+        {
+          id: 0,
+          score: 0.1,
+          metadata: {
+            [PAGE_CONTENT_KEY]: "unicode test 🦀",
+            [ID_KEY]: ids[0],
+            title: "日本語テスト 🎌",
+            tags: ["émoji", "über", "中文"],
+            emoji: "🚀🔥💯",
+          },
+        },
+      ];
+
+      const results = await store.similaritySearchVectorWithScore([1, 2, 3], 1);
+      expect(results[0][0].pageContent).toBe("unicode test 🦀");
+      expect(results[0][0].metadata.title).toBe("日本語テスト 🎌");
+      expect(results[0][0].metadata.emoji).toBe("🚀🔥💯");
+    });
+  });
+
+  describe("invalid filter syntax", () => {
+    it("propagates error from index.search on invalid filter syntax", async () => {
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      // Make mock search reject with a filter error
+      testInternals(store).index.search.mockRejectedValueOnce(
+        new Error("Invalid filter syntax: unexpected token '!!!'")
+      );
+
+      await expect(
+        store.similaritySearchVectorWithScore([1, 2, 3], 5, "!!invalid!!!")
+      ).rejects.toThrow(/Invalid filter syntax/);
     });
   });
 });
