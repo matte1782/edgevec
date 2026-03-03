@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **FilterExpression object support** in `edgevec-langchain` — `similaritySearchVectorWithScore` now accepts both DSL strings and `FilterExpression` objects (`Filter.eq()`, `Filter.and()`, etc.)
+- Re-exported `Filter` and `FilterExpression` from `edgevec-langchain` for convenience
+- 6 new FilterExpression tests in `pkg/langchain/tests/store.test.ts` (134 total, up from 128)
+
+### Changed
+- **ROADMAP.md** updated to v7.0: marked v0.9.0/W42-43 as DONE, added Milestone 10.0 (W44 research spikes)
+- `pkg/langchain/README.md`: documented both filter forms (DSL strings + FilterExpression), removed "Coming Next" section
+
+### Research
+- **WebGPU Acceleration Spike** (`docs/research/WEBGPU_SPIKE.md`) — **NO-GO** for v0.10.0. GPU-CPU transfer overhead dominates at EdgeVec's operating scale; no crossover under 500K vectors for single queries.
+- **WASM Relaxed SIMD Spike** (`docs/research/RELAXED_SIMD_SPIKE.md`) — **NO-GO** for v0.10.0. Safari still behind flag; dual WASM bundles not justified for 1.5x ARM speedup alone.
+
 ---
 
 ## [0.9.0] - 2026-03-07 — Sparse Vectors, Hybrid Search, FlatIndex, BinaryFlatIndex

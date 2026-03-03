@@ -16,7 +16,7 @@ import { Document } from "@langchain/core/documents";
 import type { EmbeddingsInterface } from "@langchain/core/embeddings";
 import type { DocumentInterface } from "@langchain/core/documents";
 import { EdgeVecIndex } from "edgevec/edgevec-wrapper.js";
-import type { Metadata, SearchOptions } from "edgevec/edgevec-wrapper.js";
+import type { Metadata, SearchOptions, FilterExpression } from "edgevec/edgevec-wrapper.js";
 
 import { ensureInitialized, initEdgeVec } from "./init.js";
 import { serializeMetadata, deserializeMetadata, PAGE_CONTENT_KEY, ID_KEY } from "./metadata.js";
@@ -115,7 +115,7 @@ interface PersistedIdMapData {
  * ```
  */
 export class EdgeVecStore extends SaveableVectorStore {
-  declare FilterType: string;
+  declare FilterType: string | FilterExpression;
 
   /** LangChain serialization namespace */
   lc_namespace = ["langchain", "vectorstores", "edgevec"];
@@ -304,13 +304,13 @@ export class EdgeVecStore extends SaveableVectorStore {
    *
    * @param query - Query embedding vector
    * @param k - Number of results to return
-   * @param filter - Optional EdgeVec filter DSL string
+   * @param filter - Optional EdgeVec filter: DSL string or FilterExpression object
    * @returns Array of [Document, normalizedScore] tuples
    */
   async similaritySearchVectorWithScore(
     query: number[],
     k: number,
-    filter?: string
+    filter?: string | FilterExpression
   ): Promise<[DocumentInterface, number][]> {
     ensureInitialized();
 

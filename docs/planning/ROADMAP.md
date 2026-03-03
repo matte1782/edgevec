@@ -1,19 +1,19 @@
-# EdgeVec Roadmap v6.1
+# EdgeVec Roadmap v7.0
 
-**Date:** 2026-01-08
+**Date:** 2026-03-17
 **Author:** PLANNER
-**Status:** [REVISED] — v0.8.0 Released, v0.9.0-v1.0 Strategic Plan
-**Current Version:** v0.8.0 (released 2026-01-08)
-**Next Version:** v0.9.0 (planned — Weeks 36-41)
+**Status:** [REVISED] — v0.9.0 Released, v0.10.0 Strategic Plan
+**Current Version:** v0.9.0 (released 2026-03-07)
+**Next Version:** v0.10.0 (planned — Weeks 44-47)
 
 ---
 
 ## Executive Summary
 
 **Total Duration:** ~52 Weeks (Dec 2025 – Dec 2026)
-**Current Status:** v0.8.0 RELEASED — Consolidation complete, developer experience enhanced
+**Current Status:** v0.9.0 RELEASED — Hybrid search, sparse vectors, LangChain.js integration complete
 **Philosophy:** Test-First, WASM-Native, Community-Driven
-**Critical Path:** v0.9.0 (Hybrid Search) → v0.10.0 (Advanced Features) → v1.0 (Production)
+**Critical Path:** v0.10.0 (WebGPU/SIMD Research + Advanced Features) → v1.0 (Production)
 
 ### Strategic Priorities (2026)
 
@@ -30,8 +30,8 @@
 |:--------|:-------|:------|:-------|
 | v0.7.0 | **RELEASED** | SIMD Acceleration, First Community PR | 2025-12-30 |
 | v0.8.0 | **RELEASED** | Consolidation + Developer Experience | 2026-01-08 |
-| v0.9.0 | PLANNED | Sparse Vectors + Hybrid Search + Flat Index | Week 36-41 |
-| v0.10.0 | PLANNED | WebGPU Research + PQ Research | Week 42-47 |
+| v0.9.0 | **RELEASED** | Sparse Vectors + Hybrid Search + Flat Index + LangChain.js | 2026-03-07 |
+| v0.10.0 | IN PROGRESS | WebGPU/Relaxed SIMD Research + PQ Research | Week 44-47 |
 | v1.0 | PLANNED | Production Release | Week 48-52 |
 
 ---
@@ -179,13 +179,14 @@ function SearchComponent() {
 
 ---
 
-## Phase 9: v0.9.0 Hybrid Search + Community Features (Weeks 36-41)
+## Phase 9: v0.9.0 Hybrid Search + Community Features (Weeks 36-43) — RELEASED
 
 ### Strategic Context
 
-v0.9.0 focuses on **hybrid search capability** (the #1 community request) while integrating @jsonMartin's Flat Index contribution. The milestone order is optimized to eliminate external dependencies from the critical path.
+v0.9.0 delivered **hybrid search capability** (the #1 community request), Flat Index, sparse vectors, and the LangChain.js integration.
 
-**Total Duration:** 6 weeks (~72 hours)
+**Total Duration:** 8 weeks (~90 hours)
+**Status:** RELEASED (2026-03-07)
 **HOSTILE_REVIEWER:** Plan revised 2026-01-08 to address critical dependency issues
 
 ### Dependency Graph (De-risked)
@@ -202,7 +203,7 @@ Week 40-41: Flat Index (32h) [CONDITIONAL]
 
 ### Milestone 9.1: Sparse Vector Support (Weeks 36-37, 24h)
 
-**Status:** PLANNED — No external dependencies
+**Status:** COMPLETE ✓
 **Source:** Lucas (Reddit) asking for BM25/hybrid search
 **Priority:** P0 — Enables hybrid search, no blockers
 
@@ -238,7 +239,7 @@ impl SparseVector {
 
 ### Milestone 9.2: RRF Hybrid Search Helper (Weeks 38-39, 16h)
 
-**Status:** PLANNED — Depends on Milestone 9.1
+**Status:** COMPLETE ✓
 **Source:** Industry standard (Milvus, Weaviate, pgvector all use RRF)
 **Priority:** P0 — Core v0.9.0 feature
 
@@ -285,9 +286,9 @@ function rrf(dense: Id[], sparse: Id[], k = 60): Id[] {
 - [ ] Linear fusion mode tested
 - [ ] Integration tests with real BM25 scores
 
-### Milestone 9.3: Flat Index Implementation (Weeks 40-41, 32h) [CONDITIONAL]
+### Milestone 9.3: Flat Index Implementation (Weeks 40-41, 32h)
 
-**Status:** CONDITIONAL — Awaiting @jsonMartin RFC
+**Status:** COMPLETE ✓ — Implemented as FlatIndex + BinaryFlatIndex
 **Source:** PR #4 discussion, contributor announcement
 **Priority:** P1 — Community contribution, not on critical path
 
@@ -329,81 +330,113 @@ function rrf(dense: Id[], sparse: Id[], k = 60): Id[] {
 **Rationale:** No exit criteria defined; premature before BQ validated at production scale.
 See Phase 10 (v0.10.0) for PQ research with proper RFC.
 
-### v0.9.0 Success Metrics
+### Milestone 9.4: LangChain.js Integration (Weeks 42-43, 47.5h)
 
-| Metric | Target | Gate |
-|:-------|:-------|:-----|
-| Sparse vector ops | <1μs dot product | REQUIRED |
-| Hybrid search accuracy | >0.90 recall | REQUIRED |
-| Flat Index search (10k) | <50ms brute force | CONDITIONAL |
-| Community RFC turnaround | <1 week | REQUIRED |
-| Bundle size | <600KB gzipped | REQUIRED |
+**Status:** COMPLETE ✓
+**Source:** Community demand for framework integration
+**Deliverables:**
+- `edgevec-langchain` npm package (ESM 7.51KB + CJS 8.31KB)
+- Full `SaveableVectorStore` adapter with HNSW, persistence, metadata filtering
+- 128 tests at v0.9.0 release (41 metadata + 62 store + 25 integration); 134 after W44 FilterExpression addition
+- Score normalization: cosine, l2, dotproduct
+- FilterExpression object support (W44 addition)
+- Published to npm as `edgevec-langchain@0.1.0`
 
-### v0.9.0 Release Checklist
+### v0.9.0 Success Metrics — ACHIEVED
 
-**Core (REQUIRED):**
-- [ ] Sparse Vectors implemented and tested
-- [ ] RRF Hybrid Search implemented and tested
-- [ ] All quality gates pass (700+ tests)
-- [ ] Clippy clean
-- [ ] HOSTILE_REVIEWER approval
-- [ ] crates.io + npm publish
+| Metric | Target | Actual | Gate |
+|:-------|:-------|:-------|:-----|
+| Sparse vector ops | <1μs dot product | ✅ Achieved | REQUIRED |
+| Hybrid search accuracy | >0.90 recall | ✅ Achieved | REQUIRED |
+| Flat Index search (10k) | <50ms brute force | ✅ Achieved | REQUIRED |
+| LangChain.js adapter | Working integration | ✅ 134 tests | REQUIRED |
+| Test count | 700+ | 980+ lib + 134 langchain | REQUIRED |
+| Bundle size | <600KB gzipped | 477KB | REQUIRED |
 
-**Conditional:**
-- [ ] Flat Index (if RFC received by Week 35)
+### v0.9.0 Release Checklist — ALL COMPLETE
+
+- [x] Sparse Vectors implemented and tested
+- [x] RRF Hybrid Search implemented and tested
+- [x] Flat Index (FlatIndex + BinaryFlatIndex)
+- [x] LangChain.js integration (`edgevec-langchain`)
+- [x] All quality gates pass (980+ lib tests + 134 langchain tests)
+- [x] Clippy clean
+- [x] HOSTILE_REVIEWER approval (3 rounds)
+- [x] crates.io + npm publish
+- [x] Miri audit: 392+ tests pass, 0 UB
+
+**v0.9.0 Status:** RELEASED (2026-03-07)
 
 ---
 
-## Phase 10: v0.10.0 Advanced Features (Weeks 42-47)
+## Phase 10: v0.10.0 Advanced Features (Weeks 44-47)
 
 ### Strategic Context
 
-v0.10.0 explores next-generation browser capabilities (WebGPU, WASM 3.0) and integrates advanced features if research validates them.
+v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD) via time-boxed research spikes with hard GO/NO-GO criteria. Also includes Product Quantization research and LangChain.js enhancements.
 
-**Total Duration:** 6 weeks (~70 hours)
+**Total Duration:** 4 weeks (~50 hours)
 
-### Milestone 10.1: WebGPU Acceleration Research (Weeks 42-44, 24h)
+### Milestone 10.0: Research Spikes + Housekeeping (Week 44, 32h)
 
-**Status:** RESEARCH
-**Source:** Industry trend (3x faster than WebGL, browser ML support)
+**Status:** COMPLETE (W44 research spikes delivered; GO/NO-GO decisions made)
+**Source:** Roadmap items deferred from W42-43 planning
+**Plan:** `docs/planning/weeks/week_44/WEEKLY_TASK_PLAN.md`
 
-**Browser Support (as of 2025):**
+**Deliverables:**
+| Task | Hours | Output | Status |
+|:-----|:------|:-------|:-------|
+| WebGPU PoC + Benchmark | 12h | `docs/research/WEBGPU_SPIKE.md` | COMPLETE (NO-GO) |
+| Relaxed SIMD Feasibility | 4h | `docs/research/RELAXED_SIMD_SPIKE.md` | COMPLETE (NO-GO) |
+| FilterExpression in edgevec-langchain | 2h | Updated `store.ts` + 6 tests | COMPLETE |
+| ROADMAP update (this doc) | 1h | Mark W42-43 DONE, add Milestone 10.0 | COMPLETE |
+| Hostile review of all artifacts | 4h | Review docs | COMPLETE |
+
+**WebGPU GO/NO-GO Criteria (ALL must be true for GO):**
+- [ ] WebGPU beats WASM SIMD128 by >2x at some N <= 500K vectors
+- [ ] GPU-CPU transfer overhead <50% of total query time at crossover N
+- [ ] Bundle size increase <100KB (or lazy-loadable)
+- [ ] Feature can be optional without breaking non-WebGPU users
+
+**Relaxed SIMD GO/NO-GO Criteria (ALL must be true for GO):**
+- [ ] Safari enables Relaxed SIMD by default (not behind flag), OR reliable runtime detection exists
+- [ ] Estimated speedup >1.3x for at least one EdgeVec hot path
+- [ ] Can use existing `simd_dispatch!` macro pattern
+- [ ] No regression risk for browsers without support
+
+### Milestone 10.1: WebGPU Acceleration Implementation (Weeks 45-46, 24h) [IF GO]
+
+**Status:** CONDITIONAL — Pending W44 spike decision
+**Source:** Industry trend (WebGPU compute shaders for ML inference)
+
+**Browser Support (as of March 2026):**
 | Browser | WebGPU Status |
 |:--------|:--------------|
 | Chrome 113+ | ✅ Stable |
 | Edge 113+ | ✅ Stable |
-| Firefox 139+ | ✅ Stable |
-| Safari 18+ | ✅ Stable |
+| Firefox 141+ | ✅ Stable |
+| Safari 26+ | ✅ Stable |
 
-**Research Deliverables:**
+**If GO — Implementation Plan:**
 | Task | Hours | Output |
 |:-----|:------|:-------|
-| WebGPU spike (matrix ops) | 8h | Proof of concept |
-| Benchmark vs WASM SIMD | 8h | Performance comparison |
-| Memory transfer overhead | 4h | GPU↔CPU cost analysis |
-| Integration design | 4h | Architecture proposal |
+| JS bridge architecture | 4h | `src/gpu_bridge.js` |
+| WGSL dot product + L2 shaders | 4h | Compute pipelines |
+| Lazy-loading + feature detection | 4h | Optional WebGPU path |
+| Integration with EdgeVecIndex | 8h | Search acceleration |
+| Tests + benchmarks | 4h | Regression suite |
 
-**Key Questions:**
-1. When does WebGPU beat WASM SIMD? (likely >100k vectors)
-2. What's the GPU memory transfer overhead?
-3. Can we make it optional without bloating bundle?
+### Milestone 10.2: WASM Relaxed SIMD Implementation (Week 45, 12h) [IF GO]
 
-### Milestone 10.2: WASM 3.0 Relaxed SIMD (Week 44-45, 12h)
+**Status:** CONDITIONAL — Pending W44 spike decision
+**Source:** WASM Relaxed SIMD proposal (Phase 4 — standardized)
 
-**Status:** PLANNED (pending browser adoption)
-**Source:** WASM 3.0 spec (Sept 2025)
-
-**New Instructions:**
-| Instruction | Speedup | Use Case |
-|:------------|:--------|:---------|
-| Relaxed FMA | 1.5-2x | Dot product, L2 |
-| Relaxed dot product | 1.5-3x | Cosine similarity |
-| Half-precision (f16) | 2x memory | Large indexes |
-
-**Deliverables:**
-- [ ] Feature detection for relaxed SIMD
-- [ ] Updated SIMD implementations
-- [ ] Benchmark validation
+**If GO — Implementation Plan:**
+| Task | Hours | Output |
+|:-----|:------|:-------|
+| Add `wasm_relaxed` branch to `simd_dispatch!` | 4h | New SIMD path |
+| Relaxed FMA dot product | 4h | Optimized hot paths |
+| Benchmark validation | 4h | Speedup verification |
 
 ### Milestone 10.3: BM25 Integration (Weeks 45-46, 16h)
 
@@ -446,19 +479,23 @@ Research Questions (must answer ALL):
 - <100ns lookup overhead
 - >0.85 recall
 
-### Milestone 10.5: Flat Index (Weeks 40-41, 32h) [IF DEFERRED FROM v0.9.0]
+### Milestone 10.5: LangChain.js v0.2.0 (Week 45, 8h)
 
-**Status:** CONDITIONAL — Only if @jsonMartin RFC not received for v0.9.0
-**Note:** This milestone moves here if Flat Index deferred from v0.9.0
-
-See Phase 9 Milestone 9.3 for full specification.
+**Status:** PLANNED
+**Source:** W44 FilterExpression work
+**Deliverables:**
+- FilterExpression object support in `edgevec-langchain`
+- Additional test coverage and edge cases
+- Usage examples and guide
+- npm publish `edgevec-langchain@0.2.0`
 
 ### v0.10.0 Success Metrics
 
 | Metric | Target |
 |:-------|:-------|
-| WebGPU decision | Go/No-Go |
-| Relaxed SIMD speedup | 1.5x+ |
+| WebGPU decision | Go/No-Go documented |
+| Relaxed SIMD decision | Go/No-Go documented |
+| Research spikes | All exit criteria answered with data |
 | Bundle size | <600KB (with PQ) |
 
 ---
@@ -612,7 +649,7 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 |:--------|:--------|:---------|:-------------------|:----|
 | SIMD Acceleration | ✅ 8.75x | ❌ | ❌ | ❌ |
 | Binary Quantization | ✅ 32x | ❌ | ❌ | ❌ |
-| Hybrid Search | 🔜 v0.9.0 | ❌ | ✅ BM25 | ❌ |
+| Hybrid Search | ✅ v0.9.0 | ❌ | ✅ BM25 | ❌ |
 | Bundle Size | 477KB | ~300KB | ~200KB | ~100KB |
 | IndexedDB Persistence | ✅ | ✅ | ✅ | ❌ |
 | iOS Safari | ✅ (fallback) | ✅ | ✅ | ✅ |
@@ -634,8 +671,8 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 | v0.6.0 | 2025-12-23 | Metadata Storage + Binary Quantization |
 | v0.7.0 | 2025-12-30 | SIMD Acceleration + First Community PR |
 | v0.8.0 | 2026-01-08 | Consolidation + Developer Experience |
-| v0.9.0 | TBD (W41) | Sparse Vectors + Hybrid Search + Flat Index (conditional) |
-| v0.10.0 | TBD (W47) | WebGPU Research + PQ Research + Advanced Features |
+| v0.9.0 | 2026-03-07 | Sparse Vectors + Hybrid Search + Flat Index + LangChain.js |
+| v0.10.0 | TBD (W47) | WebGPU/Relaxed SIMD Research + PQ Research |
 | v1.0 | TBD (W52) | Production Release |
 
 ---
@@ -656,6 +693,7 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 | v5.1 | 2025-12-23 | v0.7.0 planning with Reddit feedback |
 | v6.0 | 2026-01-04 | Post-v0.7.0 strategic plan with community/industry analysis |
 | v6.1 | 2026-01-08 | v0.8.0 RELEASED; v0.9.0 de-risked (HOSTILE_REVIEWER reorder) |
+| v7.0 | 2026-03-17 | v0.9.0 RELEASED; W42-43 actuals; Milestone 10.0 (W44 research spikes) |
 
 ---
 

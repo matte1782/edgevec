@@ -1169,4 +1169,149 @@ describe("EdgeVecStore", () => {
       ).rejects.toThrow(/Invalid filter syntax/);
     });
   });
+
+  describe("FilterExpression support", () => {
+    // Note: edgevec WASM module is fully mocked in this test suite. The Filter
+    // class from edgevec/filter.js is a pure JS object (not WASM-dependent) but
+    // its constructor references the WASM-backed parser. We test pass-through
+    // behavior using structurally typed objects that satisfy the FilterExpression
+    // interface, which is sufficient to verify that EdgeVecStore correctly forwards
+    // filter objects to the underlying index.search() without transformation.
+
+    /** Helper: create a mock FilterExpression that satisfies the interface contract */
+    function mockFilterExpression(json: string, str: string): import("edgevec/edgevec-wrapper.js").FilterExpression {
+      return {
+        _json: json,
+        toString: () => str,
+        toJSON: () => JSON.parse(json),
+        isTautology: false,
+        isContradiction: false,
+        complexity: 1,
+      };
+    }
+
+    it("accepts FilterExpression object as filter parameter", async () => {
+      searchResults = [];
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      const filterExpr = mockFilterExpression(
+        '{"op":"eq","field":"category","value":"gpu"}',
+        'category = "gpu"'
+      );
+
+      await store.similaritySearchVectorWithScore(
+        [0.1, 0.2, 0.3],
+        5,
+        filterExpr
+      );
+
+      const mockIndex = testInternals(store).index;
+      expect(mockIndex.search).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        5,
+        { filter: filterExpr, includeMetadata: true }
+      );
+    });
+
+    it("accepts AND-combined FilterExpression objects", async () => {
+      searchResults = [];
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      const andFilter = mockFilterExpression(
+        '{"op":"and","children":[{"op":"eq","field":"category","value":"gpu"},{"op":"gt","field":"price","value":100}]}',
+        'category = "gpu" AND price > 100'
+      );
+
+      await store.similaritySearchVectorWithScore(
+        [0.1, 0.2, 0.3],
+        5,
+        andFilter
+      );
+
+      const mockIndex = testInternals(store).index;
+      expect(mockIndex.search).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        5,
+        { filter: andFilter, includeMetadata: true }
+      );
+    });
+
+    it("accepts OR-combined FilterExpression objects", async () => {
+      searchResults = [];
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      const orFilter = mockFilterExpression(
+        '{"op":"or","children":[{"op":"eq","field":"status","value":"active"},{"op":"eq","field":"status","value":"featured"}]}',
+        'status = "active" OR status = "featured"'
+      );
+
+      await store.similaritySearchVectorWithScore(
+        [0.1, 0.2, 0.3],
+        5,
+        orFilter
+      );
+
+      const mockIndex = testInternals(store).index;
+      expect(mockIndex.search).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        5,
+        { filter: orFilter, includeMetadata: true }
+      );
+    });
+
+    it("accepts between FilterExpression", async () => {
+      searchResults = [];
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      const betweenFilter = mockFilterExpression(
+        '{"op":"between","field":"price","low":100,"high":500}',
+        "price >= 100 AND price <= 500"
+      );
+
+      await store.similaritySearchVectorWithScore(
+        [0.1, 0.2, 0.3],
+        5,
+        betweenFilter
+      );
+
+      const mockIndex = testInternals(store).index;
+      expect(mockIndex.search).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        5,
+        { filter: betweenFilter, includeMetadata: true }
+      );
+    });
+
+    it("still accepts string filters (backward compatibility)", async () => {
+      searchResults = [];
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      await store.similaritySearchVectorWithScore(
+        [0.1, 0.2, 0.3],
+        5,
+        'status = "active"'
+      );
+
+      const mockIndex = testInternals(store).index;
+      expect(mockIndex.search).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        5,
+        { filter: 'status = "active"', includeMetadata: true }
+      );
+    });
+
+    it("handles undefined filter (no filter)", async () => {
+      searchResults = [];
+      const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+      await store.similaritySearchVectorWithScore([0.1, 0.2, 0.3], 5);
+
+      const mockIndex = testInternals(store).index;
+      expect(mockIndex.search).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        5,
+        { includeMetadata: true }
+      );
+    });
+  });
 });

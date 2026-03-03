@@ -158,7 +158,7 @@ Add precomputed embedding vectors with their documents. Returns assigned string 
 async similaritySearch(
   query: string,
   k: number,
-  filter?: string
+  filter?: string | FilterExpression
 ): Promise<DocumentInterface[]>
 ```
 
@@ -170,7 +170,7 @@ Search for documents similar to a text query. Returns `Document` instances (whic
 async similaritySearchVectorWithScore(
   query: number[],
   k: number,
-  filter?: string
+  filter?: string | FilterExpression
 ): Promise<[DocumentInterface, number][]>
 ```
 
@@ -239,9 +239,54 @@ Advanced: Convert between LangChain's flexible metadata and EdgeVec's `MetadataV
 
 Most users do not need these — `EdgeVecStore` handles serialization internally.
 
-## Filter Syntax
+## Filtering
 
-Filters use EdgeVec's DSL, passed as a string to `similaritySearch` or `similaritySearchVectorWithScore`.
+EdgeVec supports two filter styles: **DSL strings** and **`FilterExpression` objects**.
+
+### FilterExpression (Programmatic)
+
+Build filters programmatically using the `Filter` API — no string parsing, full type safety:
+
+```typescript
+import { Filter, EdgeVecStore } from "edgevec-langchain";
+
+// Simple equality
+const docs = await store.similaritySearch("query", 5, Filter.eq("category", "gpu"));
+
+// AND combination
+const docs = await store.similaritySearch(
+  "query", 5,
+  Filter.and(
+    Filter.eq("category", "gpu"),
+    Filter.lt("price", 500)
+  )
+);
+
+// OR combination
+const docs = await store.similaritySearch(
+  "query", 5,
+  Filter.or(
+    Filter.eq("brand", "nvidia"),
+    Filter.eq("brand", "amd")
+  )
+);
+
+// Complex: range + NOT + nested logic
+const docs = await store.similaritySearch(
+  "query", 5,
+  Filter.and(
+    Filter.between("price", 100, 500),
+    Filter.not(Filter.eq("status", "discontinued")),
+    Filter.any("tags", "gaming")
+  )
+);
+```
+
+**Available `Filter` methods:** `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `between`, `contains`, `startsWith`, `endsWith`, `like`, `in`, `notIn`, `any`, `allOf`, `none`, `isNull`, `isNotNull`, `and`, `or`, `not`, `parse`, `tryParse`, `validate`, `matchAll`, `nothing`.
+
+### DSL Strings
+
+Filters can also be passed as EdgeVec DSL strings:
 
 ### Operator Reference
 
@@ -357,8 +402,6 @@ const docs = await store.similaritySearch(
 const docs = await store.similaritySearch("query", 5, "price BETWEEN 100 AND 500");
 ```
 
-> Filters are currently passed as EdgeVec DSL strings. Object-based `FilterExpression` support is planned — see [Coming Next](#coming-next).
-
 ## WASM Initialization
 
 EdgeVec is a Rust library compiled to WebAssembly. The WASM module must be initialized before use.
@@ -441,10 +484,6 @@ Raw distances from EdgeVec are normalized to similarity scores where **higher = 
 For `dotproduct`, EdgeVec returns the negative inner product as the "distance", so this formula yields higher scores for higher dot products (sigmoid of the negated distance).
 
 Non-finite scores (NaN, Infinity) are clamped to `0`.
-
-## Coming Next
-
-- `FilterExpression` object support for programmatic filter construction
 
 ## License
 
