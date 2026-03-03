@@ -50,10 +50,11 @@
     "similarity-search",
     "rag"
   ],
+  "author": "Matteo Panzeri",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/panzerimatteo/edgevec",
+    "url": "https://github.com/matte1782/edgevec",
     "directory": "pkg/langchain"
   },
   "engines": {
