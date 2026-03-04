@@ -41,6 +41,7 @@
 use crate::flat::BinaryFlatIndexError;
 use crate::hnsw::GraphError;
 use crate::persistence::PersistenceError;
+use crate::quantization::product::PqError;
 use thiserror::Error;
 
 /// The Unified EdgeVec Error type.
@@ -61,6 +62,10 @@ pub enum EdgeVecError {
     /// Flat index errors (dimension mismatch, invalid dimensions).
     #[error(transparent)]
     FlatIndex(#[from] BinaryFlatIndexError),
+
+    /// Product Quantization errors.
+    #[error(transparent)]
+    ProductQuantization(#[from] PqError),
 
     /// Validation errors (invalid arguments, dimensions, etc).
     #[error("Validation error: {0}")]
@@ -165,6 +170,8 @@ impl From<EdgeVecError> for JsValue {
                 }
                 BinaryFlatIndexError::CapacityOverflow(_, _) => ("ERR_CAPACITY", fe.to_string()),
             },
+
+            EdgeVecError::ProductQuantization(pe) => ("ERR_PQ", pe.to_string()),
 
             EdgeVecError::Validation(msg) => ("ERR_VALIDATION", msg.clone()),
         };

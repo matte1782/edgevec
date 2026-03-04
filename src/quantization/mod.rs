@@ -57,6 +57,13 @@ pub mod scalar;
 /// - Performance analysis
 pub mod simd;
 
+/// Product Quantization (PQ) for high-compression vector encoding.
+///
+/// Compresses vectors into M-byte codes using learned subspace codebooks.
+/// Achieves 384× compression at M=8 (768D → 8 bytes) with codebook-based
+/// Asymmetric Distance Computation (ADC) for approximate search.
+pub mod product;
+
 /// Variable-dimension binary quantization.
 ///
 /// This module provides `BinaryVector` which supports any dimension
@@ -66,5 +73,6 @@ pub mod variable;
 pub use binary::{
     BinaryQuantizer, QuantizedVector, BINARY_QUANTIZATION_DIM, QUANTIZED_VECTOR_SIZE,
 };
+pub use product::{DistanceTable, PqCode, PqCodebook, PqError};
 pub use scalar::{QuantizerConfig, ScalarQuantizer};
 pub use variable::{BinaryVector, QuantizationError};
