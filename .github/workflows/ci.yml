@@ -2,6 +2,7 @@
 # ========================
 # W18.2: CI Hardening — Documented timeouts and environment variables
 # W45.6: CI Optimization — Added Rust dependency caching, Miri skip filters
+# W46.2: Expanded Miri skips — hybrid::, quantization::product::, hnsw:: (all pure-safe, no UB risk)
 #
 # Local Simulation:
 #   cargo xtask ci-check
@@ -16,7 +17,7 @@
 #   lint:       5 minutes  (cargo fmt + clippy)
 #   wasm-check: 5 minutes  (cargo check --target wasm32-unknown-unknown)
 #   fuzz-check: 5 minutes  (cargo +nightly check)
-#   miri:       35 minutes (cargo +nightly miri test, with skip filters)
+#   miri:       25 minutes (cargo +nightly miri test, focused on unsafe-adjacent code only)
 
 name: EdgeVec CI
 
@@ -113,12 +114,18 @@ jobs:
         run: cargo +nightly check --manifest-path fuzz/Cargo.toml --all-targets
 
   # Job 5: Miri Safety Audit (UB detection)
-  # Focuses on unsafe-adjacent code: SIMD, persistence, quantization, storage
-  # Pure-safe modules (filter, metadata) are skipped — they have 0 unsafe code
+  # Focuses ONLY on unsafe-adjacent code: SIMD, persistence, storage binary ops
+  # Skipped modules (pure-safe, no unsafe, or too slow under Miri):
+  #   - filter::, metadata:: — zero unsafe code
+  #   - hybrid:: — pure-safe search/fusion logic, very slow under Miri
+  #   - quantization::product:: — pure-safe k-means/PQ, extremely slow under Miri
+  #   - hnsw:: — graph search is safe-only, slow under Miri instrumentation
+  #   - wasm — not available in Miri
+  #   - test_bq_vs_f32_recall_comparison — slow integration test
   miri:
     name: Miri Safety Check
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -138,7 +145,10 @@ jobs:
             --skip filter:: \
             --skip metadata::validation:: \
             --skip metadata::serialize:: \
-            --skip metadata::error::
+            --skip metadata::error:: \
+            --skip hybrid:: \
+            --skip quantization::product:: \
+            --skip hnsw::
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
           PROPTEST_CASES: "4"
@@ -151,7 +161,10 @@ jobs:
             --skip filter:: \
             --skip metadata::validation:: \
             --skip metadata::serialize:: \
-            --skip metadata::error::
+            --skip metadata::error:: \
+            --skip hybrid:: \
+            --skip quantization::product:: \
+            --skip hnsw::
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
           PROPTEST_CASES: "4"

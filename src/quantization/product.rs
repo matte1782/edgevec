@@ -132,6 +132,19 @@ impl PqCode {
     }
 }
 
+/// Result of a PQ scan: vector index and approximate distance.
+///
+/// Returned by [`DistanceTable::scan_topk`] in ascending distance order
+/// (nearest first).
+// Implements: D2T1 — Exhaustive PQ scan top-k
+#[derive(Debug, Clone, PartialEq)]
+pub struct PqSearchResult {
+    /// Index of the vector in the `codes` slice passed to `scan_topk`.
+    pub index: usize,
+    /// Approximate squared L2 distance from the query.
+    pub distance: f32,
+}
+
 /// Precomputed distance lookup table for Asymmetric Distance Computation (ADC).
 ///
 /// For a given query vector, stores the L2 distance from each query subvector
@@ -200,6 +213,60 @@ impl DistanceTable {
     #[must_use]
     pub fn ksub(&self) -> usize {
         self.ksub
+    }
+
+    /// Exhaustive scan over PQ codes, returning the top-k nearest by ADC distance.
+    ///
+    /// Computes ADC distance for every code, then returns the k smallest.
+    /// Results are sorted by distance ascending (nearest first).
+    ///
+    /// If `k > codes.len()`, returns all codes sorted by distance.
+    /// If `codes` is empty, returns an empty vec.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any code has a different number of subquantizers than this table.
+    ///
+    /// # NaN Handling
+    ///
+    /// If any ADC distance is NaN (should not occur with a validly trained codebook),
+    /// NaN values sort to arbitrary positions in the result set. This is defined
+    /// behavior but results are not meaningful — callers should validate codebook
+    /// training data is free of NaN/Inf (enforced by `PqCodebook::train`).
+    ///
+    /// # Performance
+    ///
+    /// Time: O(n * M + n * log n) where n = codes.len(), M = num_subquantizers.
+    /// Uses a simple sort; BinaryHeap optimization can reduce to O(n * M + n * log k)
+    /// in a future iteration.
+    // Implements: D2T1 — Exhaustive PQ scan top-k
+    #[must_use]
+    pub fn scan_topk(&self, codes: &[PqCode], k: usize) -> Vec<PqSearchResult> {
+        if codes.is_empty() || k == 0 {
+            return Vec::new();
+        }
+
+        // Compute all distances
+        let mut results: Vec<PqSearchResult> = codes
+            .iter()
+            .enumerate()
+            .map(|(i, code)| PqSearchResult {
+                index: i,
+                distance: self.compute_distance(code),
+            })
+            .collect();
+
+        // Sort by distance ascending (nearest first).
+        // Use `partial_cmp` with a fallback so NaN does not cause undefined order.
+        results.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Truncate to k
+        results.truncate(k);
+        results
     }
 }
 
@@ -382,6 +449,32 @@ impl PqCodebook {
         }
 
         Ok(PqCode { codes })
+    }
+
+    /// Encode a batch of vectors into PQ codes.
+    ///
+    /// Encodes each vector independently by delegating to [`encode`](Self::encode).
+    /// Returns all codes if every vector succeeds, or the first error encountered.
+    ///
+    /// # Arguments
+    ///
+    /// * `vectors` - Slice of vector slices, each D-dimensional.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<PqCode>` with one code per input vector, in the same order.
+    ///
+    /// # Errors
+    ///
+    /// Returns `PqError::DimensionMismatch` if any vector has wrong dimensionality.
+    ///
+    /// # Performance
+    ///
+    /// Time: O(n * M * Ksub * sub_dim) where n = vectors.len()
+    /// Space: O(n * M) for the output codes
+    // Implements: D2T2 -- Batch encode for vector collections
+    pub fn encode_batch(&self, vectors: &[&[f32]]) -> Result<Vec<PqCode>, PqError> {
+        vectors.iter().map(|v| self.encode(v)).collect()
     }
 
     /// Compute the ADC distance table for a query vector.
@@ -992,5 +1085,261 @@ mod tests {
             let code = cb.encode(v).expect("encode must work");
             assert_eq!(code.num_subquantizers(), 1);
         }
+    }
+
+    // =========================================================================
+    // D2T2: encode_batch() tests
+    // =========================================================================
+
+    /// Verifies: encode_batch returns Ok with correct count and code length.
+    #[test]
+    fn test_encode_batch_basic() {
+        // Train on 100 vectors, 32D, M=4, Ksub=16
+        let data = generate_test_data(100, 32, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train should succeed");
+
+        // Batch-encode all 100 training vectors
+        let codes = cb.encode_batch(&refs).expect("encode_batch should succeed");
+
+        // Must return exactly 100 PqCodes
+        assert_eq!(codes.len(), 100, "should produce one code per input vector");
+
+        // Each code must have M=4 bytes
+        for (i, code) in codes.iter().enumerate() {
+            assert_eq!(
+                code.num_subquantizers(),
+                4,
+                "code {i} should have M=4 subquantizers"
+            );
+            // All centroid indices must be < Ksub=16
+            assert!(
+                code.codes().iter().all(|&c| (c as usize) < 16),
+                "code {i} has centroid index >= Ksub"
+            );
+        }
+    }
+
+    /// Verifies: encode_batch returns DimensionMismatch on mixed dimensions.
+    #[test]
+    fn test_encode_batch_dimension_mismatch() {
+        // Train on 32D vectors
+        let data = generate_test_data(100, 32, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train should succeed");
+
+        // Create a batch with one 64D vector mixed in
+        let good_vec = vec![0.0f32; 32];
+        let bad_vec = vec![0.0f32; 64];
+        let batch: Vec<&[f32]> = vec![good_vec.as_slice(), bad_vec.as_slice()];
+
+        let result = cb.encode_batch(&batch);
+        assert!(
+            matches!(
+                result,
+                Err(PqError::DimensionMismatch {
+                    expected: 32,
+                    actual: 64,
+                })
+            ),
+            "should fail with DimensionMismatch for the 64D vector, got: {result:?}"
+        );
+    }
+
+    /// Verifies: encode_batch on empty input returns Ok(vec![]).
+    #[test]
+    fn test_encode_batch_empty() {
+        let data = generate_test_data(100, 32, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train should succeed");
+
+        let empty: Vec<&[f32]> = vec![];
+        let codes = cb.encode_batch(&empty).expect("empty batch should succeed");
+        assert!(codes.is_empty(), "empty input should produce empty output");
+    }
+
+    // =========================================================================
+    // D2T1: scan_topk tests
+    // =========================================================================
+
+    /// Train on 100 vectors (32D, M=4, Ksub=16), encode all, scan for top-5.
+    /// Verify: returns exactly 5 results, sorted ascending by distance,
+    /// all indices in range 0..100.
+    #[test]
+    fn test_pq_scan_topk_basic() {
+        let data = generate_test_data(100, 32, 99);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        let codes: Vec<PqCode> = data.iter().map(|v| cb.encode(v).expect("encode")).collect();
+
+        let query = &data[0];
+        let dt = cb.compute_distance_table(query).expect("dist table");
+        let results = dt.scan_topk(&codes, 5);
+
+        // Exactly 5 results
+        assert_eq!(results.len(), 5, "should return exactly k=5 results");
+
+        // Sorted ascending by distance
+        for w in results.windows(2) {
+            assert!(
+                w[0].distance <= w[1].distance,
+                "results must be sorted ascending: {} <= {}",
+                w[0].distance,
+                w[1].distance
+            );
+        }
+
+        // All indices in range
+        for r in &results {
+            assert!(r.index < 100, "index {} out of range 0..100", r.index);
+        }
+
+        // All distances non-negative and finite
+        for r in &results {
+            assert!(r.distance >= 0.0, "distance must be non-negative");
+            assert!(r.distance.is_finite(), "distance must be finite");
+        }
+    }
+
+    /// k > n: 10 codes, k=20. Should return all 10 sorted by distance.
+    #[test]
+    fn test_pq_scan_topk_k_greater_than_n() {
+        let data = generate_test_data(20, 32, 77);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        // Only encode 10 of the 20 vectors
+        let codes: Vec<PqCode> = data[..10]
+            .iter()
+            .map(|v| cb.encode(v).expect("encode"))
+            .collect();
+
+        let dt = cb.compute_distance_table(&data[0]).expect("dist table");
+        let results = dt.scan_topk(&codes, 20);
+
+        assert_eq!(results.len(), 10, "k=20 > n=10, should return all 10");
+
+        // Still sorted ascending
+        for w in results.windows(2) {
+            assert!(
+                w[0].distance <= w[1].distance,
+                "results must be sorted ascending"
+            );
+        }
+    }
+
+    /// k=0 should return empty vec regardless of codes.
+    #[test]
+    fn test_pq_scan_topk_k_zero() {
+        let data = generate_test_data(20, 32, 55);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        let codes: Vec<PqCode> = data.iter().map(|v| cb.encode(v).expect("encode")).collect();
+        let dt = cb.compute_distance_table(&data[0]).expect("dist table");
+        let results = dt.scan_topk(&codes, 0);
+
+        assert!(results.is_empty(), "k=0 should return empty results");
+    }
+
+    /// Empty codes slice, k=5. Should return empty vec.
+    #[test]
+    fn test_pq_scan_topk_empty() {
+        let data = generate_test_data(20, 32, 55);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        let dt = cb.compute_distance_table(&data[0]).expect("dist table");
+        let results = dt.scan_topk(&[], 5);
+
+        assert!(
+            results.is_empty(),
+            "empty codes should return empty results"
+        );
+    }
+
+    // =========================================================================
+    // D2T4: Integration test — full pipeline
+    // =========================================================================
+
+    /// Full pipeline: train on 1K vectors, encode all, search 5 queries, verify top-10.
+    #[test]
+    fn test_pq_integration_pipeline() {
+        // 1. Generate 1K vectors (64D) with 3 distinct seeds for variety
+        let data = generate_test_data(1000, 64, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+
+        // 2. Train codebook: M=8 subspaces, 32 centroids each, 20 iterations
+        let cb = PqCodebook::train(&refs, 8, 32, 20).expect("training should succeed");
+        assert_eq!(cb.num_subquantizers(), 8);
+        assert_eq!(cb.ksub(), 32);
+        assert_eq!(cb.dimensions(), 64);
+        assert_eq!(cb.sub_dim(), 8);
+
+        // 3. Encode all 1K vectors via batch
+        let codes = cb.encode_batch(&refs).expect("batch encode should succeed");
+        assert_eq!(codes.len(), 1000);
+
+        // 4. Search 5 queries — each query is a different training vector
+        let query_indices = [0, 100, 500, 750, 999];
+        for &qi in &query_indices {
+            let dt = cb
+                .compute_distance_table(&data[qi])
+                .expect("distance table");
+            let results = dt.scan_topk(&codes, 10);
+
+            // Must return exactly 10
+            assert_eq!(results.len(), 10, "query {qi} should return top-10");
+
+            // All indices valid
+            for r in &results {
+                assert!(r.index < 1000, "query {qi}: index {} out of range", r.index);
+                assert!(r.distance >= 0.0, "query {qi}: negative distance");
+                assert!(r.distance.is_finite(), "query {qi}: non-finite distance");
+            }
+
+            // Sorted ascending
+            for w in results.windows(2) {
+                assert!(
+                    w[0].distance <= w[1].distance,
+                    "query {qi}: results not sorted"
+                );
+            }
+
+            // Self should be in top-10 (the query vector's own encoding
+            // should have very small distance)
+            assert!(
+                results.iter().any(|r| r.index == qi),
+                "query {qi}: self should appear in top-10, got indices {:?}",
+                results.iter().map(|r| r.index).collect::<Vec<_>>()
+            );
+        }
+    }
+
+    /// Encode vector v, scan for top-1 using v as query. The result should be
+    /// the index of v (self-distance is smallest).
+    #[test]
+    fn test_pq_scan_self_is_nearest() {
+        let data = generate_test_data(100, 32, 123);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        let codes: Vec<PqCode> = data.iter().map(|v| cb.encode(v).expect("encode")).collect();
+
+        // Pick vector 42 as query
+        let query_idx = 42;
+        let dt = cb
+            .compute_distance_table(&data[query_idx])
+            .expect("dist table");
+        let results = dt.scan_topk(&codes, 1);
+
+        assert_eq!(results.len(), 1, "top-1 should return exactly 1 result");
+        assert_eq!(
+            results[0].index, query_idx,
+            "self-encoded vector should be its own nearest neighbor, \
+             got index {} with distance {}, expected index {}",
+            results[0].index, results[0].distance, query_idx
+        );
     }
 }
