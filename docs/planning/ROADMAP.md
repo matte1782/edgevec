@@ -1,10 +1,10 @@
-# EdgeVec Roadmap v7.0
+# EdgeVec Roadmap v7.1
 
-**Date:** 2026-03-17
+**Date:** 2026-03-28
 **Author:** PLANNER
-**Status:** [REVISED] — v0.9.0 Released, v0.10.0 Strategic Plan
-**Current Version:** v0.9.0 (released 2026-03-07)
-**Next Version:** v0.10.0 (planned — Weeks 44-47)
+**Status:** [REVISED] — v0.9.0 Released, v0.10.0 PQ Phase 2 in progress
+**Current Version:** v0.9.0 (released 2026-02-27)
+**Next Version:** v0.10.0 (planned — Weeks 44-48)
 
 ---
 
@@ -450,46 +450,47 @@ v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD
 
 **Recommendation:** Option 3 (sparse vectors) balances capability and bundle size.
 
-### Milestone 10.4: Product Quantization Research + Implementation (Weeks 46-47, 16h)
+### Milestone 10.4: Product Quantization Research + Implementation (Weeks 45-47)
 
-**Status:** IN PROGRESS (Phase 1 literature review pulled forward to W45)
+**Status:** W46 COMPLETE — CONDITIONAL GO. W47 validation pending.
 **Source:** Industry trends (64x compression, 97% memory reduction)
 
-**Phase 1: Research (8h, Week 45 — pulled forward)**
+**Phase 1: Research (W45) — DONE**
+- Literature review: `docs/research/PRODUCT_QUANTIZATION_LITERATURE.md` [APPROVED]
+- Benchmark plan: `docs/research/PQ_BENCHMARK_PLAN.md` [APPROVED]
+- Decision: LEAN GO, 6 binary pass/fail gates (G1-G6)
 
-> **Schedule Note:** Phase 1 was pulled forward from W46 to W45 after W44 WebGPU and Relaxed SIMD spikes both resulted in NO-GO decisions, freeing ~12h of implementation capacity. This gives W46 more implementation time if Phase 1 results in GO.
+**Phase 2: Implementation (W46 Days 1-3) — DONE (~12h)**
+| Task | Actual |
+|:-----|:-------|
+| K-means engine + codebook training | Day 1 (4h) |
+| ADC scan, encode_batch, pipeline | Day 2 (4h) |
+| Integration tests, property tests, NaN validation | Day 3 (4h) |
 
-Research Questions (must answer ALL):
-1. Is 64x compression worth complexity vs BQ's 32x?
-2. Can we achieve <100ns lookup overhead in WASM?
-3. How does recall compare: PQ vs BQ at same memory budget?
+**Phase 3: Benchmarks + GO/NO-GO (W46 Days 4-5) — DONE**
+- `docs/benchmarks/PQ_GO_NOGO_DECISION.md` [REVISED]
+- Gate results: G1 PASS, G2 PASS (native), G3 INCONCLUSIVE, G4 FAIL, G5 PASS, G6 PASS
+- **Overall: CONDITIONAL GO** — implementation sound, W47 validation needed
 
-**Exit Criteria for Go Decision:**
-- [ ] Research document: `docs/research/PRODUCT_QUANTIZATION_LITERATURE.md`
-- [ ] Benchmark data comparing PQ vs BQ
-- [ ] Clear recommendation: IMPLEMENT or DEFER
+**Phase 4: Validation (W47) — PLANNED**
 
-**Phase 2: Implementation (8h, Week 47) — IF GO:**
-| Task | Hours |
-|:-----|:------|
-| Codebook training | 3h |
-| PQ distance computation | 3h |
-| Integration + tests | 2h |
+| Task | Gate | Priority |
+|:-----|:-----|:---------|
+| WASM PQ exports + benchmark harness | G2 | HIGH |
+| Real-embedding recall validation | G3 | HIGH |
+| Training optimization (early-stop + parallel) | G4 | HIGH |
+| BQ+rescore comparison on real data | B4 | MEDIUM |
+| PQ inline doc tests | — | LOW |
 
-**Expected Results (if implemented):**
-- 64x compression (vs 32x BQ)
-- <100ns lookup overhead
-- >0.85 recall
+### Milestone 10.5: LangChain.js v0.2.0 (Week 45)
 
-### Milestone 10.5: LangChain.js v0.2.0 (Week 45, 8h)
-
-**Status:** PLANNED
+**Status:** DONE (npm publish pending — user handles OTP)
 **Source:** W44 FilterExpression work
 **Deliverables:**
-- FilterExpression object support in `edgevec-langchain`
-- Additional test coverage and edge cases
-- Usage examples and guide
-- npm publish `edgevec-langchain@0.2.0`
+- [x] FilterExpression object support in `edgevec-langchain`
+- [x] Additional test coverage and edge cases (149 tests)
+- [x] Usage examples and guide (`FILTER_GUIDE.md`)
+- [ ] npm publish `edgevec-langchain@0.2.0` (OTP required)
 
 ### v0.10.0 Success Metrics
 
@@ -697,6 +698,7 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 | v6.1 | 2026-01-08 | v0.8.0 RELEASED; v0.9.0 de-risked (HOSTILE_REVIEWER reorder) |
 | v7.0 | 2026-03-17 | v0.9.0 RELEASED; W42-43 actuals; Milestone 10.0 (W44 research spikes) |
 | v7.1 | 2026-03-25 | Milestone 10.4 PQ Phase 1 pulled forward to W45; added Milestone 10.5 LangChain.js v0.2.0 |
+| v7.2 | 2026-03-28 | W46 PQ Phase 2 complete (CONDITIONAL GO); Milestone 10.4 Phases 2-3 done, Phase 4 planned for W47 |
 
 ---
 

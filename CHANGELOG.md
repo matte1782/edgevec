@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Note:** This project extends Keep a Changelog with `Research`, `Internal`, `Documentation`, and `Performance` headings as project-specific conventions.
 
 ### Added
+- **Product Quantization (PQ) engine** — `edgevec::quantization::product` module (W46 Days 1-3)
+  - `PqCodebook` — k-means++ codebook training with deterministic seeding (seed=42)
+  - `PqCode` — compact M-byte vector representation (8 bytes for 768D with M=8)
+  - `DistanceTable` — precomputed ADC lookup for fast approximate search
+  - `PqSearchResult` — ranked results from exhaustive PQ scan
+  - `PqError` — 6 error variants with full context (dimensions, indices, values)
+  - `encode_batch()` — batch encoding with first-error-short-circuit
+  - `scan_topk()` — exhaustive ADC search returning k-nearest by approximate distance
+  - NaN/Inf validation at all entry points (train, encode, compute_distance_table)
+  - 33 PQ-specific tests, 1013 total library tests
+- **PQ benchmark harness** (`benches/pq_bench.rs`) — Criterion benchmarks for encoding, ADC search, training (W46 Days 4-5)
 - **FilterExpression object support** in `edgevec-langchain` — `similaritySearchVectorWithScore` now accepts both DSL strings and `FilterExpression` objects (`Filter.eq()`, `Filter.and()`, etc.)
 - Re-exported `Filter` and `FilterExpression` from `edgevec-langchain` for convenience
 - 6 new FilterExpression tests in `pkg/langchain/tests/store.test.ts` (W44, 134 total)
@@ -19,10 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter API quick reference table (25 rows) in `pkg/langchain/README.md`
 
 ### Changed
-- **ROADMAP.md** updated to v7.0: marked v0.9.0/W42-43 as DONE, added Milestone 10.0 (W44 research spikes)
-- **ROADMAP.md** updated to v7.1: Milestone 10.4 PQ Phase 1 pulled forward to W45
+- **ROADMAP.md** updated to v7.2: W46 PQ Phase 2 complete, Phase 4 validation planned for W47
 - `pkg/langchain/README.md`: documented both filter forms (DSL strings + FilterExpression), removed "Coming Next" section
 - `pkg/langchain/package.json` and `index.ts`: version bumped to 0.2.0
+
+### Performance
+- **PQ GO/NO-GO Decision** (`docs/benchmarks/PQ_GO_NOGO_DECISION.md`) — CONDITIONAL GO (W46 Days 4-5)
+  - G1 PASS: PQ memory 16.5% of BQ at 100K (threshold: <70%)
+  - G2 PASS (native): ADC 37.6 ns/candidate (threshold: <150ns)
+  - G3 INCONCLUSIVE: Recall 2% on synthetic uniform data (correct at 64D; real-embedding validation needed)
+  - G4 FAIL: Training 198.7s at 100K (threshold: <60s; optimization needed)
+  - G5 PASS: Implementation ~12h (threshold: <16h)
+  - G6 PASS: Zero breaking API changes
 
 ### Research
 - **WebGPU Acceleration Spike** (`docs/research/WEBGPU_SPIKE.md`) — **NO-GO** for v0.10.0 (W44)
@@ -33,7 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Internal
 - **API Surface Inventory** (`docs/audits/API_SURFACE_INVENTORY.md`) — 338 public APIs catalogued across Rust, WASM, TypeScript, LangChain (W45 Day 4)
 - **API Stability Audit** (`docs/audits/API_STABILITY_AUDIT.md`) — 30 breaking change candidates, deprecation plan, v1.0 freeze timeline (W45 Day 4)
-- 5 hostile reviews passed (W44 Day 5, W45 Days 1-4), all with GO verdict after fixes
+- 8 hostile reviews passed (W44-W46), including mid-week and end-of-week sweeps
+- CI Miri skip expansion: hybrid, quantization::product, hnsw (all pure-safe, Day 2)
 
 ---
 
