@@ -1,4 +1,4 @@
-# EdgeVec Roadmap v7.1
+# EdgeVec Roadmap v7.2
 
 **Date:** 2026-03-28
 **Author:** PLANNER

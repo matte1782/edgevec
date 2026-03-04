@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PqCode` — compact M-byte vector representation (8 bytes for 768D with M=8)
   - `DistanceTable` — precomputed ADC lookup for fast approximate search
   - `PqSearchResult` — ranked results from exhaustive PQ scan
-  - `PqError` — 6 error variants with full context (dimensions, indices, values)
+  - `PqError` — 7 error variants with full context (dimensions, indices, values)
   - `encode_batch()` — batch encoding with first-error-short-circuit
   - `scan_topk()` — exhaustive ADC search returning k-nearest by approximate distance
   - NaN/Inf validation at all entry points (train, encode, compute_distance_table)
