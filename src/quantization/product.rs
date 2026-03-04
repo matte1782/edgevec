@@ -363,14 +363,7 @@ impl PqCodebook {
                 });
             }
             // Reject NaN/Infinity — these corrupt k-means centroids
-            for (d, &val) in v.iter().enumerate() {
-                if !val.is_finite() {
-                    return Err(PqError::NonFiniteValue {
-                        vector_index: i,
-                        dimension: d,
-                    });
-                }
-            }
+            validate_finite(v, i)?;
         }
 
         let sub_dim = dimensions / num_subquantizers;
@@ -420,7 +413,8 @@ impl PqCodebook {
     ///
     /// # Errors
     ///
-    /// Returns `PqError::DimensionMismatch` if the vector has wrong dimensionality.
+    /// - `PqError::DimensionMismatch` if the vector has wrong dimensionality.
+    /// - `PqError::NonFiniteValue` if the vector contains NaN or Infinity.
     pub fn encode(&self, vector: &[f32]) -> Result<PqCode, PqError> {
         if vector.len() != self.dimensions {
             return Err(PqError::DimensionMismatch {
@@ -428,6 +422,7 @@ impl PqCodebook {
                 actual: vector.len(),
             });
         }
+        validate_finite(vector, 0)?;
 
         let mut codes = Vec::with_capacity(self.num_subquantizers);
 
@@ -485,7 +480,8 @@ impl PqCodebook {
     ///
     /// # Errors
     ///
-    /// Returns `PqError::DimensionMismatch` if the query has wrong dimensionality.
+    /// - `PqError::DimensionMismatch` if the query has wrong dimensionality.
+    /// - `PqError::NonFiniteValue` if the query contains NaN or Infinity.
     pub fn compute_distance_table(&self, query: &[f32]) -> Result<DistanceTable, PqError> {
         if query.len() != self.dimensions {
             return Err(PqError::DimensionMismatch {
@@ -493,6 +489,7 @@ impl PqCodebook {
                 actual: query.len(),
             });
         }
+        validate_finite(query, 0)?;
 
         let table_size = self.num_subquantizers * self.ksub;
         let mut table = Vec::with_capacity(table_size);
@@ -706,6 +703,20 @@ fn find_nearest_centroid(vector: &[f32], centroids: &[f32], ksub: usize, sub_dim
     }
 
     best_idx
+}
+
+/// Validate that all values in a vector are finite (not NaN or Infinity).
+#[inline]
+fn validate_finite(vector: &[f32], vector_index: usize) -> Result<(), PqError> {
+    for (d, &val) in vector.iter().enumerate() {
+        if !val.is_finite() {
+            return Err(PqError::NonFiniteValue {
+                vector_index,
+                dimension: d,
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Squared L2 (Euclidean) distance between two vectors.
@@ -1054,6 +1065,57 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_rejects_nan() {
+        let data = generate_test_data(100, 32, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        let mut bad = vec![0.0f32; 32];
+        bad[10] = f32::NAN;
+        assert!(matches!(
+            cb.encode(&bad),
+            Err(PqError::NonFiniteValue {
+                vector_index: 0,
+                dimension: 10,
+            })
+        ));
+    }
+
+    #[test]
+    fn test_encode_rejects_infinity() {
+        let data = generate_test_data(100, 32, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        let mut bad = vec![0.0f32; 32];
+        bad[5] = f32::INFINITY;
+        assert!(matches!(
+            cb.encode(&bad),
+            Err(PqError::NonFiniteValue {
+                vector_index: 0,
+                dimension: 5,
+            })
+        ));
+    }
+
+    #[test]
+    fn test_distance_table_rejects_nan() {
+        let data = generate_test_data(100, 32, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 10).expect("train");
+
+        let mut bad_query = vec![0.0f32; 32];
+        bad_query[0] = f32::NAN;
+        assert!(matches!(
+            cb.compute_distance_table(&bad_query),
+            Err(PqError::NonFiniteValue {
+                vector_index: 0,
+                dimension: 0,
+            })
+        ));
+    }
+
+    #[test]
     fn test_kmeans_handles_empty_clusters() {
         // Create data with 2 tight clusters but request 16 centroids.
         // This forces many centroids to become empty during k-means,
@@ -1079,7 +1141,7 @@ mod tests {
             "training must succeed even with empty clusters"
         );
 
-        let cb = result.unwrap();
+        let cb = result.expect("training must succeed even with empty clusters");
         // Verify all vectors can be encoded
         for v in &data {
             let code = cb.encode(v).expect("encode must work");
@@ -1317,6 +1379,83 @@ mod tests {
         }
     }
 
+    // =========================================================================
+    // D3T1: Integration test — 10K scale pipeline
+    // =========================================================================
+
+    /// Full pipeline at 10K scale: train on 10,000 vectors (64D), encode all,
+    /// search 10 queries spread across the dataset, verify top-10 results.
+    // Implements: W46 D3T1 — PQ integration test at scale
+    #[test]
+    fn test_pq_integration_10k() {
+        // 1. Generate 10K vectors (64D) with distinct seed
+        let data = generate_test_data(10_000, 64, 200);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+
+        // 2. Train codebook: M=8 subspaces, 32 centroids each, 20 iterations
+        let cb = PqCodebook::train(&refs, 8, 32, 20).expect("training 10K should succeed");
+        assert_eq!(cb.num_subquantizers(), 8);
+        assert_eq!(cb.ksub(), 32);
+        assert_eq!(cb.dimensions(), 64);
+        assert_eq!(cb.sub_dim(), 8);
+
+        // 3. Encode all 10K vectors via batch
+        let codes = cb
+            .encode_batch(&refs)
+            .expect("batch encode 10K should succeed");
+        assert_eq!(codes.len(), 10_000);
+
+        // 4. Search 10 queries spread across the dataset
+        let query_indices = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9999];
+        for &qi in &query_indices {
+            let dt = cb
+                .compute_distance_table(&data[qi])
+                .expect("distance table should succeed");
+            let results = dt.scan_topk(&codes, 10);
+
+            // Must return exactly 10
+            assert_eq!(results.len(), 10, "query {qi} should return top-10");
+
+            // All indices valid and distances well-formed
+            for r in &results {
+                assert!(
+                    r.index < 10_000,
+                    "query {qi}: index {} out of range 0..10000",
+                    r.index
+                );
+                assert!(
+                    r.distance >= 0.0,
+                    "query {qi}: negative distance {}",
+                    r.distance
+                );
+                assert!(
+                    r.distance.is_finite(),
+                    "query {qi}: non-finite distance {}",
+                    r.distance
+                );
+            }
+
+            // Sorted ascending
+            for w in results.windows(2) {
+                assert!(
+                    w[0].distance <= w[1].distance,
+                    "query {qi}: results not sorted (d[{}]={} > d[{}]={})",
+                    w[0].index,
+                    w[0].distance,
+                    w[1].index,
+                    w[1].distance
+                );
+            }
+
+            // Self-inclusion: the query vector's own index must appear in top-10
+            assert!(
+                results.iter().any(|r| r.index == qi),
+                "query {qi}: self should appear in top-10, got indices {:?}",
+                results.iter().map(|r| r.index).collect::<Vec<_>>()
+            );
+        }
+    }
+
     /// Encode vector v, scan for top-1 using v as query. The result should be
     /// the index of v (self-distance is smallest).
     #[test]
@@ -1340,6 +1479,115 @@ mod tests {
             "self-encoded vector should be its own nearest neighbor, \
              got index {} with distance {}, expected index {}",
             results[0].index, results[0].distance, query_idx
+        );
+    }
+
+    // =========================================================================
+    // D3T2: Property test — recall increases with M
+    // =========================================================================
+
+    /// Property test: PQ recall@10 should generally increase (or stay the same)
+    /// when using more subquantizers M, because finer subspace decomposition
+    /// reduces quantization error.
+    ///
+    /// Protocol: 20 trials (seeds 300..320), each with 500 vectors of 64 dims.
+    /// For each trial, trains M=4 and M=8 codebooks (Ksub=16, 15 iterations),
+    /// then computes recall@10 over 5 query vectors using brute-force L2 ground
+    /// truth. Asserts that M=8 recall >= M=4 recall in >= 80% of trials.
+    // Implements: W46 D3T2 — recall monotonicity in M
+    #[test]
+    fn test_proptest_recall_increases_with_m() {
+        const NUM_TRIALS: usize = 20;
+        const NUM_VECTORS: usize = 500;
+        const DIMS: usize = 64;
+        const KSUB: usize = 16;
+        const ITERS: usize = 15;
+        const K: usize = 10;
+        const NUM_QUERIES: usize = 5;
+        const MIN_PASS_FRACTION: f64 = 0.80;
+
+        let mut trials_where_m8_wins_or_ties: usize = 0;
+
+        for seed in 300u64..300 + NUM_TRIALS as u64 {
+            let data = generate_test_data(NUM_VECTORS, DIMS, seed);
+            let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+
+            let cb_m4 =
+                PqCodebook::train(&refs, 4, KSUB, ITERS).expect("M=4 training should succeed");
+            let cb_m8 =
+                PqCodebook::train(&refs, 8, KSUB, ITERS).expect("M=8 training should succeed");
+
+            let codes_m4: Vec<PqCode> = data
+                .iter()
+                .map(|v| cb_m4.encode(v).expect("M=4 encode"))
+                .collect();
+            let codes_m8: Vec<PqCode> = data
+                .iter()
+                .map(|v| cb_m8.encode(v).expect("M=8 encode"))
+                .collect();
+
+            let mut recall_sum_m4: f64 = 0.0;
+            let mut recall_sum_m8: f64 = 0.0;
+
+            let query_indices: Vec<usize> = (0..NUM_QUERIES)
+                .map(|i| i * NUM_VECTORS / NUM_QUERIES)
+                .collect();
+
+            for &qi in &query_indices {
+                let query = &data[qi];
+
+                // Ground truth: brute-force exact L2 distances
+                let mut exact_dists: Vec<(usize, f32)> = data
+                    .iter()
+                    .enumerate()
+                    .map(|(i, v)| (i, l2_squared(query, v)))
+                    .collect();
+                exact_dists.sort_by(|a, b| {
+                    a.1.partial_cmp(&b.1)
+                        .expect("distances should be comparable")
+                });
+                let true_topk: std::collections::HashSet<usize> =
+                    exact_dists.iter().take(K).map(|&(idx, _)| idx).collect();
+
+                // PQ recall for M=4
+                let dt_m4 = cb_m4
+                    .compute_distance_table(query)
+                    .expect("M=4 distance table");
+                let results_m4 = dt_m4.scan_topk(&codes_m4, K);
+                let pq_topk_m4: std::collections::HashSet<usize> =
+                    results_m4.iter().map(|r| r.index).collect();
+                let recall_m4 = pq_topk_m4.intersection(&true_topk).count() as f64 / K as f64;
+
+                // PQ recall for M=8
+                let dt_m8 = cb_m8
+                    .compute_distance_table(query)
+                    .expect("M=8 distance table");
+                let results_m8 = dt_m8.scan_topk(&codes_m8, K);
+                let pq_topk_m8: std::collections::HashSet<usize> =
+                    results_m8.iter().map(|r| r.index).collect();
+                let recall_m8 = pq_topk_m8.intersection(&true_topk).count() as f64 / K as f64;
+
+                recall_sum_m4 += recall_m4;
+                recall_sum_m8 += recall_m8;
+            }
+
+            let avg_recall_m4 = recall_sum_m4 / NUM_QUERIES as f64;
+            let avg_recall_m8 = recall_sum_m8 / NUM_QUERIES as f64;
+
+            if avg_recall_m8 >= avg_recall_m4 {
+                trials_where_m8_wins_or_ties += 1;
+            }
+        }
+
+        let pass_rate = trials_where_m8_wins_or_ties as f64 / NUM_TRIALS as f64;
+        assert!(
+            pass_rate >= MIN_PASS_FRACTION,
+            "M=8 should have recall >= M=4 in >= {:.0}% of trials, \
+             but only passed in {}/{} trials ({:.1}%)",
+            MIN_PASS_FRACTION * 100.0,
+            trials_where_m8_wins_or_ties,
+            NUM_TRIALS,
+            pass_rate * 100.0
         );
     }
 }
