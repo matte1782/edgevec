@@ -1313,5 +1313,417 @@ describe("EdgeVecStore", () => {
         { includeMetadata: true }
       );
     });
+
+    describe("FilterExpression edge cases", () => {
+      it("handles empty AND filter (tautology)", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const tautologyFilter = {
+          ...mockFilterExpression(
+            '{"op":"and","children":[]}',
+            "TRUE"
+          ),
+          isTautology: true,
+        };
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          tautologyFilter
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: tautologyFilter, includeMetadata: true }
+        );
+      });
+
+      it("handles deeply nested filters (depth 3+)", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const nestedJson = JSON.stringify({
+          op: "and",
+          children: [
+            {
+              op: "or",
+              children: [
+                { op: "eq", field: "status", value: "active" },
+                { op: "ne", field: "status", value: "deleted" },
+              ],
+            },
+            {
+              op: "and",
+              children: [
+                { op: "gt", field: "score", value: 0.5 },
+                { op: "lt", field: "score", value: 0.95 },
+              ],
+            },
+          ],
+        });
+
+        const deepFilter = mockFilterExpression(
+          nestedJson,
+          '(status = "active" OR status != "deleted") AND (score > 0.5 AND score < 0.95)'
+        );
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          deepFilter
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: deepFilter, includeMetadata: true }
+        );
+      });
+
+      it("handles unicode field names", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const unicodeFilter = mockFilterExpression(
+          '{"op":"eq","field":"citt\u00e0","value":"Milano"}',
+          'citt\u00e0 = "Milano"'
+        );
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          unicodeFilter
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: unicodeFilter, includeMetadata: true }
+        );
+      });
+
+      it("handles special characters in values", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const specialValue = 'he said \\"hello\\\\world\\"';
+        const specialFilter = mockFilterExpression(
+          '{"op":"eq","field":"message","value":"he said \\\\\\"hello\\\\\\\\world\\\\\\""}',
+          `message = "${specialValue}"`
+        );
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          specialFilter
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: specialFilter, includeMetadata: true }
+        );
+      });
+
+      it("handles numeric edge cases (zero, negative)", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        // Test zero value
+        const zeroFilter = mockFilterExpression(
+          '{"op":"eq","field":"score","value":0}',
+          "score = 0"
+        );
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          zeroFilter
+        );
+
+        let mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: zeroFilter, includeMetadata: true }
+        );
+        // Verify the filter object itself has the zero value, not undefined/null
+        expect(zeroFilter.toJSON().value).toBe(0);
+
+        // Test negative value
+        const negativeFilter = mockFilterExpression(
+          '{"op":"lt","field":"temperature","value":-40.5}',
+          "temperature < -40.5"
+        );
+
+        const store2 = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+        await store2.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          negativeFilter
+        );
+
+        mockIndex = testInternals(store2).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: negativeFilter, includeMetadata: true }
+        );
+        expect(negativeFilter.toJSON().value).toBe(-40.5);
+      });
+    });
+
+    // Real-world filter patterns that users will write. These verify that complex
+    // nested FilterExpression objects are passed through correctly to the WASM layer.
+    describe("FilterExpression real-world patterns", () => {
+      it("e-commerce: category + price range filter", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const filterExpr: import("edgevec/edgevec-wrapper.js").FilterExpression = {
+          ...mockFilterExpression(
+            '{"op":"and","children":[{"op":"eq","field":"category","value":"electronics"},{"op":"ge","field":"price","value":100},{"op":"le","field":"price","value":500}]}',
+            'category = "electronics" AND price >= 100 AND price <= 500'
+          ),
+          complexity: 3,
+        };
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          10,
+          filterExpr
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          10,
+          { filter: filterExpr, includeMetadata: true }
+        );
+      });
+
+      it("multi-tenant: tenant isolation with status filter", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const filterExpr: import("edgevec/edgevec-wrapper.js").FilterExpression = {
+          ...mockFilterExpression(
+            '{"op":"and","children":[{"op":"eq","field":"tenant_id","value":"org_123"},{"op":"or","children":[{"op":"eq","field":"status","value":"active"},{"op":"eq","field":"status","value":"pending"}]}]}',
+            'tenant_id = "org_123" AND (status = "active" OR status = "pending")'
+          ),
+          complexity: 4,
+        };
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          10,
+          filterExpr
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          10,
+          { filter: filterExpr, includeMetadata: true }
+        );
+      });
+
+      it("date range: time-bounded search", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const filterExpr: import("edgevec/edgevec-wrapper.js").FilterExpression = {
+          ...mockFilterExpression(
+            '{"op":"and","children":[{"op":"ge","field":"created_at","value":"2026-01-01"},{"op":"lt","field":"created_at","value":"2026-04-01"}]}',
+            'created_at >= "2026-01-01" AND created_at < "2026-04-01"'
+          ),
+          complexity: 2,
+        };
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          10,
+          filterExpr
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          10,
+          { filter: filterExpr, includeMetadata: true }
+        );
+      });
+
+      it("negation: document type with NOT deleted", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const filterExpr: import("edgevec/edgevec-wrapper.js").FilterExpression = {
+          ...mockFilterExpression(
+            '{"op":"and","children":[{"op":"eq","field":"type","value":"document"},{"op":"not","child":{"op":"eq","field":"deleted","value":true}}]}',
+            'type = "document" AND NOT (deleted = true)'
+          ),
+          complexity: 3,
+        };
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          10,
+          filterExpr
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          10,
+          { filter: filterExpr, includeMetadata: true }
+        );
+      });
+    });
+
+    // Type safety tests verifying that the adapter correctly relies on TypeScript
+    // types for compile-time safety and WASM for runtime validation.
+    describe("FilterExpression type safety", () => {
+      it("passes through object without _json field (WASM validates)", async () => {
+        // The adapter does not validate filter shape -- WASM is responsible for
+        // validation. This documents the pass-through behavior.
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const noJsonField = {
+          toString: () => "test",
+          toJSON: () => ({}),
+          isTautology: false,
+          isContradiction: false,
+          complexity: 0,
+        } as any;
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          noJsonField
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: noJsonField, includeMetadata: true }
+        );
+      });
+
+      it("passes through object with non-standard toJSON return (WASM validates)", async () => {
+        // Malformed FilterExpression objects are forwarded to WASM which will
+        // throw its own validation error.
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        const badToJson = {
+          _json: '{"op":"eq"}',
+          toString: () => "malformed",
+          toJSON: () => "this-is-a-string-not-an-object",
+          isTautology: false,
+          isContradiction: false,
+          complexity: 1,
+        } as any;
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          badToJson
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: badToJson, includeMetadata: true }
+        );
+      });
+
+      it("TypeScript prevents plain object as FilterExpression at compile time", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        // @ts-expect-error - Plain objects are not assignable to string | FilterExpression
+        await store.similaritySearchVectorWithScore([1, 2, 3], 5, { foo: "bar" });
+
+        // Runtime does not prevent it -- only TypeScript's type system does.
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: { foo: "bar" }, includeMetadata: true }
+        );
+      });
+    });
+
+    // W45.1b: Null/undefined/empty filter handling tests
+    // These tests document pass-through behavior. The adapter does not validate
+    // filters — WASM handles validation. Null, empty, and whitespace filters are
+    // forwarded as-is.
+    describe("null/undefined/empty filter handling", () => {
+      it("passes null filter through to WASM (JS interop)", async () => {
+        // TypeScript type is `string | FilterExpression | undefined`, but plain JS
+        // callers can pass null. The `!== undefined` guard means null is forwarded.
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          null as any
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: null, includeMetadata: true }
+        );
+      });
+
+      it("passes empty string filter through to WASM", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          ""
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: "", includeMetadata: true }
+        );
+      });
+
+      it("passes whitespace-only filter through to WASM", async () => {
+        searchResults = [];
+        const store = new EdgeVecStore(new MockEmbeddings(), { dimensions: 3 });
+
+        await store.similaritySearchVectorWithScore(
+          [0.1, 0.2, 0.3],
+          5,
+          "   "
+        );
+
+        const mockIndex = testInternals(store).index;
+        expect(mockIndex.search).toHaveBeenCalledWith(
+          expect.any(Float32Array),
+          5,
+          { filter: "   ", includeMetadata: true }
+        );
+      });
+    });
   });
 });

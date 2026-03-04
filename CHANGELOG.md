@@ -7,22 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **Note:** This project extends Keep a Changelog with `Research`, `Internal`, `Documentation`, and `Performance` headings as project-specific conventions.
+
 ### Added
 - **FilterExpression object support** in `edgevec-langchain` — `similaritySearchVectorWithScore` now accepts both DSL strings and `FilterExpression` objects (`Filter.eq()`, `Filter.and()`, etc.)
 - Re-exported `Filter` and `FilterExpression` from `edgevec-langchain` for convenience
-- 6 new FilterExpression tests in `pkg/langchain/tests/store.test.ts` (134 total, up from 128)
+- 6 new FilterExpression tests in `pkg/langchain/tests/store.test.ts` (W44, 134 total)
+- 15 FilterExpression edge case tests (W45 Day 1) — edge cases, real-world patterns, type safety, null/undefined/empty filter handling (149 total LangChain tests)
+- **Filter usage guide** (`pkg/langchain/docs/FILTER_GUIDE.md`) — 4 real-world examples: e-commerce, RAG, multi-tenant, time-bounded
+- **edgevec-langchain CHANGELOG** (`pkg/langchain/CHANGELOG.md`) — v0.2.0 + v0.1.0 entries
+- Filter API quick reference table (25 rows) in `pkg/langchain/README.md`
 
 ### Changed
 - **ROADMAP.md** updated to v7.0: marked v0.9.0/W42-43 as DONE, added Milestone 10.0 (W44 research spikes)
+- **ROADMAP.md** updated to v7.1: Milestone 10.4 PQ Phase 1 pulled forward to W45
 - `pkg/langchain/README.md`: documented both filter forms (DSL strings + FilterExpression), removed "Coming Next" section
+- `pkg/langchain/package.json` and `index.ts`: version bumped to 0.2.0
 
 ### Research
-- **WebGPU Acceleration Spike** (`docs/research/WEBGPU_SPIKE.md`) — **NO-GO** for v0.10.0. GPU-CPU transfer overhead dominates at EdgeVec's operating scale; no crossover under 500K vectors for single queries.
-- **WASM Relaxed SIMD Spike** (`docs/research/RELAXED_SIMD_SPIKE.md`) — **NO-GO** for v0.10.0. Safari still behind flag; dual WASM bundles not justified for 1.5x ARM speedup alone.
+- **WebGPU Acceleration Spike** (`docs/research/WEBGPU_SPIKE.md`) — **NO-GO** for v0.10.0 (W44)
+- **WASM Relaxed SIMD Spike** (`docs/research/RELAXED_SIMD_SPIKE.md`) — **NO-GO** for v0.10.0 (W44)
+- **Product Quantization Literature Review** (`docs/research/PRODUCT_QUANTIZATION_LITERATURE.md`) — LEAN GO, MEDIUM confidence. 4 systems analyzed, 3 research questions, WASM feasibility, 6 GO/NO-GO criteria (W45 Day 3)
+- **PQ Benchmark Plan** (`docs/research/PQ_BENCHMARK_PLAN.md`) — 8 benchmarks with reproducible methodology, GO/NO-GO decision matrix (W45 Day 4)
+
+### Internal
+- **API Surface Inventory** (`docs/audits/API_SURFACE_INVENTORY.md`) — 338 public APIs catalogued across Rust, WASM, TypeScript, LangChain (W45 Day 4)
+- **API Stability Audit** (`docs/audits/API_STABILITY_AUDIT.md`) — 30 breaking change candidates, deprecation plan, v1.0 freeze timeline (W45 Day 4)
+- 5 hostile reviews passed (W44 Day 5, W45 Days 1-4), all with GO verdict after fixes
 
 ---
 
-## [0.9.0] - 2026-03-07 — Sparse Vectors, Hybrid Search, FlatIndex, BinaryFlatIndex
+## [0.9.0] - 2026-02-27 — Sparse Vectors, Hybrid Search, FlatIndex, BinaryFlatIndex
 
 ### Added (v0.9.0) — Sparse Vectors (RFC-007)
 
@@ -670,7 +685,7 @@ npm install edgevec@0.4.1
 
 ---
 
-## [0.4.0] - 2025-12-20 — Documentation & Quality Sprint
+## [0.4.0] - 2025-12-16 — Documentation & Quality Sprint
 
 **Focus:** Production readiness — comprehensive documentation, P99 tracking, and quality hardening.
 
@@ -1001,7 +1016,7 @@ This version was internal only, not published to crates.io or npm.
 
 | Version | Date | Highlights |
 |:--------|:-----|:-----------|
-| 0.9.0 | 2026-03-07 | **FlatIndex**, **BinaryFlatIndex** (PR #7), **Sparse Vectors** (RFC-007), **RRF Hybrid Search** |
+| 0.9.0 | 2026-02-27 | **FlatIndex**, **BinaryFlatIndex** (PR #7), **Sparse Vectors** (RFC-007), **RRF Hybrid Search** |
 | 0.8.0 | 2026-02-02 | **Vue 3 Composables**, **Filter Functions**, **SIMD Euclidean**, Tech Debt |
 | 0.7.0 | 2025-12-27 | **SIMD Acceleration** (2x+), **First Community Contribution** (@jsonMartin — 8.75x Hamming) |
 | 0.6.0 | 2025-12-22 | **RFC-002:** Binary Quantization (32x memory), Metadata Storage, Memory Pressure |

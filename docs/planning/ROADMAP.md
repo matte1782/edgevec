@@ -452,10 +452,12 @@ v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD
 
 ### Milestone 10.4: Product Quantization Research + Implementation (Weeks 46-47, 16h)
 
-**Status:** RESEARCH (moved from v0.9.0 with proper exit criteria)
+**Status:** IN PROGRESS (Phase 1 literature review pulled forward to W45)
 **Source:** Industry trends (64x compression, 97% memory reduction)
 
-**Phase 1: Research (8h, Week 46)**
+**Phase 1: Research (8h, Week 45 — pulled forward)**
+
+> **Schedule Note:** Phase 1 was pulled forward from W46 to W45 after W44 WebGPU and Relaxed SIMD spikes both resulted in NO-GO decisions, freeing ~12h of implementation capacity. This gives W46 more implementation time if Phase 1 results in GO.
 
 Research Questions (must answer ALL):
 1. Is 64x compression worth complexity vs BQ's 32x?
@@ -463,7 +465,7 @@ Research Questions (must answer ALL):
 3. How does recall compare: PQ vs BQ at same memory budget?
 
 **Exit Criteria for Go Decision:**
-- [ ] Research document: `docs/research/PRODUCT_QUANTIZATION_ANALYSIS.md`
+- [ ] Research document: `docs/research/PRODUCT_QUANTIZATION_LITERATURE.md`
 - [ ] Benchmark data comparing PQ vs BQ
 - [ ] Clear recommendation: IMPLEMENT or DEFER
 
@@ -694,6 +696,7 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 | v6.0 | 2026-01-04 | Post-v0.7.0 strategic plan with community/industry analysis |
 | v6.1 | 2026-01-08 | v0.8.0 RELEASED; v0.9.0 de-risked (HOSTILE_REVIEWER reorder) |
 | v7.0 | 2026-03-17 | v0.9.0 RELEASED; W42-43 actuals; Milestone 10.0 (W44 research spikes) |
+| v7.1 | 2026-03-25 | Milestone 10.4 PQ Phase 1 pulled forward to W45; added Milestone 10.5 LangChain.js v0.2.0 |
 
 ---
 

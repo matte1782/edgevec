@@ -48,6 +48,34 @@ const results = await store.similaritySearch("browser vector search", 2);
 console.log(results);
 ```
 
+### With FilterExpression
+
+```typescript
+import { EdgeVecStore, Filter } from "edgevec-langchain";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const embeddings = new OpenAIEmbeddings();
+const store = await EdgeVecStore.fromTexts(
+  ["NVIDIA RTX 4090", "AMD RX 7900 XTX", "Intel Arc A770"],
+  [
+    { category: "gpu", price: 1599 },
+    { category: "gpu", price: 949 },
+    { category: "gpu", price: 349 },
+  ],
+  embeddings,
+  { dimensions: 1536 }
+);
+
+const results = await store.similaritySearch(
+  "fast GPU for gaming",
+  5,
+  Filter.and(
+    Filter.eq("category", "gpu"),
+    Filter.lt("price", 500)
+  )
+);
+```
+
 ## API Reference
 
 ### `EdgeVecStore`
@@ -239,6 +267,39 @@ Advanced: Convert between LangChain's flexible metadata and EdgeVec's `MetadataV
 
 Most users do not need these — `EdgeVecStore` handles serialization internally.
 
+## Advanced Usage
+
+### RAG Retrieval Chain
+
+Use `EdgeVecStore` as a filtered retriever in a LangChain RAG pipeline:
+
+```typescript
+import { EdgeVecStore, Filter } from "edgevec-langchain";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { ChatOpenAI } from "@langchain/openai";
+import { createRetrievalChain } from "langchain/chains/retrieval";
+import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
+
+// Build a filtered retriever
+const embeddings = new OpenAIEmbeddings();
+const store = await EdgeVecStore.fromDocuments(docs, embeddings, { dimensions: 1536 });
+const retriever = store.asRetriever({
+  k: 5,
+  filter: Filter.and(
+    Filter.eq("status", "published"),
+    Filter.ge("updated_at", "2026-01-01")
+  ),
+});
+
+// Use in a RAG chain
+const llm = new ChatOpenAI({ model: "gpt-4" });
+const chain = await createRetrievalChain({
+  retriever,
+  combineDocsChain: await createStuffDocumentsChain({ llm }),
+});
+const response = await chain.invoke({ input: "How does HNSW work?" });
+```
+
 ## Filtering
 
 EdgeVec supports two filter styles: **DSL strings** and **`FilterExpression` objects**.
@@ -282,11 +343,46 @@ const docs = await store.similaritySearch(
 );
 ```
 
-**Available `Filter` methods:** `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `between`, `contains`, `startsWith`, `endsWith`, `like`, `in`, `notIn`, `any`, `allOf`, `none`, `isNull`, `isNotNull`, `and`, `or`, `not`, `parse`, `tryParse`, `validate`, `matchAll`, `nothing`.
+### Filter API Quick Reference
+
+| Method | Description | Example |
+|:-------|:------------|:--------|
+| `Filter.eq(field, value)` | Equality | `Filter.eq("status", "active")` |
+| `Filter.ne(field, value)` | Not equal | `Filter.ne("type", "draft")` |
+| `Filter.lt(field, value)` | Less than | `Filter.lt("price", 100)` |
+| `Filter.le(field, value)` | Less or equal | `Filter.le("rating", 5)` |
+| `Filter.gt(field, value)` | Greater than | `Filter.gt("score", 0.8)` |
+| `Filter.ge(field, value)` | Greater or equal | `Filter.ge("count", 10)` |
+| `Filter.between(field, lo, hi)` | Range | `Filter.between("price", 10, 50)` |
+| `Filter.contains(field, sub)` | String contains | `Filter.contains("name", "pro")` |
+| `Filter.startsWith(field, pre)` | String prefix | `Filter.startsWith("sku", "GPU")` |
+| `Filter.endsWith(field, suf)` | String suffix | `Filter.endsWith("file", ".pdf")` |
+| `Filter.like(field, pat)` | LIKE pattern | `Filter.like("name", "GPU_%")` |
+| `Filter.in(field, values)` | Value in set | `Filter.in("cat", ["a","b"])` |
+| `Filter.notIn(field, values)` | Value not in set | `Filter.notIn("cat", ["x"])` |
+| `Filter.any(field, values)` | Array has any | `Filter.any("tags", "rust")` |
+| `Filter.allOf(field, values)` | Array has all | `Filter.allOf("tags", ["a","b"])` |
+| `Filter.none(field, values)` | Array has none | `Filter.none("tags", ["old"])` |
+| `Filter.isNull(field)` | Field is null | `Filter.isNull("deleted_at")` |
+| `Filter.isNotNull(field)` | Field exists | `Filter.isNotNull("email")` |
+| `Filter.and(...filters)` | Logical AND | `Filter.and(f1, f2)` |
+| `Filter.or(...filters)` | Logical OR | `Filter.or(f1, f2)` |
+| `Filter.not(filter)` | Logical NOT | `Filter.not(f1)` |
+| `Filter.matchAll` | Tautology (match all, getter) | `Filter.matchAll` |
+| `Filter.nothing` | Contradiction (match none, getter) | `Filter.nothing` |
+| `Filter.parse(dsl)` | Parse DSL string | `Filter.parse('x = 1')` |
+| `Filter.tryParse(dsl)` | Parse, null on error | `Filter.tryParse('x = 1')` |
+| `Filter.validate(dsl)` | Validate DSL | `Filter.validate('x = 1')` |
+
+**Available `Filter` methods:** `eq`, `ne`, `lt`, `le`, `gt`, `ge`, `between`, `contains`, `startsWith`, `endsWith`, `like`, `in`, `notIn`, `any`, `allOf`, `none`, `isNull`, `isNotNull`, `and`, `or`, `not`, `parse`, `tryParse`, `validate`. **Getters:** `matchAll`, `nothing`.
 
 ### DSL Strings
 
 Filters can also be passed as EdgeVec DSL strings:
+
+```typescript
+const docs = await store.similaritySearch("query", 5, 'category = "gpu" AND price < 500');
+```
 
 ### Operator Reference
 

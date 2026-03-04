@@ -2,7 +2,7 @@
  * edgevec-langchain — LangChain.js VectorStore adapter for EdgeVec
  *
  * @module edgevec-langchain
- * @version 0.1.0
+ * @version 0.2.0
  */
 
 // WASM initialization
