@@ -1,6 +1,7 @@
 # EdgeVec CI Configuration
 # ========================
 # W18.2: CI Hardening — Documented timeouts and environment variables
+# W45.6: CI Optimization — Added Rust dependency caching, Miri skip filters
 #
 # Local Simulation:
 #   cargo xtask ci-check
@@ -15,7 +16,7 @@
 #   lint:       5 minutes  (cargo fmt + clippy)
 #   wasm-check: 5 minutes  (cargo check --target wasm32-unknown-unknown)
 #   fuzz-check: 5 minutes  (cargo +nightly check)
-#   miri:       25 minutes (cargo +nightly miri test)
+#   miri:       35 minutes (cargo +nightly miri test, with skip filters)
 
 name: EdgeVec CI
 
@@ -49,6 +50,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Run Unit Tests
         run: cargo test --verbose
 
@@ -63,6 +67,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
 
       - name: Check Formatting
         run: cargo fmt -- --check
@@ -82,6 +89,9 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Check WASM Build
         run: cargo check --target wasm32-unknown-unknown
 
@@ -96,14 +106,19 @@ jobs:
       - name: Install Nightly Rust
         uses: dtolnay/rust-toolchain@nightly
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Check ALL Fuzz Targets Compile
         run: cargo +nightly check --manifest-path fuzz/Cargo.toml --all-targets
 
   # Job 5: Miri Safety Audit (UB detection)
+  # Focuses on unsafe-adjacent code: SIMD, persistence, quantization, storage
+  # Pure-safe modules (filter, metadata) are skipped — they have 0 unsafe code
   miri:
     name: Miri Safety Check
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -112,14 +127,31 @@ jobs:
         with:
           components: miri
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
       - name: Run Miri (core)
-        run: cargo +nightly miri test --lib --no-default-features -- --skip wasm --skip test_bq_vs_f32_recall_comparison
+        run: |
+          cargo +nightly miri test --lib --no-default-features -- \
+            --skip wasm \
+            --skip test_bq_vs_f32_recall_comparison \
+            --skip filter:: \
+            --skip metadata::validation:: \
+            --skip metadata::serialize:: \
+            --skip metadata::error::
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
           PROPTEST_CASES: "4"
 
       - name: Run Miri (sparse feature)
-        run: cargo +nightly miri test --lib --no-default-features --features sparse -- --skip wasm --skip test_bq_vs_f32_recall_comparison
+        run: |
+          cargo +nightly miri test --lib --no-default-features --features sparse -- \
+            --skip wasm \
+            --skip test_bq_vs_f32_recall_comparison \
+            --skip filter:: \
+            --skip metadata::validation:: \
+            --skip metadata::serialize:: \
+            --skip metadata::error::
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
           PROPTEST_CASES: "4"
