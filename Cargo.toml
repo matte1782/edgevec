@@ -240,6 +240,10 @@ name = "sparse_storage_bench"
 harness = false
 
 [[bench]]
+name = "pq_bench"
+harness = false
+
+[[bench]]
 name = "hybrid_bench"
 harness = false
 required-features = ["sparse"]
