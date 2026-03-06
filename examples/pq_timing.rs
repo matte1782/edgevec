@@ -1,7 +1,8 @@
 //! Quick PQ training timing comparison: max_iters=15 vs max_iters=5
 //! Both use early-stop convergence (threshold 1e-4).
 //!
-//! Run: `cargo run --release --example pq_timing`
+//! Run (sequential):  `cargo run --release --example pq_timing`
+//! Run (parallel):    `cargo run --release --features parallel --example pq_timing`
 
 use edgevec::quantization::product::PqCodebook;
 use rand::{Rng, SeedableRng};

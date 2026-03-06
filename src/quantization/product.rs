@@ -40,6 +40,8 @@
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 use thiserror::Error;
 
 /// Error type for Product Quantization operations.
@@ -320,6 +322,36 @@ pub struct PqCodebook {
     sub_dim: usize,
 }
 
+/// Train a single subspace: extract subvectors, run k-means, return centroids.
+///
+/// Each subspace uses an independent deterministic RNG seeded as `42 + m`,
+/// ensuring identical results whether called sequentially or in parallel.
+// Implements: D4T1 — Rayon parallel subspace training (helper)
+fn train_subspace(
+    vectors: &[&[f32]],
+    m: usize,
+    sub_dim: usize,
+    ksub: usize,
+    max_iters: usize,
+    convergence_threshold: f32,
+) -> Vec<f32> {
+    let sub_offset = m * sub_dim;
+    let mut sub_vectors: Vec<Vec<f32>> = Vec::with_capacity(vectors.len());
+    for v in vectors {
+        sub_vectors.push(v[sub_offset..sub_offset + sub_dim].to_vec());
+    }
+    // Per-subspace deterministic RNG: seed = 42 + subspace index
+    let mut rng = ChaCha8Rng::seed_from_u64(42 + m as u64);
+    kmeans(
+        &sub_vectors,
+        ksub,
+        sub_dim,
+        max_iters,
+        &mut rng,
+        convergence_threshold,
+    )
+}
+
 impl PqCodebook {
     /// Train a PQ codebook on a set of vectors using k-means clustering.
     ///
@@ -332,8 +364,10 @@ impl PqCodebook {
     ///
     /// # Determinism
     ///
-    /// Training is deterministic for the same input (uses `ChaCha8Rng` with seed=42).
-    /// The seed is fixed to ensure reproducible codebooks for benchmarking.
+    /// Training is deterministic for the same input. Each subspace uses an
+    /// independent `ChaCha8Rng` seeded as `42 + m` (subspace index), enabling
+    /// parallel training (via the `parallel` feature) without sacrificing
+    /// reproducibility.
     ///
     /// # Returns
     ///
@@ -413,36 +447,35 @@ impl PqCodebook {
         }
 
         let sub_dim = dimensions / num_subquantizers;
-        let n = vectors.len();
 
         // Allocate codebook: [M][Ksub][sub_dim]
         let codebook_size = num_subquantizers * ksub * sub_dim;
+
+        // Train each subspace independently.
+        //
+        // Each subspace uses a per-subspace deterministic RNG seeded as
+        // `seed_from_u64(42 + m)`. This ensures identical results regardless
+        // of whether subspaces are trained sequentially or in parallel.
+        //
+        // When the `parallel` feature is enabled, subspaces are trained
+        // concurrently via rayon's par_iter. When disabled, they are trained
+        // sequentially with identical per-subspace seeding.
+        // Implements: D4T1 — Rayon parallel subspace training
+
+        #[cfg(feature = "parallel")]
+        let sub_results: Vec<Vec<f32>> = (0..num_subquantizers)
+            .into_par_iter()
+            .map(|m| train_subspace(vectors, m, sub_dim, ksub, max_iters, convergence_threshold))
+            .collect();
+
+        #[cfg(not(feature = "parallel"))]
+        let sub_results: Vec<Vec<f32>> = (0..num_subquantizers)
+            .map(|m| train_subspace(vectors, m, sub_dim, ksub, max_iters, convergence_threshold))
+            .collect();
+
+        // Copy all subspace results into the flat codebook
         let mut centroids = vec![0.0f32; codebook_size];
-
-        // Fixed seed for deterministic training
-        let mut rng = ChaCha8Rng::seed_from_u64(42);
-
-        // Train each subspace independently
-        for m in 0..num_subquantizers {
-            let sub_offset = m * sub_dim;
-
-            // Extract subvectors for this subspace
-            let mut sub_vectors: Vec<Vec<f32>> = Vec::with_capacity(n);
-            for v in vectors {
-                sub_vectors.push(v[sub_offset..sub_offset + sub_dim].to_vec());
-            }
-
-            // Run k-means for this subspace
-            let sub_centroids = kmeans(
-                &sub_vectors,
-                ksub,
-                sub_dim,
-                max_iters,
-                &mut rng,
-                convergence_threshold,
-            );
-
-            // Copy trained centroids into the flat codebook
+        for (m, sub_centroids) in sub_results.iter().enumerate() {
             let codebook_offset = m * ksub * sub_dim;
             for k in 0..ksub {
                 let dst_start = codebook_offset + k * sub_dim;
@@ -1986,5 +2019,45 @@ mod tests {
             (invalid_code.codes()[0] as usize) >= ksub as usize,
             "Code byte must be >= ksub to be invalid"
         );
+    }
+
+    // =========================================================================
+    // D4T1: Parallel training determinism test
+    // =========================================================================
+
+    /// Verifies that PQ training is deterministic: two calls with identical
+    /// input produce identical codebooks. This holds for both the sequential
+    /// path (`--features default`) and the parallel path (`--features parallel`)
+    /// because each subspace uses an independent RNG seeded as `42 + m`.
+    ///
+    /// The test encodes vectors with both codebooks and verifies identical codes,
+    /// which is a stronger check than comparing centroids (it proves the full
+    /// encode pipeline is deterministic).
+    // Implements: D4T1 — Rayon parallel subspace training determinism
+    #[test]
+    fn test_parallel_train_deterministic() {
+        let data = generate_test_data(500, 64, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+
+        let cb1 = PqCodebook::train(&refs, 8, 32, 15).expect("train 1");
+        let cb2 = PqCodebook::train(&refs, 8, 32, 15).expect("train 2");
+
+        // Centroids must be bitwise identical
+        assert_eq!(
+            cb1.centroids, cb2.centroids,
+            "same input must produce identical codebook (per-subspace seeding)"
+        );
+
+        // Encode a sample of vectors and verify identical codes
+        for &idx in &[0, 100, 250, 499] {
+            let code1 = cb1.encode(&data[idx]).expect("encode 1");
+            let code2 = cb2.encode(&data[idx]).expect("encode 2");
+            assert_eq!(
+                code1.codes(),
+                code2.codes(),
+                "encoding vector {} must be identical across codebooks",
+                idx
+            );
+        }
     }
 }

@@ -361,7 +361,7 @@ Every HIGH carry-forward item from GATE_W46_COMPLETE.md is mapped to a task:
 - [x] Real embedding data acquisition is an EXPLICIT prerequisite task (W47.1a, Day 1)
 - [x] WASM exports list 3 specific functions (train_pq, encode_pq, pq_search)
 - [x] Training optimization has separate sub-tasks with individual measurements (W47.3b, W47.3c, W47.4a, W47.4b)
-- [x] PqError variant count is 7 (verified from source: product.rs lines 49-107)
+- [x] PqError variant count is 8 (7 original + InvalidConvergenceThreshold added W47 Day 3)
 - [x] No silently dropped items — all 10 carry-forward items mapped (see Traceability)
 - [x] Git push timing addressed (W47.0a, Day 1)
 - [x] Existing benches/pq_bench.rs referenced (Key References table)

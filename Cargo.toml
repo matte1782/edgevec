@@ -109,6 +109,9 @@ postcard = { version = "1.0", features = ["use-std"] }
 log = "0.4"
 cfg-if = "1.0.4"
 
+# Optional: parallel training via rayon (not available on WASM)
+rayon = { version = "1.10", optional = true }
+
 # =============================================================================
 # WASM-ONLY DEPENDENCIES — Only compiled on wasm32 targets
 # =============================================================================
@@ -251,6 +254,9 @@ required-features = ["sparse"]
 [[example]]
 name = "batch_insert"
 
+[[example]]
+name = "recall_validation"
+
 # [[bin]]
 # name = "recall_bench"
 # path = "benches/recall_bench.rs"
@@ -295,6 +301,7 @@ debug = true        # Include debug info for profiling
 default = ["sparse"]
 sparse = []
 simd = []
+parallel = ["rayon"]
 
 # =============================================================================
 # CONFIGURATION STATUS

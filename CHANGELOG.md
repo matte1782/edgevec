@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Product Quantization (PQ) engine** — `edgevec::quantization::product` module (W46 Days 1-3)
-  - `PqCodebook` — k-means++ codebook training with deterministic seeding (seed=42)
+  - `PqCodebook` — k-means++ codebook training with deterministic per-subspace seeding (seed=42+m)
   - `PqCode` — compact M-byte vector representation (8 bytes for 768D with M=8)
   - `DistanceTable` — precomputed ADC lookup for fast approximate search
   - `PqSearchResult` — ranked results from exhaustive PQ scan
-  - `PqError` — 7 error variants with full context (dimensions, indices, values)
+  - `PqError` — 8 error variants with full context (dimensions, indices, values)
   - `encode_batch()` — batch encoding with first-error-short-circuit
   - `scan_topk()` — exhaustive ADC search returning k-nearest by approximate distance
   - NaN/Inf validation at all entry points (train, encode, compute_distance_table)
@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Filter API quick reference table (25 rows) in `pkg/langchain/README.md`
 
 ### Changed
+- **PQ seeding:** Switched from shared sequential RNG (`seed=42`) to per-subspace deterministic seeding (`seed=42+m`). Enables parallel training via rayon. **Breaking:** codebooks trained before this change will differ (PQ is unreleased, no external consumers affected).
 - **ROADMAP.md** updated to v7.2: W46 PQ Phase 2 complete, Phase 4 validation planned for W47
 - `pkg/langchain/README.md`: documented both filter forms (DSL strings + FilterExpression), removed "Coming Next" section
 - `pkg/langchain/package.json` and `index.ts`: version bumped to 0.2.0
