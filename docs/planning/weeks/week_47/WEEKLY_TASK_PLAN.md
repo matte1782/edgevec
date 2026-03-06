@@ -23,7 +23,7 @@ W47 resolves all three. If ALL pass, PQ becomes a production-ready quantization 
 |:---------|:-----|:--------|
 | PQ GO/NO-GO Decision | `docs/benchmarks/PQ_GO_NOGO_DECISION.md` | W46 results, gate thresholds, mitigations |
 | PQ Benchmark Plan | `docs/research/PQ_BENCHMARK_PLAN.md` | Methodology, reproducibility protocol |
-| PQ Implementation | `src/quantization/product.rs` | Source of truth — 7 PqError variants, 33 tests |
+| PQ Implementation | `src/quantization/product.rs` | Source of truth — 9 PqError variants (7 original + InvalidConvergenceThreshold + ZeroDimensions) |
 | Existing Benchmarks | `benches/pq_bench.rs` | B1/B2/B5/B7 native harness (reuse, don't rebuild) |
 | WASM Module | `src/wasm/mod.rs` | Existing WASM patterns (handle/opaque-pointer style) |
 | Architecture | `docs/architecture/ARCHITECTURE.md` | Performance budgets |
@@ -361,7 +361,7 @@ Every HIGH carry-forward item from GATE_W46_COMPLETE.md is mapped to a task:
 - [x] Real embedding data acquisition is an EXPLICIT prerequisite task (W47.1a, Day 1)
 - [x] WASM exports list 3 specific functions (train_pq, encode_pq, pq_search)
 - [x] Training optimization has separate sub-tasks with individual measurements (W47.3b, W47.3c, W47.4a, W47.4b)
-- [x] PqError variant count is 8 (7 original + InvalidConvergenceThreshold added W47 Day 3)
+- [x] PqError variant count is 9 (7 original + InvalidConvergenceThreshold D3 + ZeroDimensions D5)
 - [x] No silently dropped items — all 10 carry-forward items mapped (see Traceability)
 - [x] Git push timing addressed (W47.0a, Day 1)
 - [x] Existing benches/pq_bench.rs referenced (Key References table)

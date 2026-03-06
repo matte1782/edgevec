@@ -112,6 +112,12 @@ pub enum PqError {
         /// The invalid value.
         value: f32,
     },
+    /// Training vectors have zero dimensions.
+    ///
+    /// PQ requires vectors with at least one dimension. Zero-dimensional
+    /// vectors would produce sub_dim=0, causing division and indexing errors.
+    #[error("training vectors have 0 dimensions")]
+    ZeroDimensions,
 }
 
 /// A PQ-encoded vector: M bytes, one centroid index per subspace.
@@ -426,6 +432,9 @@ impl PqCodebook {
         }
 
         let dimensions = vectors[0].len();
+        if dimensions == 0 {
+            return Err(PqError::ZeroDimensions);
+        }
         if dimensions % num_subquantizers != 0 {
             return Err(PqError::DimensionNotDivisible {
                 dimensions,
@@ -2018,6 +2027,34 @@ mod tests {
         assert!(
             (invalid_code.codes()[0] as usize) >= ksub as usize,
             "Code byte must be >= ksub to be invalid"
+        );
+    }
+
+    // =========================================================================
+    // D5T3: Zero-dimension validation
+    // =========================================================================
+
+    /// Verifies that training with zero-dimensional vectors returns
+    /// `PqError::ZeroDimensions` instead of panicking or producing
+    /// a degenerate codebook.
+    // Implements: D5T3 — zero-dimension guard in train()
+    #[test]
+    fn test_train_zero_dimensions() {
+        // 10 vectors with 0 dimensions each
+        let data: Vec<Vec<f32>> = (0..10).map(|_| Vec::new()).collect();
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+
+        let result = PqCodebook::train(&refs, 4, 2, 5);
+        assert!(
+            matches!(result, Err(PqError::ZeroDimensions)),
+            "expected ZeroDimensions error, got: {result:?}"
+        );
+
+        // Also verify train_with_convergence_threshold
+        let result2 = PqCodebook::train_with_convergence_threshold(&refs, 4, 2, 5, 1e-4);
+        assert!(
+            matches!(result2, Err(PqError::ZeroDimensions)),
+            "expected ZeroDimensions error from train_with_convergence_threshold, got: {result2:?}"
         );
     }
 

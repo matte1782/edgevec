@@ -237,6 +237,7 @@ pub use metric::Metric;
 // No `use` statement needed since it's already defined above
 pub use persistence::ChunkedWriter;
 pub use quantization::{BinaryQuantizer, QuantizedVector, QuantizerConfig, ScalarQuantizer};
+pub use quantization::{DistanceTable, PqCode, PqCodebook, PqError, PqSearchResult};
 pub use simd::{
     capabilities, detect_neon, select_backend, warn_if_suboptimal, SimdBackend, SimdCapabilities,
 };
