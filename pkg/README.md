@@ -271,7 +271,7 @@ config.quantized = true;  // Enable SQ8 quantization
 
 Brute-force exact nearest neighbor search for small datasets. No graph overhead, 100% recall guarantee.
 
-```rust
+```rust,ignore
 use edgevec::{FlatIndex, FlatIndexConfig, DistanceMetric};
 
 let config = FlatIndexConfig::new(768)
@@ -279,24 +279,35 @@ let config = FlatIndexConfig::new(768)
     .with_capacity(10_000);
 let mut index = FlatIndex::new(config);
 
+// Insert vectors
 let id = index.insert(&embedding)?;
+
+// Exact search (100% recall)
 let results = index.search(&query, 10)?;
+
+// Persistence via snapshot
+let snapshot = index.to_snapshot()?;
+let restored = FlatIndex::from_snapshot(&snapshot)?;
 ```
+
+**When to use FlatIndex:** Datasets under ~50K vectors where exact recall matters more than speed.
 
 ### Sparse Vectors (v0.9.0)
 
 CSR-format sparse vector storage with inverted index for fast keyword-style retrieval.
 
-```rust
+```rust,ignore
 use edgevec::SparseVector;
 use edgevec::sparse::{SparseStorage, SparseSearcher};
 
+// Create a sparse vector (e.g., BM25 term weights)
 let sv = SparseVector::new(
     vec![10, 42, 999],       // term indices
     vec![0.8, 1.2, 0.3],    // term weights
     30_000,                   // vocabulary size
 )?;
 
+// Store and search
 let mut storage = SparseStorage::new();
 let id = storage.insert(&sv)?;
 
@@ -306,32 +317,49 @@ let results = searcher.search(&query_sv, 10);
 
 ### Hybrid Search (v0.9.0)
 
-Combine dense (HNSW) and sparse retrieval with RRF or linear fusion.
+Combine dense (HNSW) and sparse retrieval with Reciprocal Rank Fusion (RRF) or linear fusion.
 
-```rust
+```rust,ignore
 use edgevec::hybrid::{HybridSearcher, HybridSearchConfig, FusionMethod};
 
+// Set up: HNSW index + sparse storage already populated
 let searcher = HybridSearcher::new(&hnsw_index, &dense_storage, &sparse_storage);
 
 let config = HybridSearchConfig::new(
-    50, 50, 10,
-    FusionMethod::Rrf { k: 60 },
+    50,   // dense_k: candidates from HNSW
+    50,   // sparse_k: candidates from sparse
+    10,   // final_k: results after fusion
+    FusionMethod::Rrf { k: 60 },  // RRF with k=60
 );
 
 let results = searcher.search(&dense_query, &sparse_query, &config)?;
+for r in &results {
+    println!("ID: {}, score: {:.4}, dense_rank: {:?}, sparse_rank: {:?}",
+        r.id, r.score, r.dense_rank, r.sparse_rank);
+}
 ```
 
 ### BinaryFlatIndex (v0.9.0)
 
-Native binary vector storage with Hamming distance search. 32x memory reduction.
+Native binary vector storage with Hamming distance search. 32x memory reduction, sub-microsecond inserts.
 
-```rust
+```rust,ignore
 use edgevec::BinaryFlatIndex;
 
+// 768-bit binary vectors (96 bytes each)
 let mut index = BinaryFlatIndex::new(768)?;
+
+// Insert packed binary vectors
 let id = index.insert(&binary_vector)?;
+
+// Hamming distance search
 let results = index.search(&query, 10)?;
+for r in &results {
+    println!("ID: {}, distance: {}", r.id, r.distance);
+}
 ```
+
+**Use cases:** Semantic caching, large-scale deduplication, insert-heavy workloads (~1us insert vs ~2ms for HNSW).
 
 ---
 

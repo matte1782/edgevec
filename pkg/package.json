@@ -1,7 +1,7 @@
 {
   "name": "edgevec",
   "type": "module",
-  "description": "High-performance embedded vector database for Browser, Node, and Edge — HNSW, FlatIndex, Sparse Vectors, Hybrid Search",
+  "description": "High-performance embedded vector database for Browser, Node, and Edge",
   "version": "0.9.0",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -11,26 +11,15 @@
   "files": [
     "edgevec_bg.wasm",
     "edgevec.js",
+    "edgevec_bg.js",
     "edgevec.d.ts",
-    "edgevec_bg.wasm.d.ts",
-    "edgevec-wrapper.js",
-    "edgevec-wrapper.d.ts",
-    "edgevec-types.d.ts",
-    "filter.js",
-    "filter.d.ts",
-    "filter-builder.js",
-    "filter-builder.d.ts",
-    "sparse-helpers.js",
-    "sparse-helpers.d.ts",
-    "index.js",
-    "index.d.ts",
-    "snippets",
     "LICENSE-APACHE",
     "LICENSE-MIT"
   ],
   "main": "edgevec.js",
   "types": "edgevec.d.ts",
   "sideEffects": [
+    "./edgevec.js",
     "./snippets/*"
   ],
   "keywords": [
@@ -38,17 +27,6 @@
     "database",
     "wasm",
     "hnsw",
-    "similarity-search",
-    "sparse",
-    "hybrid-search",
-    "flat-index",
-    "binary-quantization",
-    "nearest-neighbor",
-    "embedding",
-    "semantic-search",
-    "webassembly",
-    "simd",
-    "indexeddb",
-    "browser"
+    "similarity-search"
   ]
 }

@@ -1810,6 +1810,88 @@ export class PersistenceIterator {
   next_chunk(): Uint8Array | undefined;
 }
 
+export class PqCodebookHandle {
+  private constructor();
+  free(): void;
+  [Symbol.dispose](): void;
+  /**
+   * Returns the vector dimensionality this codebook was trained on.
+   */
+  dimensions(): number;
+  /**
+   * Returns the number of subquantizers (M) in this codebook.
+   */
+  numSubquantizers(): number;
+  /**
+   * Returns the number of centroids per subspace (Ksub).
+   */
+  ksub(): number;
+  /**
+   * Encode a single vector into a PQ code.
+   *
+   * Returns a `Uint8Array` of length M (one centroid index per subspace).
+   *
+   * # Arguments
+   *
+   * * `vector` - A `Float32Array` of length `dims` (the dimensionality
+   *   used during training).
+   *
+   * # Errors
+   *
+   * Returns a string error if:
+   * - `vector` has wrong dimensionality
+   * - `vector` contains NaN or Infinity
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const code = codebook.encodePq(new Float32Array([0.1, 0.2, ...]));
+   * console.log(code.length); // M (e.g., 8)
+   * ```
+   */
+  encodePq(vector: Float32Array): Uint8Array;
+  /**
+   * Search over PQ-encoded vectors using Asymmetric Distance Computation.
+   *
+   * Given a flat byte array of PQ codes and a query vector, computes
+   * approximate distances and returns the top-k nearest results.
+   *
+   * # Arguments
+   *
+   * * `codes` - Flat `Uint8Array` of all PQ codes: `n_codes * M` bytes.
+   *   Each consecutive M bytes form one PQ code.
+   * * `n_codes` - Number of encoded vectors in `codes`.
+   * * `query` - Query vector (`Float32Array` of length `dims`).
+   * * `k` - Number of nearest neighbors to return.
+   *
+   * # Returns
+   *
+   * A JavaScript `Array` of objects `{index: number, distance: number}`,
+   * sorted by distance ascending (nearest first). Length is `min(k, n_codes)`.
+   *
+   * # Errors
+   *
+   * Returns a string error if:
+   * - `query` contains NaN or Infinity
+   * - `query` has wrong dimensionality
+   * - `codes.length != n_codes * M`
+   * - `k` is 0
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * // Encode 1000 vectors, then search
+   * const allCodes = new Uint8Array(1000 * 8); // M=8
+   * // ... fill allCodes from encodePq() calls ...
+   * const results = codebook.pqSearch(allCodes, 1000, query, 10);
+   * for (const r of results) {
+   *     console.log(`Index: ${r.index}, Distance: ${r.distance}`);
+   * }
+   * ```
+   */
+  pqSearch(codes: Uint8Array, n_codes: number, query: Float32Array, k: number): any;
+}
+
 /**
  * Vector storage type for EdgeVec.
  *
@@ -1989,6 +2071,45 @@ export function init_logging(): void;
 export function parse_filter_js(filter_str: string): string;
 
 /**
+ * Train a PQ codebook from flat vector data.
+ *
+ * Takes a flat `Float32Array` of `n_vectors * dims` elements and trains
+ * a Product Quantization codebook with `m` subquantizers, each having
+ * `ksub` centroids, using `max_iters` k-means iterations.
+ *
+ * # Arguments
+ *
+ * * `data` - Flat `Float32Array`: `n_vectors` vectors of `dims` dimensions each,
+ *   stored contiguously (row-major).
+ * * `dims` - Dimensionality of each vector. Must be > 0 and divisible by `m`.
+ * * `n_vectors` - Number of vectors in `data`. Must be >= `ksub`.
+ * * `m` - Number of subquantizers. Must be >= 1.
+ * * `ksub` - Centroids per subspace. Must be in \[2, 256\].
+ * * `max_iters` - Maximum k-means iterations per subspace.
+ *
+ * # Returns
+ *
+ * A `PqCodebookHandle` that can be used for encoding and searching.
+ *
+ * # Errors
+ *
+ * Returns a string error if:
+ * - `data` contains NaN or Infinity values
+ * - `data.length != n_vectors * dims`
+ * - `dims` is not divisible by `m`
+ * - Fewer than `ksub` vectors are provided
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const data = new Float32Array(1000 * 128); // 1000 vectors, 128 dims
+ * // ... fill data ...
+ * const codebook = trainPq(data, 128, 1000, 8, 256, 25);
+ * ```
+ */
+export function trainPq(data: Float32Array, dims: number, n_vectors: number, m: number, ksub: number, max_iters: number): PqCodebookHandle;
+
+/**
  * Try to parse a filter string, returning null on error.
  *
  * # Arguments
@@ -2038,161 +2159,3 @@ export function try_parse_filter_js(filter_str: string): any;
  * ```
  */
 export function validate_filter_js(filter_str: string): string;
-
-export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
-
-export interface InitOutput {
-  readonly memory: WebAssembly.Memory;
-  readonly __wbg_batchinsertconfig_free: (a: number, b: number) => void;
-  readonly __wbg_batchinsertresult_free: (a: number, b: number) => void;
-  readonly __wbg_edgevec_free: (a: number, b: number) => void;
-  readonly __wbg_edgevecconfig_free: (a: number, b: number) => void;
-  readonly __wbg_get_edgevecconfig_dimensions: (a: number) => number;
-  readonly __wbg_get_wasmcompactionresult_duration_ms: (a: number) => number;
-  readonly __wbg_get_wasmcompactionresult_new_size: (a: number) => number;
-  readonly __wbg_get_wasmcompactionresult_tombstones_removed: (a: number) => number;
-  readonly __wbg_jsmetadatavalue_free: (a: number, b: number) => void;
-  readonly __wbg_persistenceiterator_free: (a: number, b: number) => void;
-  readonly __wbg_set_edgevecconfig_dimensions: (a: number, b: number) => void;
-  readonly __wbg_wasmbatchdeleteresult_free: (a: number, b: number) => void;
-  readonly __wbg_wasmcompactionresult_free: (a: number, b: number) => void;
-  readonly batchinsertconfig_new: () => number;
-  readonly batchinsertconfig_set_validateDimensions: (a: number, b: number) => void;
-  readonly batchinsertconfig_validateDimensions: (a: number) => number;
-  readonly batchinsertresult_ids: (a: number, b: number) => void;
-  readonly batchinsertresult_inserted: (a: number) => number;
-  readonly batchinsertresult_total: (a: number) => number;
-  readonly benchmarkHamming: (a: number, b: number) => number;
-  readonly benchmarkHammingBatch: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_canInsert: (a: number) => number;
-  readonly edgevec_compact: (a: number, b: number) => void;
-  readonly edgevec_compactionThreshold: (a: number, b: number) => void;
-  readonly edgevec_compactionWarning: (a: number, b: number) => void;
-  readonly edgevec_deleteAllMetadata: (a: number, b: number) => number;
-  readonly edgevec_deleteMetadata: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly edgevec_deletedCount: (a: number, b: number) => void;
-  readonly edgevec_enableBQ: (a: number, b: number) => void;
-  readonly edgevec_getAllMetadata: (a: number, b: number) => number;
-  readonly edgevec_getMemoryConfig: (a: number, b: number) => void;
-  readonly edgevec_getMemoryPressure: (a: number, b: number) => void;
-  readonly edgevec_getMemoryRecommendation: (a: number, b: number) => void;
-  readonly edgevec_getMetadata: (a: number, b: number, c: number, d: number) => number;
-  readonly edgevec_hasBQ: (a: number) => number;
-  readonly edgevec_hasMetadata: (a: number, b: number, c: number, d: number) => number;
-  readonly edgevec_hasSparseStorage: (a: number) => number;
-  readonly edgevec_hybridSearch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
-  readonly edgevec_initSparseStorage: (a: number) => void;
-  readonly edgevec_insert: (a: number, b: number, c: number) => void;
-  readonly edgevec_insertBatch: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_insertBatchFlat: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_insertBatchWithProgress: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_insertBinary: (a: number, b: number, c: number) => void;
-  readonly edgevec_insertSparse: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly edgevec_insertWithBq: (a: number, b: number, c: number) => void;
-  readonly edgevec_insertWithMetadata: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_isDeleted: (a: number, b: number, c: number) => void;
-  readonly edgevec_liveCount: (a: number, b: number) => void;
-  readonly edgevec_load: (a: number, b: number) => number;
-  readonly edgevec_memoryUsage: (a: number) => number;
-  readonly edgevec_metadataKeyCount: (a: number, b: number) => number;
-  readonly edgevec_metadataVectorCount: (a: number) => number;
-  readonly edgevec_needsCompaction: (a: number, b: number) => void;
-  readonly edgevec_new: (a: number, b: number) => void;
-  readonly edgevec_save: (a: number, b: number, c: number) => number;
-  readonly edgevec_save_stream: (a: number, b: number, c: number) => void;
-  readonly edgevec_search: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_searchBQ: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_searchBQRescored: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly edgevec_searchBinary: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_searchBinaryFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly edgevec_searchBinaryWithEf: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly edgevec_searchFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly edgevec_searchHybrid: (a: number, b: number, c: number, d: number) => void;
-  readonly edgevec_searchSparse: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly edgevec_searchWithFilter: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly edgevec_serializedSize: (a: number) => number;
-  readonly edgevec_setCompactionThreshold: (a: number, b: number, c: number) => void;
-  readonly edgevec_setMemoryConfig: (a: number, b: number, c: number) => void;
-  readonly edgevec_setMetadata: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly edgevec_softDelete: (a: number, b: number, c: number) => void;
-  readonly edgevec_softDeleteBatch: (a: number, b: number, c: number) => void;
-  readonly edgevec_softDeleteBatchCompat: (a: number, b: number, c: number) => void;
-  readonly edgevec_sparseCount: (a: number) => number;
-  readonly edgevec_tombstoneRatio: (a: number, b: number) => void;
-  readonly edgevec_totalMetadataCount: (a: number) => number;
-  readonly edgevecconfig_indexType: (a: number) => number;
-  readonly edgevecconfig_isFlat: (a: number) => number;
-  readonly edgevecconfig_isHnsw: (a: number) => number;
-  readonly edgevecconfig_new: (a: number) => number;
-  readonly edgevecconfig_setMetricType: (a: number, b: number) => void;
-  readonly edgevecconfig_set_ef_construction: (a: number, b: number) => void;
-  readonly edgevecconfig_set_ef_search: (a: number, b: number) => void;
-  readonly edgevecconfig_set_indexType: (a: number, b: number) => void;
-  readonly edgevecconfig_set_m: (a: number, b: number) => void;
-  readonly edgevecconfig_set_m0: (a: number, b: number) => void;
-  readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
-  readonly edgevecconfig_set_vector_type: (a: number, b: number) => void;
-  readonly edgevecconfig_vector_type: (a: number) => number;
-  readonly getSimdBackend: (a: number) => void;
-  readonly get_filter_info_js: (a: number, b: number, c: number) => void;
-  readonly init_logging: () => void;
-  readonly jsmetadatavalue_asBoolean: (a: number) => number;
-  readonly jsmetadatavalue_asFloat: (a: number, b: number) => void;
-  readonly jsmetadatavalue_asInteger: (a: number, b: number) => void;
-  readonly jsmetadatavalue_asString: (a: number, b: number) => void;
-  readonly jsmetadatavalue_asStringArray: (a: number) => number;
-  readonly jsmetadatavalue_fromBoolean: (a: number) => number;
-  readonly jsmetadatavalue_fromFloat: (a: number) => number;
-  readonly jsmetadatavalue_fromInteger: (a: number, b: number) => void;
-  readonly jsmetadatavalue_fromString: (a: number, b: number) => number;
-  readonly jsmetadatavalue_fromStringArray: (a: number, b: number) => void;
-  readonly jsmetadatavalue_getType: (a: number, b: number) => void;
-  readonly jsmetadatavalue_isBoolean: (a: number) => number;
-  readonly jsmetadatavalue_isFloat: (a: number) => number;
-  readonly jsmetadatavalue_isInteger: (a: number) => number;
-  readonly jsmetadatavalue_isString: (a: number) => number;
-  readonly jsmetadatavalue_isStringArray: (a: number) => number;
-  readonly jsmetadatavalue_toJS: (a: number) => number;
-  readonly parse_filter_js: (a: number, b: number, c: number) => void;
-  readonly persistenceiterator_next_chunk: (a: number) => number;
-  readonly try_parse_filter_js: (a: number, b: number) => number;
-  readonly validate_filter_js: (a: number, b: number, c: number) => void;
-  readonly wasmbatchdeleteresult_allValid: (a: number) => number;
-  readonly wasmbatchdeleteresult_alreadyDeleted: (a: number) => number;
-  readonly wasmbatchdeleteresult_anyDeleted: (a: number) => number;
-  readonly wasmbatchdeleteresult_deleted: (a: number) => number;
-  readonly wasmbatchdeleteresult_invalidIds: (a: number) => number;
-  readonly wasmbatchdeleteresult_total: (a: number) => number;
-  readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
-  readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
-  readonly __wasm_bindgen_func_elem_2008: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_1992: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_2526: (a: number, b: number, c: number, d: number) => void;
-  readonly __wbindgen_export: (a: number, b: number) => number;
-  readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
-  readonly __wbindgen_export3: (a: number) => void;
-  readonly __wbindgen_export4: (a: number, b: number, c: number) => void;
-  readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
-}
-
-export type SyncInitInput = BufferSource | WebAssembly.Module;
-
-/**
-* Instantiates the given `module`, which can either be bytes or
-* a precompiled `WebAssembly.Module`.
-*
-* @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
-*
-* @returns {InitOutput}
-*/
-export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
-
-/**
-* If `module_or_path` is {RequestInfo} or {URL}, makes a request and
-* for everything else, calls `WebAssembly.instantiate` directly.
-*
-* @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
-*
-* @returns {Promise<InitOutput>}
-*/
-export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;
