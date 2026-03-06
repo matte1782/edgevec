@@ -8,6 +8,7 @@ use crate::hybrid::{FusionMethod, HybridSearchConfig, HybridSearcher};
 use crate::metadata::validation::{validate_key, validate_value, MAX_KEYS_PER_VECTOR};
 use crate::metadata::MetadataStore;
 use crate::persistence::{chunking::ChunkIter, ChunkedWriter, PersistenceError};
+use crate::quantization::product::{PqCode, PqCodebook};
 #[cfg(feature = "sparse")]
 use crate::sparse::{SparseSearcher, SparseStorage, SparseVector};
 use crate::storage::VectorStorage;
@@ -4328,5 +4329,304 @@ impl<'de> Deserialize<'de> for HybridFusionOption {
         }
 
         deserializer.deserialize_any(FusionVisitor)
+    }
+}
+
+// =============================================================================
+// Product Quantization (PQ) WASM Bindings
+// =============================================================================
+
+/// WASM handle for a trained PQ codebook.
+///
+/// Wraps a [`PqCodebook`] as an opaque handle that can be passed between
+/// JavaScript and WASM. The codebook lives entirely on the WASM heap;
+/// only query vectors and results cross the JS/WASM boundary.
+///
+/// # JavaScript Usage
+///
+/// ```javascript
+/// // Train a codebook from flat Float32Array data
+/// const codebook = trainPq(data, 128, 1000, 8, 256, 25);
+///
+/// // Encode a single vector
+/// const code = codebook.encodePq(vector); // Uint8Array of length M
+///
+/// // Search over encoded vectors
+/// const results = codebook.pqSearch(allCodes, 1000, query, 10);
+/// // results = [{index: 42, distance: 0.123}, ...]
+/// ```
+#[wasm_bindgen]
+pub struct PqCodebookHandle {
+    codebook: PqCodebook,
+}
+
+/// Train a PQ codebook from flat vector data.
+///
+/// Takes a flat `Float32Array` of `n_vectors * dims` elements and trains
+/// a Product Quantization codebook with `m` subquantizers, each having
+/// `ksub` centroids, using `max_iters` k-means iterations.
+///
+/// # Arguments
+///
+/// * `data` - Flat `Float32Array`: `n_vectors` vectors of `dims` dimensions each,
+///   stored contiguously (row-major).
+/// * `dims` - Dimensionality of each vector. Must be > 0 and divisible by `m`.
+/// * `n_vectors` - Number of vectors in `data`. Must be >= `ksub`.
+/// * `m` - Number of subquantizers. Must be >= 1.
+/// * `ksub` - Centroids per subspace. Must be in \[2, 256\].
+/// * `max_iters` - Maximum k-means iterations per subspace.
+///
+/// # Returns
+///
+/// A `PqCodebookHandle` that can be used for encoding and searching.
+///
+/// # Errors
+///
+/// Returns a string error if:
+/// - `data` contains NaN or Infinity values
+/// - `data.length != n_vectors * dims`
+/// - `dims` is not divisible by `m`
+/// - Fewer than `ksub` vectors are provided
+///
+/// # Example (JavaScript)
+///
+/// ```javascript
+/// const data = new Float32Array(1000 * 128); // 1000 vectors, 128 dims
+/// // ... fill data ...
+/// const codebook = trainPq(data, 128, 1000, 8, 256, 25);
+/// ```
+#[wasm_bindgen(js_name = "trainPq")]
+#[allow(clippy::cast_possible_truncation)]
+pub fn train_pq(
+    data: &[f32],
+    dims: u32,
+    n_vectors: u32,
+    m: u32,
+    ksub: u32,
+    max_iters: u32,
+) -> Result<PqCodebookHandle, JsValue> {
+    let dims = dims as usize;
+    let n_vectors = n_vectors as usize;
+    let m = m as usize;
+    let ksub = ksub as usize;
+    let max_iters = max_iters as usize;
+
+    // Validate flat array length matches declared shape
+    if dims == 0 {
+        return Err(JsValue::from_str("PQ error: dims must be > 0"));
+    }
+    if n_vectors == 0 {
+        return Err(JsValue::from_str("PQ error: n_vectors must be > 0"));
+    }
+    let expected_len = n_vectors
+        .checked_mul(dims)
+        .ok_or_else(|| JsValue::from_str("PQ error: n_vectors * dims overflows usize"))?;
+    if data.len() != expected_len {
+        return Err(JsValue::from_str(&format!(
+            "PQ error: data.length ({}) != n_vectors ({}) * dims ({})",
+            data.len(),
+            n_vectors,
+            dims
+        )));
+    }
+
+    // NaN/Inf validation -- PQ training rejects non-finite values but we
+    // provide a clearer error message at the WASM boundary.
+    if data.iter().any(|v| !v.is_finite()) {
+        return Err(JsValue::from_str(
+            "PQ error: data contains non-finite values (NaN or Infinity)",
+        ));
+    }
+
+    // Reshape flat data into slice-of-slices for PqCodebook::train
+    let refs: Vec<&[f32]> = (0..n_vectors)
+        .map(|i| &data[i * dims..(i + 1) * dims])
+        .collect();
+
+    let codebook = PqCodebook::train(&refs, m, ksub, max_iters)
+        .map_err(|e| JsValue::from_str(&format!("PQ error: {e}")))?;
+
+    Ok(PqCodebookHandle { codebook })
+}
+
+#[wasm_bindgen]
+impl PqCodebookHandle {
+    /// Encode a single vector into a PQ code.
+    ///
+    /// Returns a `Uint8Array` of length M (one centroid index per subspace).
+    ///
+    /// # Arguments
+    ///
+    /// * `vector` - A `Float32Array` of length `dims` (the dimensionality
+    ///   used during training).
+    ///
+    /// # Errors
+    ///
+    /// Returns a string error if:
+    /// - `vector` has wrong dimensionality
+    /// - `vector` contains NaN or Infinity
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const code = codebook.encodePq(new Float32Array([0.1, 0.2, ...]));
+    /// console.log(code.length); // M (e.g., 8)
+    /// ```
+    #[wasm_bindgen(js_name = "encodePq")]
+    pub fn encode_pq(&self, vector: &[f32]) -> Result<Vec<u8>, JsValue> {
+        // NaN/Inf validated inside PqCodebook::encode, but give a clearer
+        // boundary error for JS callers.
+        if vector.iter().any(|v| !v.is_finite()) {
+            return Err(JsValue::from_str(
+                "PQ error: vector contains non-finite values (NaN or Infinity)",
+            ));
+        }
+
+        let code = self
+            .codebook
+            .encode(vector)
+            .map_err(|e| JsValue::from_str(&format!("PQ error: {e}")))?;
+
+        Ok(code.codes().to_vec())
+    }
+
+    /// Search over PQ-encoded vectors using Asymmetric Distance Computation.
+    ///
+    /// Given a flat byte array of PQ codes and a query vector, computes
+    /// approximate distances and returns the top-k nearest results.
+    ///
+    /// # Arguments
+    ///
+    /// * `codes` - Flat `Uint8Array` of all PQ codes: `n_codes * M` bytes.
+    ///   Each consecutive M bytes form one PQ code.
+    /// * `n_codes` - Number of encoded vectors in `codes`.
+    /// * `query` - Query vector (`Float32Array` of length `dims`).
+    /// * `k` - Number of nearest neighbors to return.
+    ///
+    /// # Returns
+    ///
+    /// A JavaScript `Array` of objects `{index: number, distance: number}`,
+    /// sorted by distance ascending (nearest first). Length is `min(k, n_codes)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a string error if:
+    /// - `query` contains NaN or Infinity
+    /// - `query` has wrong dimensionality
+    /// - `codes.length != n_codes * M`
+    /// - `k` is 0
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// // Encode 1000 vectors, then search
+    /// const allCodes = new Uint8Array(1000 * 8); // M=8
+    /// // ... fill allCodes from encodePq() calls ...
+    /// const results = codebook.pqSearch(allCodes, 1000, query, 10);
+    /// for (const r of results) {
+    ///     console.log(`Index: ${r.index}, Distance: ${r.distance}`);
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = "pqSearch")]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn pq_search(
+        &self,
+        codes: &[u8],
+        n_codes: u32,
+        query: &[f32],
+        k: u32,
+    ) -> Result<JsValue, JsValue> {
+        let n_codes = n_codes as usize;
+        let k = k as usize;
+        let m = self.codebook.num_subquantizers();
+
+        if k == 0 {
+            return Err(JsValue::from_str("PQ error: k must be > 0"));
+        }
+
+        // Validate codes array length
+        let expected_codes_len = n_codes
+            .checked_mul(m)
+            .ok_or_else(|| JsValue::from_str("PQ error: n_codes * M overflows usize"))?;
+        if codes.len() != expected_codes_len {
+            return Err(JsValue::from_str(&format!(
+                "PQ error: codes.length ({}) != n_codes ({}) * M ({})",
+                codes.len(),
+                n_codes,
+                m
+            )));
+        }
+
+        // NaN/Inf validation on query
+        if query.iter().any(|v| !v.is_finite()) {
+            return Err(JsValue::from_str(
+                "PQ error: query contains non-finite values (NaN or Infinity)",
+            ));
+        }
+
+        // Compute distance table from query
+        let distance_table = self
+            .codebook
+            .compute_distance_table(query)
+            .map_err(|e| JsValue::from_str(&format!("PQ error: {e}")))?;
+
+        // Reshape flat codes into Vec<PqCode>, validating all code bytes < ksub.
+        // Without this check, a JS caller could pass bytes >= ksub which would
+        // cause an out-of-bounds panic in compute_distance().
+        let ksub_val = self.codebook.ksub();
+        let pq_codes: Vec<PqCode> = (0..n_codes)
+            .map(|i| {
+                let slice = &codes[i * m..(i + 1) * m];
+                for (j, &byte) in slice.iter().enumerate() {
+                    if (byte as usize) >= ksub_val {
+                        return Err(JsValue::from_str(&format!(
+                            "PQ error: code[{}] byte {} has value {} >= ksub ({})",
+                            i, j, byte, ksub_val
+                        )));
+                    }
+                }
+                Ok(PqCode::from_codes(slice.to_vec()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Run scan
+        let results = distance_table.scan_topk(&pq_codes, k);
+
+        // Convert to JS array of {index, distance} objects
+        let arr = Array::new_with_length(results.len() as u32);
+        for (i, r) in results.iter().enumerate() {
+            let obj = Object::new();
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("index"),
+                &JsValue::from(r.index as u32),
+            )?;
+            Reflect::set(
+                &obj,
+                &JsValue::from_str("distance"),
+                &JsValue::from_f64(f64::from(r.distance)),
+            )?;
+            arr.set(i as u32, obj.into());
+        }
+
+        Ok(arr.into())
+    }
+
+    /// Returns the number of subquantizers (M) in this codebook.
+    #[wasm_bindgen(js_name = "numSubquantizers")]
+    pub fn num_subquantizers(&self) -> u32 {
+        self.codebook.num_subquantizers() as u32
+    }
+
+    /// Returns the vector dimensionality this codebook was trained on.
+    #[wasm_bindgen(js_name = "dimensions")]
+    pub fn dimensions(&self) -> u32 {
+        self.codebook.dimensions() as u32
+    }
+
+    /// Returns the number of centroids per subspace (Ksub).
+    #[wasm_bindgen(js_name = "ksub")]
+    pub fn ksub(&self) -> u32 {
+        self.codebook.ksub() as u32
     }
 }

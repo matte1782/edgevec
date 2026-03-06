@@ -73,3 +73,4 @@ CLAUDE.md
 
 # Playwright MCP test screenshots
 .playwright-mcp/
+tests/data/embeddings_768d_50k.bin

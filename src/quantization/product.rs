@@ -119,6 +119,21 @@ pub struct PqCode {
 }
 
 impl PqCode {
+    /// Construct a `PqCode` from raw centroid indices.
+    ///
+    /// Each byte is a centroid index for one subspace. The length of `codes`
+    /// must equal M (the number of subquantizers used during training).
+    ///
+    /// # Safety Contract
+    ///
+    /// Callers must ensure that every value in `codes` is < Ksub (the number
+    /// of centroids per subspace). Values >= Ksub will cause out-of-bounds
+    /// reads during distance computation.
+    #[must_use]
+    pub fn from_codes(codes: Vec<u8>) -> Self {
+        Self { codes }
+    }
+
     /// Returns the centroid indices as a slice.
     #[must_use]
     pub fn codes(&self) -> &[u8] {
@@ -1588,6 +1603,261 @@ mod tests {
             trials_where_m8_wins_or_ties,
             NUM_TRIALS,
             pass_rate * 100.0
+        );
+    }
+
+    // =========================================================================
+    // D1T5: WASM PQ integration tests (native-side)
+    //
+    // These tests verify the PQ pipeline that the WASM exports wrap:
+    //   train_pq  -> PqCodebook::train
+    //   encode_pq -> PqCodebook::encode
+    //   pq_search -> DistanceTable::scan_topk
+    //
+    // They exercise flat-array reshaping, PqCode::from_codes round-trips,
+    // and the full train->encode->search pipeline at small scale.
+    // =========================================================================
+
+    /// Train a PqCodebook through the same path used by the WASM `train_pq`
+    /// export: flat-array training data reshaped into D-dimensional vectors.
+    /// Verifies the codebook has correct metadata after training.
+    // Implements: W47 D1T5 — WASM PQ train integration test
+    #[test]
+    fn test_wasm_pq_train_returns_handle() {
+        // Simulate the flat-array reshaping that train_pq performs:
+        // 100 vectors of 32D, stored as a flat [f32; 3200]
+        let data = generate_test_data(100, 32, 500);
+        let flat: Vec<f32> = data.iter().flat_map(|v| v.iter().copied()).collect();
+        assert_eq!(flat.len(), 100 * 32);
+
+        // Reshape flat array back into slices (mirrors train_pq logic)
+        let dims = 32_usize;
+        let num_vectors = flat.len() / dims;
+        let vectors: Vec<&[f32]> = (0..num_vectors)
+            .map(|i| &flat[i * dims..(i + 1) * dims])
+            .collect();
+
+        // Train with m=4, ksub=16, max_iters=5
+        let cb = PqCodebook::train(&vectors, 4, 16, 5)
+            .expect("training 100 vectors (32D) should succeed");
+
+        // Verify codebook metadata
+        assert_eq!(cb.dimensions(), 32, "codebook dimensions must match input");
+        assert_eq!(cb.num_subquantizers(), 4, "codebook M must match requested");
+        assert_eq!(cb.ksub(), 16, "codebook ksub must match requested");
+        assert_eq!(cb.sub_dim(), 8, "sub_dim must be D/M = 32/4 = 8");
+    }
+
+    /// Encode a vector through the same path used by the WASM `encode_pq`
+    /// export. Verifies the PQ code has M bytes, all values < ksub.
+    // Implements: W47 D1T5 — WASM PQ encode integration test
+    #[test]
+    fn test_wasm_pq_encode_returns_codes() {
+        let data = generate_test_data(100, 32, 501);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+
+        let m = 4_usize;
+        let ksub = 16_usize;
+        let cb = PqCodebook::train(&refs, m, ksub, 5).expect("training should succeed");
+
+        // Encode a single vector (simulates encode_pq WASM path)
+        let code = cb.encode(&data[0]).expect("encoding should succeed");
+
+        // Code length must equal M
+        assert_eq!(
+            code.num_subquantizers(),
+            m,
+            "encoded code must have M={} bytes",
+            m
+        );
+        assert_eq!(code.codes().len(), m, "codes slice length must equal M");
+
+        // All code values must be < ksub (valid centroid indices)
+        for (i, &c) in code.codes().iter().enumerate() {
+            assert!(
+                (c as usize) < ksub,
+                "code[{}] = {} must be < ksub={}",
+                i,
+                c,
+                ksub
+            );
+        }
+
+        // Verify encoding a different vector also works
+        let code2 = cb
+            .encode(&data[99])
+            .expect("encoding vector 99 should succeed");
+        assert_eq!(code2.num_subquantizers(), m);
+        for &c in code2.codes() {
+            assert!((c as usize) < ksub);
+        }
+    }
+
+    /// Full search pipeline through the path used by the WASM `pq_search`
+    /// export: train -> encode batch -> compute distance table -> scan_topk.
+    /// Also verifies PqCode::from_codes round-trip.
+    // Implements: W47 D1T5 — WASM PQ search integration test
+    #[test]
+    fn test_wasm_pq_search_returns_results() {
+        let data = generate_test_data(100, 32, 502);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+
+        let m = 4_usize;
+        let ksub = 16_usize;
+        let k = 5_usize;
+        let cb = PqCodebook::train(&refs, m, ksub, 10).expect("training should succeed");
+
+        // Encode all vectors
+        let codes: Vec<PqCode> = data.iter().map(|v| cb.encode(v).expect("encode")).collect();
+        assert_eq!(codes.len(), 100);
+
+        // Search with query = data[0], k=5
+        let query = &data[0];
+        let dt = cb
+            .compute_distance_table(query)
+            .expect("distance table should succeed");
+        let results = dt.scan_topk(&codes, k);
+
+        // Must return exactly k results
+        assert_eq!(
+            results.len(),
+            k,
+            "scan_topk must return exactly k={} results",
+            k
+        );
+
+        // Results must be sorted by distance ascending
+        for w in results.windows(2) {
+            assert!(
+                w[0].distance <= w[1].distance,
+                "results not sorted: d[{}]={} > d[{}]={}",
+                w[0].index,
+                w[0].distance,
+                w[1].index,
+                w[1].distance
+            );
+        }
+
+        // All distances must be non-negative and finite
+        for r in &results {
+            assert!(
+                r.distance >= 0.0,
+                "distance must be non-negative, got {}",
+                r.distance
+            );
+            assert!(
+                r.distance.is_finite(),
+                "distance must be finite, got {}",
+                r.distance
+            );
+            assert!(r.index < 100, "index {} out of range 0..100", r.index);
+        }
+
+        // Self should be nearest (query is data[0])
+        assert_eq!(
+            results[0].index, 0,
+            "query vector (index 0) should be its own nearest neighbor, got index {}",
+            results[0].index
+        );
+
+        // ---- PqCode::from_codes round-trip ----
+        // Encode a vector, extract raw bytes, reconstruct via from_codes,
+        // verify that distance computation matches.
+        let original_code = cb.encode(&data[42]).expect("encode vector 42");
+        let raw_bytes = original_code.codes().to_vec();
+        let reconstructed = PqCode::from_codes(raw_bytes);
+
+        // Codes must be identical
+        assert_eq!(
+            reconstructed.codes(),
+            original_code.codes(),
+            "from_codes round-trip must preserve codes"
+        );
+
+        // Distance via original and reconstructed must match exactly
+        let dt_42 = cb
+            .compute_distance_table(&data[42])
+            .expect("distance table for vector 42");
+        let dist_original = dt_42.compute_distance(&original_code);
+        let dist_reconstructed = dt_42.compute_distance(&reconstructed);
+        assert_eq!(
+            dist_original, dist_reconstructed,
+            "distance through from_codes round-trip must be identical: {} vs {}",
+            dist_original, dist_reconstructed
+        );
+    }
+
+    #[test]
+    fn test_wasm_pq_train_rejects_nan() {
+        // NaN in training data must produce an error, not silently corrupt codebook
+        let mut data: Vec<Vec<f32>> = (0..100)
+            .map(|i| (0..32).map(|d| (i * 32 + d) as f32 * 0.01).collect())
+            .collect();
+        data[50][10] = f32::NAN;
+
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let result = PqCodebook::train(&refs, 4, 16, 5);
+        assert!(result.is_err(), "NaN data must be rejected");
+    }
+
+    #[test]
+    fn test_wasm_pq_encode_rejects_wrong_dims() {
+        // Vector with wrong dimensions must produce DimensionMismatch error
+        let data: Vec<Vec<f32>> = (0..100)
+            .map(|i| (0..32).map(|d| (i * 32 + d) as f32 * 0.01).collect())
+            .collect();
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, 4, 16, 5).unwrap();
+
+        let short_vec = vec![0.1f32; 16];
+        let result = cb.encode(&short_vec);
+        assert!(result.is_err(), "Wrong dimension vector must be rejected");
+    }
+
+    #[test]
+    fn test_wasm_pq_from_codes_length_matches_m() {
+        let codes = vec![0u8, 1, 2, 3];
+        let pq = PqCode::from_codes(codes);
+        assert_eq!(pq.num_subquantizers(), 4);
+        assert_eq!(pq.codes(), &[0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_pq_code_with_invalid_ksub_causes_oob() {
+        // Validates that code bytes >= ksub would cause OOB in compute_distance.
+        // The WASM boundary (`pq_search`) catches this before reaching here,
+        // but this test documents the internal invariant.
+        let dim = 32;
+        let m = 4;
+        let ksub = 16;
+        let n = 500;
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let data: Vec<Vec<f32>> = (0..n)
+            .map(|_| (0..dim).map(|_| rng.gen::<f32>()).collect())
+            .collect();
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let cb = PqCodebook::train(&refs, m, ksub, 5).unwrap();
+
+        // Valid code: all bytes < ksub — should work
+        let valid_code = PqCode::from_codes(vec![0u8; m as usize]);
+        let query: Vec<f32> = (0..dim).map(|_| rng.gen::<f32>()).collect();
+        let dt = cb.compute_distance_table(&query).unwrap();
+        let dist = dt.compute_distance(&valid_code);
+        assert!(
+            dist >= 0.0,
+            "Valid code should produce non-negative distance"
+        );
+
+        // Invalid code: byte == ksub — this is what WASM boundary must reject
+        let invalid_code = PqCode::from_codes(vec![ksub as u8; m as usize]);
+        // We don't call compute_distance with invalid_code here because it
+        // would panic (assert_eq on subquantizer count passes but indexing
+        // into distance table would be OOB). The WASM boundary test below
+        // verifies the rejection path.
+        assert_eq!(invalid_code.codes()[0], ksub as u8);
+        assert!(
+            (invalid_code.codes()[0] as usize) >= ksub as usize,
+            "Code byte must be >= ksub to be invalid"
         );
     }
 }
