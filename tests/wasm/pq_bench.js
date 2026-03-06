@@ -61,14 +61,21 @@ function generateSyntheticVectors(n, dims, seed) {
 }
 
 /**
- * Compute percentile from sorted array.
+ * Compute percentile from sorted array using linear interpolation.
+ * For small sample sizes (< 100), P99 will interpolate between the
+ * highest values rather than always returning the max.
  * @param {number[]} sorted - sorted array of values
  * @param {number} p - percentile (0-100)
  * @returns {number}
  */
 function percentile(sorted, p) {
-  const idx = Math.ceil((p / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, idx)];
+  if (sorted.length === 0) return 0;
+  if (sorted.length === 1) return sorted[0];
+  const rank = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  const frac = rank - lo;
+  return sorted[lo] + frac * (sorted[hi] - sorted[lo]);
 }
 
 /**
@@ -89,6 +96,9 @@ function percentile(sorted, p) {
  * @returns {Promise<object>} timing results
  */
 async function benchADC(nCodes, nQueries, iterations, opts = {}) {
+  if (iterations < 1) throw new Error('iterations must be >= 1');
+  if (nCodes < 1) throw new Error('nCodes must be >= 1');
+  if (nQueries < 1) throw new Error('nQueries must be >= 1');
   const dims = opts.dims || 768;
   const m = opts.m || 8;
   const ksub = opts.ksub || 256;
@@ -118,7 +128,7 @@ async function benchADC(nCodes, nQueries, iterations, opts = {}) {
   const allCodes = new Uint8Array(nCodes * m);
   for (let i = 0; i < nCodes; i++) {
     const vec = data.subarray(i * dims, (i + 1) * dims);
-    const code = codebook.encodePq(new Float32Array(vec));
+    const code = codebook.encodePq(vec);
     allCodes.set(code, i * m);
   }
   const encMs = performance.now() - encStart;
@@ -181,6 +191,8 @@ async function benchADC(nCodes, nQueries, iterations, opts = {}) {
  * @returns {Promise<object>} timing results
  */
 async function benchTraining(nVectors, iterations, opts = {}) {
+  if (iterations < 1) throw new Error('iterations must be >= 1');
+  if (nVectors < 1) throw new Error('nVectors must be >= 1');
   const dims = opts.dims || 768;
   const m = opts.m || 8;
   const ksub = opts.ksub || 256;
@@ -256,7 +268,7 @@ function computeGroundTruth(vectors, n, dims, queries, k) {
       dists[i] = sum;
     }
 
-    // Find top-k (partial sort via selection)
+    // Find top-k via full sort (acceptable: ground truth cost excluded from timing)
     const indices = Array.from({ length: n }, (_, i) => i);
     indices.sort((a, b) => dists[a] - dists[b]);
     results.push(indices.slice(0, k));
