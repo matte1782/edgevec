@@ -346,6 +346,26 @@ impl PqCodebook {
         ksub: usize,
         max_iters: usize,
     ) -> Result<Self, PqError> {
+        Self::train_with_convergence_threshold(vectors, num_subquantizers, ksub, max_iters, 1e-4)
+    }
+
+    /// Train a PQ codebook with explicit convergence threshold.
+    ///
+    /// Same as [`train()`](Self::train) but allows overriding the early-stop
+    /// convergence threshold. K-means halts early when the maximum centroid
+    /// movement (L2 distance) falls below `convergence_threshold`.
+    ///
+    /// # Arguments
+    ///
+    /// * `convergence_threshold` - Early-stop threshold for k-means (default: `1e-4`).
+    ///   Set to `0.0` to disable early stopping.
+    pub fn train_with_convergence_threshold(
+        vectors: &[&[f32]],
+        num_subquantizers: usize,
+        ksub: usize,
+        max_iters: usize,
+        convergence_threshold: f32,
+    ) -> Result<Self, PqError> {
         // Validate parameters
         if num_subquantizers == 0 {
             return Err(PqError::InvalidM);
@@ -402,7 +422,14 @@ impl PqCodebook {
             }
 
             // Run k-means for this subspace
-            let sub_centroids = kmeans(&sub_vectors, ksub, sub_dim, max_iters, &mut rng);
+            let sub_centroids = kmeans(
+                &sub_vectors,
+                ksub,
+                sub_dim,
+                max_iters,
+                &mut rng,
+                convergence_threshold,
+            );
 
             // Copy trained centroids into the flat codebook
             let codebook_offset = m * ksub * sub_dim;
@@ -576,6 +603,7 @@ fn kmeans(
     sub_dim: usize,
     max_iters: usize,
     rng: &mut ChaCha8Rng,
+    convergence_threshold: f32,
 ) -> Vec<f32> {
     let n = vectors.len();
 
@@ -633,7 +661,25 @@ fn kmeans(
             }
         }
 
+        // Early-stop: check max centroid movement
+        let mut max_movement_sq = 0.0f32;
+        for k in 0..ksub {
+            let offset = k * sub_dim;
+            let mut dist_sq = 0.0f32;
+            for d in 0..sub_dim {
+                let diff = new_centroids[offset + d] - centroids[offset + d];
+                dist_sq += diff * diff;
+            }
+            if dist_sq > max_movement_sq {
+                max_movement_sq = dist_sq;
+            }
+        }
+
         centroids = new_centroids;
+
+        if max_movement_sq < convergence_threshold * convergence_threshold {
+            break;
+        }
     }
 
     centroids
@@ -795,7 +841,7 @@ mod tests {
         // 256 centroids on 1K vectors (96-dim subspace) should converge
         let data = generate_test_data(1000, 96, 42);
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        let centroids = kmeans(&data, 256, 96, 20, &mut rng);
+        let centroids = kmeans(&data, 256, 96, 20, &mut rng, 1e-4);
 
         // Should have exactly 256 * 96 floats
         assert_eq!(centroids.len(), 256 * 96);
@@ -814,7 +860,7 @@ mod tests {
             vec![10.0, 11.0],
         ];
         let mut rng = ChaCha8Rng::seed_from_u64(42);
-        let centroids = kmeans(&data, 2, 2, 50, &mut rng);
+        let centroids = kmeans(&data, 2, 2, 50, &mut rng, 1e-4);
 
         assert_eq!(centroids.len(), 4); // 2 centroids * 2 dims
 
@@ -840,6 +886,35 @@ mod tests {
         let c2 = kmeans_plus_plus_init(&data, 8, 16, &mut rng2);
 
         assert_eq!(c1, c2, "same seed must produce identical initialization");
+    }
+
+    #[test]
+    fn test_train_early_stop_converges() {
+        // Clustered data (not uniform random) to ensure convergence
+        let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let mut data: Vec<Vec<f32>> = Vec::new();
+        // 3 tight clusters in 8D
+        for cluster_center in [0.0f32, 50.0, 100.0] {
+            for _ in 0..100 {
+                let v: Vec<f32> = (0..8)
+                    .map(|_| cluster_center + (rng.gen::<f32>() - 0.5) * 2.0)
+                    .collect();
+                data.push(v);
+            }
+        }
+
+        // With generous threshold, should stop well before max_iters=100
+        let mut rng2 = ChaCha8Rng::seed_from_u64(42);
+        let centroids = kmeans(&data, 3, 8, 100, &mut rng2, 1e-2);
+        assert_eq!(centroids.len(), 3 * 8);
+        assert!(centroids.iter().all(|&v| v.is_finite()));
+
+        // Verify centroids found the clusters (each near 0, 50, or 100)
+        let mut centers: Vec<f32> = (0..3).map(|k| centroids[k * 8]).collect();
+        centers.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert!(centers[0].abs() < 5.0, "cluster 0 near 0");
+        assert!((centers[1] - 50.0).abs() < 5.0, "cluster 1 near 50");
+        assert!((centers[2] - 100.0).abs() < 5.0, "cluster 2 near 100");
     }
 
     // =========================================================================
