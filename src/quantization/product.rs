@@ -882,7 +882,7 @@ mod tests {
             num_subquantizers: 7,
         };
         assert!(err.to_string().contains("768"));
-        assert!(err.to_string().contains("7"));
+        assert!(err.to_string().contains('7'));
     }
 
     // =========================================================================
@@ -1944,16 +1944,20 @@ mod tests {
         );
 
         // Distance via original and reconstructed must match exactly
+        // (same code bytes → same distance table lookups → bit-identical result)
         let dt_42 = cb
             .compute_distance_table(&data[42])
             .expect("distance table for vector 42");
         let dist_original = dt_42.compute_distance(&original_code);
         let dist_reconstructed = dt_42.compute_distance(&reconstructed);
-        assert_eq!(
-            dist_original, dist_reconstructed,
-            "distance through from_codes round-trip must be identical: {} vs {}",
-            dist_original, dist_reconstructed
-        );
+        #[allow(clippy::float_cmp)] // Bit-identical codes produce bit-identical distances
+        {
+            assert_eq!(
+                dist_original, dist_reconstructed,
+                "distance through from_codes round-trip must be identical: {} vs {}",
+                dist_original, dist_reconstructed
+            );
+        }
     }
 
     #[test]
@@ -2008,7 +2012,7 @@ mod tests {
         let cb = PqCodebook::train(&refs, m, ksub, 5).unwrap();
 
         // Valid code: all bytes < ksub — should work
-        let valid_code = PqCode::from_codes(vec![0u8; m as usize]);
+        let valid_code = PqCode::from_codes(vec![0u8; m]);
         let query: Vec<f32> = (0..dim).map(|_| rng.gen::<f32>()).collect();
         let dt = cb.compute_distance_table(&query).unwrap();
         let dist = dt.compute_distance(&valid_code);
@@ -2018,14 +2022,14 @@ mod tests {
         );
 
         // Invalid code: byte == ksub — this is what WASM boundary must reject
-        let invalid_code = PqCode::from_codes(vec![ksub as u8; m as usize]);
+        let invalid_code = PqCode::from_codes(vec![ksub as u8; m]);
         // We don't call compute_distance with invalid_code here because it
         // would panic (assert_eq on subquantizer count passes but indexing
         // into distance table would be OOB). The WASM boundary test below
         // verifies the rejection path.
         assert_eq!(invalid_code.codes()[0], ksub as u8);
         assert!(
-            (invalid_code.codes()[0] as usize) >= ksub as usize,
+            (invalid_code.codes()[0] as usize) >= ksub,
             "Code byte must be >= ksub to be invalid"
         );
     }
