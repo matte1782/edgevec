@@ -104,6 +104,12 @@ pub enum PqError {
         /// Dimension index of the non-finite value.
         dimension: usize,
     },
+    /// Convergence threshold must be finite and non-negative.
+    #[error("convergence_threshold must be finite and >= 0.0, got {value}")]
+    InvalidConvergenceThreshold {
+        /// The invalid value.
+        value: f32,
+    },
 }
 
 /// A PQ-encoded vector: M bytes, one centroid index per subspace.
@@ -367,6 +373,11 @@ impl PqCodebook {
         convergence_threshold: f32,
     ) -> Result<Self, PqError> {
         // Validate parameters
+        if !convergence_threshold.is_finite() || convergence_threshold < 0.0 {
+            return Err(PqError::InvalidConvergenceThreshold {
+                value: convergence_threshold,
+            });
+        }
         if num_subquantizers == 0 {
             return Err(PqError::InvalidM);
         }
@@ -915,6 +926,47 @@ mod tests {
         assert!(centers[0].abs() < 5.0, "cluster 0 near 0");
         assert!((centers[1] - 50.0).abs() < 5.0, "cluster 1 near 50");
         assert!((centers[2] - 100.0).abs() < 5.0, "cluster 2 near 100");
+    }
+
+    #[test]
+    fn test_train_convergence_threshold_nan_rejected() {
+        let data = generate_test_data(300, 16, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let result = PqCodebook::train_with_convergence_threshold(&refs, 4, 16, 10, f32::NAN);
+        assert!(matches!(
+            result,
+            Err(PqError::InvalidConvergenceThreshold { .. })
+        ));
+    }
+
+    #[test]
+    fn test_train_convergence_threshold_infinity_rejected() {
+        let data = generate_test_data(300, 16, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let result = PqCodebook::train_with_convergence_threshold(&refs, 4, 16, 10, f32::INFINITY);
+        assert!(matches!(
+            result,
+            Err(PqError::InvalidConvergenceThreshold { .. })
+        ));
+    }
+
+    #[test]
+    fn test_train_convergence_threshold_negative_rejected() {
+        let data = generate_test_data(300, 16, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let result = PqCodebook::train_with_convergence_threshold(&refs, 4, 16, 10, -0.001);
+        assert!(matches!(
+            result,
+            Err(PqError::InvalidConvergenceThreshold { .. })
+        ));
+    }
+
+    #[test]
+    fn test_train_convergence_threshold_zero_accepted() {
+        let data = generate_test_data(300, 16, 42);
+        let refs: Vec<&[f32]> = data.iter().map(|v| v.as_slice()).collect();
+        let result = PqCodebook::train_with_convergence_threshold(&refs, 4, 16, 10, 0.0);
+        assert!(result.is_ok(), "0.0 should disable early-stop, not error");
     }
 
     // =========================================================================

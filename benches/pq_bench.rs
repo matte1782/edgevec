@@ -129,8 +129,8 @@ fn bench_pq_training_100k(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("pq_training_100k");
     group.sample_size(10);
-    group.warm_up_time(std::time::Duration::from_secs(3));
-    group.measurement_time(std::time::Duration::from_secs(60));
+    group.warm_up_time(std::time::Duration::from_secs(5));
+    group.measurement_time(std::time::Duration::from_secs(600));
 
     group.bench_function("train_100k_768d", |b| {
         b.iter(|| {
