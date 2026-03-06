@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="EdgeVec Product Quantization WASM Benchmark Suite. Measure ADC search latency, training time, and validate PQ gate thresholds in the browser.">
+  <meta name="keywords" content="EdgeVec, product quantization, PQ, WASM, benchmark, ADC, vector database, WebAssembly">
+  <meta name="author" content="Matteo Panzeri">
+
+  <meta property="og:title" content="EdgeVec PQ Benchmark Suite">
+  <meta property="og:description" content="Product Quantization WASM benchmarks. Validate G2/G4 gate thresholds in real-time.">
+  <meta property="og:type" content="website">
+
+  <title>EdgeVec // PQ Benchmark Suite</title>
+  <link rel="icon" type="image/svg+xml" href="../demo/favicon.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-void: #030306;
+      --bg-primary: #0a0a0f;
+      --bg-card: #0f0f18;
+      --bg-card-hover: #151525;
+      --cyan: #00ffff;
+      --cyan-dim: #00aaaa;
+      --magenta: #ff00ff;
+      --green: #00ff88;
+      --purple: #9945ff;
+      --orange: #ff6b35;
+      --red: #ff3355;
+      --amber: #ffaa00;
+      --white: #e8e8f0;
+      --gray-100: #b0b0c0;
+      --gray-200: #6a6a80;
+      --border: rgba(0, 255, 255, 0.1);
+      --border-hover: rgba(0, 255, 255, 0.3);
+      --font-display: 'Orbitron', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; overflow-x: hidden; }
+    body {
+      font-family: var(--font-mono);
+      background: var(--bg-void);
+      color: var(--white);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* ── Matrix Canvas ── */
+    #matrix {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    .gradient-overlay {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 100% 60% at 50% -20%, rgba(0, 255, 255, 0.12), transparent),
+        radial-gradient(ellipse 80% 50% at 100% 100%, rgba(255, 0, 255, 0.08), transparent),
+        radial-gradient(ellipse 60% 40% at 0% 80%, rgba(0, 255, 136, 0.06), transparent);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Header ── */
+    .header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header__inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header__logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header__brand {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--cyan);
+      text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+      letter-spacing: 0.1em;
+      text-decoration: none;
+    }
+
+    .header__sep {
+      color: var(--gray-200);
+      font-size: 18px;
+      font-weight: 300;
+    }
+
+    .header__subtitle {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-100);
+      letter-spacing: 0.08em;
+    }
+
+    .header__status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      transition: all 0.3s;
+    }
+
+    .header__status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      transition: all 0.3s;
+    }
+
+    .status--loading {
+      background: rgba(255, 170, 0, 0.12);
+      color: var(--amber);
+      border: 1px solid rgba(255, 170, 0, 0.3);
+    }
+    .status--loading .header__status-dot {
+      background: var(--amber);
+      box-shadow: 0 0 10px var(--amber);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .status--ready {
+      background: rgba(0, 255, 136, 0.12);
+      color: var(--green);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+    }
+    .status--ready .header__status-dot {
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+    }
+
+    .status--error {
+      background: rgba(255, 51, 85, 0.12);
+      color: var(--red);
+      border: 1px solid rgba(255, 51, 85, 0.3);
+    }
+    .status--error .header__status-dot {
+      background: var(--red);
+      box-shadow: 0 0 10px var(--red);
+    }
+
+    .status--running {
+      background: rgba(0, 255, 255, 0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+    }
+    .status--running .header__status-dot {
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 10px currentColor; }
+      50% { opacity: 0.5; box-shadow: 0 0 25px currentColor; }
+    }
+
+    .header__nav {
+      display: flex;
+      gap: 20px;
+    }
+
+    .header__link {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--gray-100);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header__link:hover {
+      color: var(--cyan);
+      text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    }
+
+    .header__link svg {
+      width: 14px; height: 14px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    /* ── Main Content ── */
+    .main {
+      position: relative;
+      z-index: 10;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 84px 24px 40px;
+      display: grid;
+      gap: 20px;
+    }
+
+    /* ── Page Title ── */
+    .page-title {
+      text-align: center;
+      padding: 32px 0 12px;
+    }
+
+    .page-title__heading {
+      font-family: var(--font-display);
+      font-size: clamp(24px, 5vw, 36px);
+      font-weight: 800;
+      color: var(--cyan);
+      text-shadow:
+        0 0 30px rgba(0, 255, 255, 0.5),
+        0 0 60px rgba(0, 255, 255, 0.2);
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .page-title__sub {
+      font-size: 13px;
+      color: var(--gray-100);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    /* ── System Info Bar ── */
+    .sys-info {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 11px;
+    }
+
+    .sys-info__item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sys-info__label {
+      color: var(--gray-200);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 10px;
+    }
+
+    .sys-info__value {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* ── Bench Grid ── */
+    .bench-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+
+    /* ── Bench Card ── */
+    .bench-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Scanline effect */
+    .bench-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 255, 0.015) 2px,
+        rgba(0, 255, 255, 0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .bench-card:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(0, 255, 255, 0.08);
+    }
+
+    .bench-card > * { position: relative; z-index: 2; }
+
+    .bench-card__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .bench-card__title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: 0.04em;
+    }
+
+    .bench-card__subtitle {
+      font-size: 11px;
+      color: var(--gray-200);
+      margin-top: 4px;
+    }
+
+    /* ── Gate Badges ── */
+    .gate-badge {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.1em;
+      flex-shrink: 0;
+    }
+
+    .gate-badge--g2 {
+      background: rgba(153, 69, 255, 0.15);
+      color: var(--purple);
+      border: 1px solid rgba(153, 69, 255, 0.3);
+      text-shadow: 0 0 10px rgba(153, 69, 255, 0.5);
+    }
+
+    .gate-badge--g4 {
+      background: rgba(0, 255, 255, 0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 255, 255, 0.3);
+      text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    }
+
+    .gate-badge--smoke {
+      background: rgba(176, 176, 192, 0.1);
+      color: var(--gray-200);
+      border: 1px solid rgba(176, 176, 192, 0.2);
+    }
+
+    /* ── Config Fields ── */
+    .bench-config {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 8px;
+    }
+
+    .config-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .config-field__label {
+      font-size: 9px;
+      color: var(--gray-200);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .config-field__input {
+      background: var(--bg-void);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--white);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      width: 100%;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    .config-field__input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.15), 0 0 12px rgba(0, 255, 255, 0.1);
+    }
+
+    /* ── Progress Bar ── */
+    .progress-bar {
+      height: 3px;
+      background: rgba(0, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar.visible { display: block; }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+    }
+
+    /* ── Run Button ── */
+    .btn-run {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      width: 100%;
+      background: linear-gradient(135deg, var(--cyan), var(--cyan-dim));
+      color: #000;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 12px rgba(0, 255, 255, 0.2);
+    }
+
+    .btn-run:hover:not(:disabled) {
+      transform: scale(1.02);
+      box-shadow: 0 4px 20px rgba(0, 255, 255, 0.4);
+      filter: brightness(1.1);
+    }
+
+    .btn-run:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      filter: none;
+      transform: none;
+    }
+
+    /* ── Results ── */
+    .bench-result {
+      display: none;
+      background: var(--bg-void);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .bench-result.visible { display: block; }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .result-metric {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .result-label {
+      font-size: 9px;
+      color: var(--gray-200);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .result-value {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--white);
+    }
+
+    .result-value.pass {
+      color: var(--green);
+      text-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+    }
+
+    .result-value.fail {
+      color: var(--red);
+      text-shadow: 0 0 15px rgba(255, 51, 85, 0.5);
+    }
+
+    .result-value.warn {
+      color: var(--amber);
+      text-shadow: 0 0 15px rgba(255, 170, 0, 0.5);
+    }
+
+    .result-unit {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--gray-200);
+      margin-left: 4px;
+    }
+
+    .result-details {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--gray-100);
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+
+    /* ── Log Panel ── */
+    .log-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: rgba(10, 10, 15, 0.6);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .log-header__title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gray-100);
+      letter-spacing: 0.08em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .log-count {
+      background: rgba(0, 255, 255, 0.1);
+      color: var(--cyan);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+    }
+
+    .log-toggle {
+      font-size: 12px;
+      color: var(--gray-200);
+      transition: transform 0.2s;
+    }
+
+    .log-body {
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 12px 20px;
+      font-size: 11px;
+      line-height: 1.8;
+      color: var(--gray-100);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .log-body.collapsed { display: none; }
+
+    .log-entry { white-space: pre-wrap; word-break: break-word; }
+    .log-ts { color: var(--gray-200); }
+    .log-info { color: var(--cyan); }
+    .log-ok { color: var(--green); }
+    .log-warn { color: var(--amber); }
+    .log-err { color: var(--red); }
+
+    /* ── API Reference ── */
+    .api-ref {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 24px;
+    }
+
+    .api-ref__title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gray-200);
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+
+    .api-ref__item {
+      display: block;
+      padding: 8px 0;
+      font-size: 11px;
+      color: var(--cyan-dim);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .api-ref__item:last-child { border-bottom: none; }
+
+    /* ── Footer ── */
+    .footer {
+      position: relative;
+      z-index: 10;
+      padding: 32px 24px;
+      text-align: center;
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+    }
+
+    .footer__brand {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--cyan);
+      text-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+      margin-bottom: 8px;
+    }
+
+    .footer__copy {
+      font-size: 11px;
+      color: var(--gray-200);
+    }
+
+    .footer__author {
+      font-size: 11px;
+      color: var(--gray-200);
+      margin-top: 6px;
+      opacity: 0.8;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in {
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    .fade-in-d1 { animation-delay: 0.1s; }
+    .fade-in-d2 { animation-delay: 0.2s; }
+    .fade-in-d3 { animation-delay: 0.3s; }
+    .fade-in-d4 { animation-delay: 0.4s; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .header__nav { display: none; }
+      .bench-grid { grid-template-columns: 1fr; }
+      .sys-info { gap: 12px; }
+      .header__sep, .header__subtitle { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Matrix Rain Canvas -->
+  <canvas id="matrix"></canvas>
+  <div class="gradient-overlay"></div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header__inner">
+      <div class="header__logo">
+        <a href="../index.html" class="header__brand">EDGEVEC</a>
+        <span class="header__sep">//</span>
+        <span class="header__subtitle">PQ BENCHMARK</span>
+        <div id="statusBadge" class="header__status status--loading">
+          <span class="header__status-dot"></span>
+          <span id="statusText">INITIALIZING</span>
+        </div>
+      </div>
+      <nav class="header__nav">
+        <a href="../index.html" class="header__link">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          HOME
+        </a>
+        <a href="../demo/hub.html" class="header__link">
+          <svg viewBox="0 0 24 24"><path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          DEMOS
+        </a>
+        <a href="https://github.com/matte1782/edgevec" class="header__link" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          GITHUB
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- Page Title -->
+    <div class="page-title fade-in">
+      <h1 class="page-title__heading">PQ BENCHMARK SUITE</h1>
+      <p class="page-title__sub">Product Quantization WASM performance validation. Gate thresholds enforced in real-time.</p>
+    </div>
+
+    <!-- System Info -->
+    <div class="sys-info fade-in fade-in-d1" id="sysInfo">
+      <div class="sys-info__item">
+        <span class="sys-info__label">Engine</span>
+        <span class="sys-info__value" id="sysEngine">--</span>
+      </div>
+      <div class="sys-info__item">
+        <span class="sys-info__label">WASM</span>
+        <span class="sys-info__value" id="sysWasm">--</span>
+      </div>
+      <div class="sys-info__item">
+        <span class="sys-info__label">Bundle</span>
+        <span class="sys-info__value" id="sysBundle">--</span>
+      </div>
+      <div class="sys-info__item">
+        <span class="sys-info__label">Platform</span>
+        <span class="sys-info__value" id="sysPlatform">--</span>
+      </div>
+    </div>
+
+    <!-- Benchmark Cards -->
+    <div class="bench-grid">
+
+      <!-- Smoke Test -->
+      <div class="bench-card fade-in fade-in-d2" id="cardSmoke">
+        <div class="bench-card__header">
+          <div>
+            <div class="bench-card__title">SMOKE TEST</div>
+            <div class="bench-card__subtitle">Quick validation -- 1K vectors, 32D</div>
+          </div>
+          <span class="gate-badge gate-badge--smoke">VERIFY</span>
+        </div>
+        <div class="bench-config">
+          <div class="config-field">
+            <label class="config-field__label">Vectors</label>
+            <input class="config-field__input" type="number" id="smokeN" value="1000" min="100" max="10000">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Dims</label>
+            <input class="config-field__input" type="number" id="smokeDims" value="32" min="8" max="768">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">M</label>
+            <input class="config-field__input" type="number" id="smokeM" value="4" min="1" max="32">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Ksub</label>
+            <input class="config-field__input" type="number" id="smokeKsub" value="16" min="4" max="256">
+          </div>
+        </div>
+        <div class="progress-bar" id="smokeProgress"><div class="progress-fill"></div></div>
+        <button class="btn-run" id="btnSmoke" disabled>RUN SMOKE TEST</button>
+        <div class="bench-result" id="smokeResult"></div>
+      </div>
+
+      <!-- ADC Search -->
+      <div class="bench-card fade-in fade-in-d3" id="cardADC">
+        <div class="bench-card__header">
+          <div>
+            <div class="bench-card__title">ADC SEARCH LATENCY</div>
+            <div class="bench-card__subtitle">G2 Gate -- Target: &lt;150ns/candidate P99</div>
+          </div>
+          <span class="gate-badge gate-badge--g2">G2</span>
+        </div>
+        <div class="bench-config">
+          <div class="config-field">
+            <label class="config-field__label">Codes</label>
+            <input class="config-field__input" type="number" id="adcN" value="10000" min="100" max="1000000">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Queries</label>
+            <input class="config-field__input" type="number" id="adcQ" value="1" min="1" max="100">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Iterations</label>
+            <input class="config-field__input" type="number" id="adcIter" value="5" min="1" max="50">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Dims</label>
+            <input class="config-field__input" type="number" id="adcDims" value="768" min="8" max="1536">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">M</label>
+            <input class="config-field__input" type="number" id="adcM" value="8" min="1" max="64">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Ksub</label>
+            <input class="config-field__input" type="number" id="adcKsub" value="256" min="4" max="256">
+          </div>
+        </div>
+        <div class="progress-bar" id="adcProgress"><div class="progress-fill"></div></div>
+        <button class="btn-run" id="btnADC" disabled>RUN ADC BENCHMARK</button>
+        <div class="bench-result" id="adcResult"></div>
+      </div>
+
+      <!-- Training -->
+      <div class="bench-card fade-in fade-in-d4" id="cardTrain">
+        <div class="bench-card__header">
+          <div>
+            <div class="bench-card__title">TRAINING LATENCY</div>
+            <div class="bench-card__subtitle">G4 Gate -- Target: &lt;60s WASM (100K)</div>
+          </div>
+          <span class="gate-badge gate-badge--g4">G4</span>
+        </div>
+        <div class="bench-config">
+          <div class="config-field">
+            <label class="config-field__label">Vectors</label>
+            <input class="config-field__input" type="number" id="trainN" value="1000" min="100" max="200000">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Iterations</label>
+            <input class="config-field__input" type="number" id="trainIter" value="3" min="1" max="20">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Dims</label>
+            <input class="config-field__input" type="number" id="trainDims" value="768" min="8" max="1536">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">M</label>
+            <input class="config-field__input" type="number" id="trainM" value="8" min="1" max="64">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Ksub</label>
+            <input class="config-field__input" type="number" id="trainKsub" value="256" min="4" max="256">
+          </div>
+          <div class="config-field">
+            <label class="config-field__label">Max Iters</label>
+            <input class="config-field__input" type="number" id="trainMaxIters" value="5" min="1" max="50">
+          </div>
+        </div>
+        <div class="progress-bar" id="trainProgress"><div class="progress-fill"></div></div>
+        <button class="btn-run" id="btnTrain" disabled>RUN TRAINING BENCHMARK</button>
+        <div class="bench-result" id="trainResult"></div>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="log-panel fade-in fade-in-d4">
+      <div class="log-header" id="logHeader">
+        <h3 class="log-header__title">
+          EVENT LOG
+          <span class="log-count" id="logCount">0</span>
+        </h3>
+        <span class="log-toggle" id="logToggle">&#9660;</span>
+      </div>
+      <div class="log-body" id="logBody"></div>
+    </div>
+
+    <!-- API Reference -->
+    <div class="api-ref fade-in fade-in-d4">
+      <h3 class="api-ref__title">CONSOLE API (PLAYWRIGHT / DEVTOOLS)</h3>
+      <code class="api-ref__item">await benchADC(nCodes, nQueries, iterations, {dims, m, ksub, k, maxIters})</code>
+      <code class="api-ref__item">await benchTraining(nVectors, iterations, {dims, m, ksub, maxIters})</code>
+      <code class="api-ref__item">computeGroundTruth(vectors, n, dims, queries, k)</code>
+      <code class="api-ref__item">generateSyntheticVectors(n, dims, seed)</code>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer__brand">EDGEVEC v0.9.0</div>
+    <p class="footer__copy">Product Quantization WASM Benchmark Suite // W47 Validation</p>
+    <p class="footer__author">Created by Matteo Panzeri // University of Pavia // BSc in AI</p>
+  </footer>
+
+  <!-- Matrix Rain Script -->
+  <script>
+    (function() {
+      var canvas = document.getElementById('matrix');
+      var ctx = canvas.getContext('2d');
+
+      var w, h, cols, drops;
+      var chars = '01ABCDEFabcdef0123456789';
+      var fontSize = 14;
+
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        cols = Math.floor(w / fontSize);
+        drops = Array(cols).fill(1);
+      }
+
+      function draw() {
+        ctx.fillStyle = 'rgba(3, 3, 6, 0.05)';
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.fillStyle = '#00ff88';
+        ctx.font = fontSize + 'px monospace';
+
+        for (var i = 0; i < drops.length; i++) {
+          var char = chars[Math.floor(Math.random() * chars.length)];
+          ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+
+          if (drops[i] * fontSize > h && Math.random() > 0.975) {
+            drops[i] = 0;
+          }
+          drops[i]++;
+        }
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        setInterval(draw, 50);
+      }
+    })();
+  </script>
+
+  <!-- Benchmark Logic -->
+  <script type="module">
+    import init, { trainPq } from '../pkg-web/edgevec.js';
+
+    var logBody = document.getElementById('logBody');
+    var logCountEl = document.getElementById('logCount');
+    var logEntries = 0;
+
+    function log(msg, level) {
+      level = level || 'info';
+      logEntries++;
+      logCountEl.textContent = String(logEntries);
+      var ts = new Date().toISOString().slice(11, 23);
+      var entry = document.createElement('div');
+      entry.className = 'log-entry';
+      var tsSpan = document.createElement('span');
+      tsSpan.className = 'log-ts';
+      tsSpan.textContent = ts + ' ';
+      var msgSpan = document.createElement('span');
+      msgSpan.className = 'log-' + level;
+      msgSpan.textContent = msg;
+      entry.appendChild(tsSpan);
+      entry.appendChild(msgSpan);
+      logBody.appendChild(entry);
+      logBody.scrollTop = logBody.scrollHeight;
+      console.log('[' + level.toUpperCase() + '] ' + msg);
+    }
+
+    document.getElementById('logHeader').addEventListener('click', function() {
+      logBody.classList.toggle('collapsed');
+      document.getElementById('logToggle').textContent = logBody.classList.contains('collapsed') ? '\u25B6' : '\u25BC';
+    });
+
+    function setStatus(state, text) {
+      var badge = document.getElementById('statusBadge');
+      var cls = {loading:'status--loading',ready:'status--ready',error:'status--error',running:'status--running'};
+      badge.className = 'header__status ' + (cls[state] || 'status--loading');
+      document.getElementById('statusText').textContent = text;
+    }
+
+    function showProgress(id) {
+      var el = document.getElementById(id);
+      el.classList.add('visible');
+      el.querySelector('.progress-fill').style.width = '10%';
+    }
+
+    function updateProgress(id, pct) {
+      document.getElementById(id).querySelector('.progress-fill').style.width = pct + '%';
+    }
+
+    function hideProgress(id) {
+      var el = document.getElementById(id);
+      el.querySelector('.progress-fill').style.width = '100%';
+      setTimeout(function() { el.classList.remove('visible'); }, 400);
+    }
+
+    function enableButtons(en) {
+      document.getElementById('btnSmoke').disabled = !en;
+      document.getElementById('btnADC').disabled = !en;
+      document.getElementById('btnTrain').disabled = !en;
+    }
+
+    // Safe DOM result rendering (no innerHTML)
+    function clearResult(id) {
+      var el = document.getElementById(id);
+      el.classList.remove('visible');
+      while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    function addMetric(grid, label, value, unit, cls) {
+      var metric = document.createElement('div');
+      metric.className = 'result-metric';
+      var lbl = document.createElement('span');
+      lbl.className = 'result-label';
+      lbl.textContent = label;
+      var val = document.createElement('span');
+      val.className = 'result-value' + (cls ? ' ' + cls : '');
+      val.textContent = value;
+      if (unit) {
+        var u = document.createElement('span');
+        u.className = 'result-unit';
+        u.textContent = unit;
+        val.appendChild(u);
+      }
+      metric.appendChild(lbl);
+      metric.appendChild(val);
+      grid.appendChild(metric);
+    }
+
+    function addDetails(container, lines) {
+      var det = document.createElement('div');
+      det.className = 'result-details';
+      det.textContent = lines.join('\n');
+      container.appendChild(det);
+    }
+
+    function renderADCResult(r) {
+      var el = document.getElementById('adcResult');
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.classList.add('visible');
+      var threshold = 150;
+      var grid = document.createElement('div');
+      grid.className = 'result-grid';
+      addMetric(grid, 'Median', r.median_ns_per_candidate, 'ns/cand', r.median_ns_per_candidate <= threshold ? 'pass' : 'fail');
+      addMetric(grid, 'P99', r.p99_ns_per_candidate, 'ns/cand', r.p99_ns_per_candidate <= threshold ? 'pass' : 'fail');
+      addMetric(grid, 'Training', r.trainMs, 'ms');
+      addMetric(grid, 'Encoding', r.encodeMs, 'ms');
+      el.appendChild(grid);
+      addDetails(el, [
+        'G2 Gate (' + threshold + 'ns P99): ' + (r.p99_ns_per_candidate <= threshold ? 'PASS' : 'FAIL') + ' | Candidates/iter: ' + r.totalCandidatesPerIter.toLocaleString() + ' | Config: ' + r.dims + 'D M=' + r.m + ' Ksub=' + r.ksub,
+        'Raw timings: [' + r.rawTimingsMs.join(', ') + '] ms'
+      ]);
+    }
+
+    function renderTrainResult(r) {
+      var el = document.getElementById('trainResult');
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.classList.add('visible');
+      var threshold = 60;
+      var grid = document.createElement('div');
+      grid.className = 'result-grid';
+      addMetric(grid, 'Median', r.median_s, 's', r.median_s <= threshold ? 'pass' : r.median_s <= threshold * 1.5 ? 'warn' : 'fail');
+      addMetric(grid, 'P99', r.p99_s, 's');
+      addMetric(grid, 'Min', r.min_s, 's');
+      addMetric(grid, 'Max', r.max_s, 's');
+      el.appendChild(grid);
+      addDetails(el, [
+        'G4 Gate (' + threshold + 's WASM): ' + (r.median_s <= threshold ? 'PASS' : 'FAIL') + ' | Vectors: ' + r.nVectors.toLocaleString() + ' | Config: ' + r.dims + 'D M=' + r.m + ' Ksub=' + r.ksub + ' iters=' + r.maxIters,
+        'Raw timings: [' + r.rawTimingsS.join(', ') + '] s'
+      ]);
+    }
+
+    function renderSmokeResult(r) {
+      var el = document.getElementById('smokeResult');
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.classList.add('visible');
+      var grid = document.createElement('div');
+      grid.className = 'result-grid';
+      addMetric(grid, 'Median', r.median_ns_per_candidate, 'ns/cand', 'pass');
+      addMetric(grid, 'Training', r.trainMs, 'ms');
+      el.appendChild(grid);
+      addDetails(el, ['Smoke OK | ' + r.nCodes + ' codes x ' + r.nQueries + ' queries | Config: ' + r.dims + 'D M=' + r.m + ' Ksub=' + r.ksub]);
+    }
+
+    // System info
+    var ua = navigator.userAgent;
+    var chromeMatch = ua.match(/Chrome\/(\d+\.\d+)/);
+    var engine = chromeMatch ? 'Chrome ' + chromeMatch[1] : ua.split(' ').pop();
+    document.getElementById('sysEngine').textContent = engine;
+    document.getElementById('sysWasm').textContent = typeof WebAssembly !== 'undefined' ? 'Supported' : 'Unsupported';
+    document.getElementById('sysPlatform').textContent = navigator.platform || 'Unknown';
+    window.__sysInfo = { engine: engine, ua: navigator.userAgent, platform: navigator.platform };
+
+    // Expose trainPq globally for pq_bench.js
+    window.__edgevec = { trainPq: trainPq };
+
+    // Boot sequence
+    log('EDGEVEC PQ BENCHMARK SUITE v0.9.0');
+    log('INITIALIZING WASM MODULE...');
+    log('Loading runtime from ../pkg-web/edgevec.js');
+
+    try {
+      await init();
+      log('WASM module loaded successfully.', 'ok');
+      log('Running codebook smoke check...');
+
+      var data = new Float32Array(100 * 32);
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      var cb = trainPq(data, 32, 100, 4, 16, 5);
+      log('Codebook OK: dims=' + cb.dimensions() + ', M=' + cb.numSubquantizers() + ', Ksub=' + cb.ksub(), 'ok');
+      cb.free();
+
+      setStatus('ready', 'PQ WASM READY');
+      log('ALL SYSTEMS NOMINAL. Ready for benchmarks.', 'ok');
+      document.getElementById('sysBundle').textContent = '~622 KB';
+      enableButtons(true);
+    } catch (e) {
+      setStatus('error', 'INIT FAILED');
+      log('FATAL: ' + e, 'err');
+      console.error(e);
+    }
+
+    try {
+      await import('./pq_bench.js');
+    } catch {
+      // Fallback: some servers strip trailing slash from directory URLs,
+      // causing ./pq_bench.js to resolve to parent dir. Retry with explicit path.
+      await import('./pq-bench/pq_bench.js');
+    }
+    log('Benchmark harness loaded.', 'ok');
+
+    // Button handlers
+    document.getElementById('btnSmoke').addEventListener('click', async function() {
+      enableButtons(false);
+      setStatus('running', 'RUNNING SMOKE...');
+      showProgress('smokeProgress');
+      clearResult('smokeResult');
+      var n = +document.getElementById('smokeN').value;
+      var dims = +document.getElementById('smokeDims').value;
+      var m = +document.getElementById('smokeM').value;
+      var ksub = +document.getElementById('smokeKsub').value;
+      log('Smoke: n=' + n + ' dims=' + dims + ' M=' + m + ' Ksub=' + ksub);
+      try {
+        updateProgress('smokeProgress', 50);
+        var r = await benchADC(n, 1, 1, { dims: dims, m: m, ksub: ksub });
+        renderSmokeResult(r);
+        log('Smoke OK: ' + r.median_ns_per_candidate + 'ns/candidate', 'ok');
+      } catch (e) { log('Smoke FAIL: ' + e, 'err'); }
+      hideProgress('smokeProgress');
+      setStatus('ready', 'PQ WASM READY');
+      enableButtons(true);
+    });
+
+    document.getElementById('btnADC').addEventListener('click', async function() {
+      enableButtons(false);
+      setStatus('running', 'RUNNING ADC...');
+      showProgress('adcProgress');
+      clearResult('adcResult');
+      var n = +document.getElementById('adcN').value;
+      var q = +document.getElementById('adcQ').value;
+      var iters = +document.getElementById('adcIter').value;
+      var dims = +document.getElementById('adcDims').value;
+      var m = +document.getElementById('adcM').value;
+      var ksub = +document.getElementById('adcKsub').value;
+      log('ADC: n=' + n + ' q=' + q + ' iters=' + iters + ' dims=' + dims + ' M=' + m + ' Ksub=' + ksub);
+      try {
+        updateProgress('adcProgress', 30);
+        var r = await benchADC(n, q, iters, { dims: dims, m: m, ksub: ksub });
+        updateProgress('adcProgress', 90);
+        renderADCResult(r);
+        log('ADC: median=' + r.median_ns_per_candidate + 'ns P99=' + r.p99_ns_per_candidate + 'ns', r.p99_ns_per_candidate <= 150 ? 'ok' : 'warn');
+      } catch (e) { log('ADC FAIL: ' + e, 'err'); }
+      hideProgress('adcProgress');
+      setStatus('ready', 'PQ WASM READY');
+      enableButtons(true);
+    });
+
+    document.getElementById('btnTrain').addEventListener('click', async function() {
+      enableButtons(false);
+      setStatus('running', 'RUNNING TRAINING...');
+      showProgress('trainProgress');
+      clearResult('trainResult');
+      var n = +document.getElementById('trainN').value;
+      var iters = +document.getElementById('trainIter').value;
+      var dims = +document.getElementById('trainDims').value;
+      var m = +document.getElementById('trainM').value;
+      var ksub = +document.getElementById('trainKsub').value;
+      var maxIters = +document.getElementById('trainMaxIters').value;
+      log('Training: n=' + n + ' iters=' + iters + ' dims=' + dims + ' M=' + m + ' Ksub=' + ksub + ' maxIters=' + maxIters);
+      try {
+        updateProgress('trainProgress', 20);
+        var r = await benchTraining(n, iters, { dims: dims, m: m, ksub: ksub, maxIters: maxIters });
+        updateProgress('trainProgress', 90);
+        renderTrainResult(r);
+        log('Training: median=' + r.median_s + 's P99=' + r.p99_s + 's', r.median_s <= 60 ? 'ok' : 'warn');
+      } catch (e) { log('Training FAIL: ' + e, 'err'); }
+      hideProgress('trainProgress');
+      setStatus('ready', 'PQ WASM READY');
+      enableButtons(true);
+    });
+  </script>
+</body>
+</html>
