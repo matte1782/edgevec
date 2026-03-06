@@ -115,7 +115,7 @@ Track C (Demo + Blog — Days 4-5):         |
 | W48.1a | Create `src/filter/boost.rs` — MetadataBoost struct and matching logic | RUST_ENGINEER | 3h | Unit | `MetadataBoost { field: String, value: MetadataValue, weight: f32 }` struct with `MetadataBoost::new() -> Result<Self, BoostError>` (rejects NaN/Inf weights per CLAUDE.md Section 3.1 NaN guard). `compute_boost(metadata: &HashMap<String, MetadataValue>) -> f32` method. Returns `weight` if metadata field matches value (including `StringArray.contains(value)` for array fields), else `0.0`. Type mismatch returns `0.0` (no error). `BoostError` enum for construction-time validation. Max 200 lines. `cargo build` succeeds |
 | W48.1b | Add `search_boosted()` to `FilteredSearcher` in `src/filter/filtered_search.rs` | RUST_ENGINEER | 3h | Unit | `pub fn search_boosted(&mut self, query: &[f32], k: usize, boosts: &[MetadataBoost], filter: Option<&FilterExpr>, strategy: FilterStrategy) -> Result<FilteredSearchResult, FilteredSearchError>`. Semantics: run `search_filtered()` with `oversample = (k * 3).max(50).min(500)`, then rerank results by MULTIPLICATIVE boosting: `final_distance = raw_distance * (1.0 - boost_factor)` where `boost_factor = sum(boost_i.compute_boost(meta_i)).clamp(-1.0, 0.99)`. This is scale-independent: a weight of 0.3 with one match reduces distance by 30%, regardless of whether L2 distances are 0.001 or 50000. Returns top-k by final_distance. If boosts is empty, delegates to `search_filtered()`. `cargo build` succeeds |
 | W48.1c | Write 11 MetadataBoost unit tests in `src/filter/boost.rs` | TEST_ENGINEER | 2h | Unit | All 11 tests pass with `cargo test test_boost`: `test_boost_single_field_match`, `test_boost_multiple_fields`, `test_boost_no_match_no_effect`, `test_boost_all_match_reranks`, `test_boost_weight_zero_neutral`, `test_boost_negative_weight_penalty`, `test_boost_combined_with_filter`, `test_boost_large_weight_dominates`, `test_boost_type_mismatch_ignored`, `test_boost_string_array_contains`, `test_boost_wasm_smoke` (native-side test verifying boost struct is serde-friendly) |
-| W48.1d | Regression: `cargo test --lib` + `cargo clippy -- -D warnings` + `cargo check --target wasm32-unknown-unknown` | TEST_ENGINEER | 0.5h | Full suite | All existing tests pass (1013+ lib + 11 new boost tests), 0 clippy warnings, WASM build succeeds |
+| W48.1d | Regression: `cargo test --lib` + `cargo clippy -- -D warnings` + `cargo check --target wasm32-unknown-unknown` | TEST_ENGINEER | 0.5h | Full suite | All existing tests pass (1027+ lib + 11 new boost tests), 0 clippy warnings, WASM build succeeds |
 
 **Day 1 exit criterion:** MetadataBoost struct exists. search_boosted() method works. 11 unit tests pass. WASM builds.
 
@@ -178,7 +178,7 @@ Track C (Demo + Blog — Days 4-5):         |
 |:---|:-----|:------|:-----------|:-------------|:--------------------|
 | W48.6a | Fix all hostile review findings (both rounds) | RUST_ENGINEER | 2h | Review fixes | All critical + major issues from both hostile reviews resolved |
 | W48.6b | Update ROADMAP.md v7.2 to v7.3 — add Growth phase + W48 actuals | PLANNER | 1h | Document | ROADMAP v7.3 reflects: MetadataBoost feature, demo, blog post, growth pivot strategy. Milestone 10.5 or new Growth milestone added |
-| W48.6c | Full regression: `cargo test --lib` + `cargo clippy -- -D warnings` + `cargo check --target wasm32-unknown-unknown` | TEST_ENGINEER | 0.5h | Full suite | All tests pass (1013+ existing + 11 new boost tests), 0 clippy warnings, WASM build succeeds |
+| W48.6c | Full regression: `cargo test --lib` + `cargo clippy -- -D warnings` + `cargo check --target wasm32-unknown-unknown` | TEST_ENGINEER | 0.5h | Full suite | All tests pass (1027+ existing + 11 new boost tests), 0 clippy warnings, WASM build succeeds |
 | W48.6d | Commit all W48 work | PLANNER | 0.5h | Git | Conventional commit: `feat(w48): MetadataBoost API + entity-RAG demo + blog post` |
 | W48.6e | Create `.claude/GATE_W48_COMPLETE.md` | PLANNER | 0.5h | Gate | Gate file documents: both hostile review verdicts, MetadataBoost test count, demo verification, blog approval, carry-forward items |
 
@@ -265,7 +265,7 @@ W48 introduces new work (growth pivot), not carry-forwards from W47. The followi
 6. **WASM:** Export follows existing handle pattern, no `unwrap()`. BoostConfig uses bare JSON values, NOT MetadataValue's adjacently-tagged format.
 7. **Tests:** All 11 specific test names present and pass (including `test_boost_string_array_contains`)
 8. **NaN sort defense:** `sort_by` uses `unwrap_or(Ordering::Greater)` to push NaN distances to end, not `Ordering::Equal`
-9. **Regression:** Existing 1013+ tests unbroken
+9. **Regression:** Existing 1027+ tests unbroken
 
 **Verdict required before Day 3 demo data prep proceeds with confidence (though data prep can start independently).**
 
@@ -301,7 +301,7 @@ W48 introduces new work (growth pivot), not carry-forwards from W47. The followi
 | Index build time for 1000 vectors at 384D < 3 seconds in Chrome | [ ] |
 | Blog post 1500-2000 words, hostile-reviewed and approved | [ ] |
 | README updated with MetadataBoost section + demo link | [ ] |
-| No existing tests broken (1013+ lib pass) | [ ] |
+| No existing tests broken (1027+ lib pass) | [ ] |
 | Clippy clean (`-D warnings`) | [ ] |
 | WASM build: `cargo check --target wasm32-unknown-unknown` succeeds | [ ] |
 | WASM bundle < 500KB | [ ] |

@@ -266,7 +266,7 @@ PQ saves 32.6% vs BQ at system level, and 94.9% vs F32.
 | **Browser** | Chrome 145.0 (Win32) |
 | **Embedding Model** | all-mpnet-base-v2 (768D) |
 | **Dataset** | 50,000 real sentence embeddings (153.6 MB) |
-| **Commits** | baeb7d4 (Day 1) through 0882c8c (Day 4) |
+| **Commits** | baeb7d4 (Day 1) through 239d3d2 (Day 6) |
 
 ### G2 WASM ADC Benchmark (W47 Day 3)
 

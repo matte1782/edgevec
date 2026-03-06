@@ -15,7 +15,7 @@ Implement the MetadataBoost struct and search_boosted() method with full test co
 - `src/filter/boost.rs` exists with MetadataBoost struct (< 200 lines)
 - `search_boosted()` method added to FilteredSearcher
 - 11 named unit tests pass with `cargo test test_boost`
-- `cargo test --lib` passes (1013+ existing + 11 new)
+- `cargo test --lib` passes (1027+ existing + 11 new)
 - `cargo clippy -- -D warnings` clean
 - `cargo check --target wasm32-unknown-unknown` succeeds
 
@@ -243,7 +243,7 @@ cargo test --lib                  # Full regression
 
 **Commands:**
 ```bash
-cargo test --lib                                  # 1013+ tests + 11 new
+cargo test --lib                                  # 1027+ tests + 11 new
 cargo clippy -- -D warnings                       # 0 warnings
 cargo check --target wasm32-unknown-unknown        # WASM build
 ```
@@ -251,7 +251,7 @@ cargo check --target wasm32-unknown-unknown        # WASM build
 **Expected Output:** All green. No regressions.
 
 **Acceptance:**
-- [ ] `cargo test --lib` — 1024+ passed (1013 existing + 11 new), 0 failed
+- [ ] `cargo test --lib` — 1024+ passed (1027 existing + 11 new), 0 failed
 - [ ] `cargo clippy -- -D warnings` — 0 warnings
 - [ ] `cargo check --target wasm32-unknown-unknown` — success
 

@@ -130,7 +130,7 @@ cargo check --target wasm32-unknown-unknown        # WASM build
 ```
 
 **Acceptance:**
-- [ ] `cargo test --lib` — 1024+ passed (1013 existing + 11 new boost), 0 failed
+- [ ] `cargo test --lib` — 1024+ passed (1027 existing + 11 new boost), 0 failed
 - [ ] `cargo clippy -- -D warnings` — 0 warnings
 - [ ] `cargo check --target wasm32-unknown-unknown` — success
 

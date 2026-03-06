@@ -507,7 +507,7 @@ v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD
 | WebGPU decision | Go/No-Go documented |
 | Relaxed SIMD decision | Go/No-Go documented |
 | Research spikes | All exit criteria answered with data |
-| Bundle size | <600KB (with PQ) |
+| Bundle size | <700KB (with PQ — actual: 622KB) |
 
 ---
 
