@@ -175,10 +175,7 @@ def verify_embeddings(embeddings: np.ndarray, expected_dim: int) -> bool:
 
 def save_embeddings(embeddings: np.ndarray, dim: int) -> Path:
     """Save embeddings as raw f32 binary file."""
-    if dim == EXPECTED_DIM:
-        filename = f"embeddings_{dim}d_50k.bin"
-    else:
-        filename = f"embeddings_{dim}d_50k.bin"
+    filename = f"embeddings_{dim}d_50k.bin"
 
     output_path = OUTPUT_DIR / filename
     embeddings.tofile(str(output_path))
