@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeVec PQ WASM Benchmark Suite</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-card: #1a2035;
+      --bg-card-hover: #1f2847;
+      --border: #2a3555;
+      --border-accent: #3b82f6;
+      --text-primary: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --gradient-brand: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+
+    .logo {
+      width: 36px; height: 36px;
+      background: var(--gradient-brand);
+      border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1rem; color: #fff; letter-spacing: -1px;
+    }
+
+    .header h1 { font-size: 1.25rem; font-weight: 700; }
+    .header h1 span { color: var(--accent-cyan); font-weight: 400; }
+
+    .header-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.25rem 0.75rem; border-radius: 999px;
+      font-size: 0.75rem; font-weight: 600; font-family: var(--font-mono);
+    }
+
+    .badge-loading { background: rgba(245,158,11,0.15); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-ready { background: rgba(16,185,129,0.15); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-error { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+    .badge-running { background: rgba(59,130,246,0.15); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); }
+
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; display: grid; gap: 1.5rem; }
+
+    .sys-info {
+      display: flex; gap: 1.5rem; flex-wrap: wrap;
+      padding: 1rem 1.25rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
+      font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary);
+    }
+
+    .sys-info-item { display: flex; align-items: center; gap: 0.5rem; }
+    .sys-info-label { color: var(--text-muted); }
+    .sys-info-value { color: var(--text-primary); font-weight: 500; }
+
+    .bench-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.25rem; }
+
+    .bench-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      padding: 1.5rem; transition: border-color 0.2s, box-shadow 0.2s;
+      display: flex; flex-direction: column; gap: 1rem;
+    }
+
+    .bench-card:hover { border-color: var(--border-accent); box-shadow: var(--shadow-md); }
+
+    .bench-card-header { display: flex; align-items: flex-start; justify-content: space-between; }
+    .bench-card-title { font-size: 1rem; font-weight: 700; }
+    .bench-card-subtitle { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem; }
+
+    .bench-card-tag {
+      font-size: 0.65rem; font-weight: 700; font-family: var(--font-mono);
+      padding: 0.15rem 0.5rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0;
+    }
+
+    .tag-g2 { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+    .tag-g4 { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+    .tag-smoke { background: rgba(100,116,139,0.2); color: var(--text-secondary); }
+
+    .bench-config { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.5rem; }
+    .config-field { display: flex; flex-direction: column; gap: 0.2rem; }
+
+    .config-field label {
+      font-size: 0.65rem; font-family: var(--font-mono); color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+
+    .config-field input {
+      background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 0.4rem 0.6rem; color: var(--text-primary); font-family: var(--font-mono); font-size: 0.8rem; width: 100%;
+      transition: border-color 0.2s;
+    }
+
+    .config-field input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+
+    .btn-run {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.6rem 1.25rem; border: none; border-radius: var(--radius-sm);
+      font-family: var(--font-sans); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      transition: all 0.15s; width: 100%; background: var(--gradient-brand); color: #fff;
+    }
+
+    .btn-run:hover:not(:disabled) { filter: brightness(1.1); box-shadow: 0 2px 8px rgba(59,130,246,0.4); }
+    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+
+    .bench-result {
+      display: none; background: var(--bg-primary); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 1rem; font-family: var(--font-mono); font-size: 0.8rem;
+    }
+
+    .bench-result.visible { display: block; }
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .result-metric { display: flex; flex-direction: column; }
+
+    .result-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .result-value { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); }
+    .result-value.pass { color: var(--accent-green); }
+    .result-value.fail { color: var(--accent-red); }
+    .result-value.warn { color: var(--accent-amber); }
+    .result-unit { font-size: 0.7rem; font-weight: 400; color: var(--text-secondary); margin-left: 0.2rem; }
+
+    .result-details {
+      margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);
+      font-size: 0.75rem; color: var(--text-secondary); line-height: 1.8;
+    }
+
+    .progress-bar { height: 3px; background: var(--bg-primary); border-radius: 2px; overflow: hidden; display: none; }
+    .progress-bar.visible { display: block; }
+    .progress-fill { height: 100%; background: var(--gradient-brand); border-radius: 2px; transition: width 0.3s ease; width: 0%; }
+
+    .log-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1.25rem; background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border); cursor: pointer; user-select: none;
+    }
+
+    .log-header h3 { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; }
+
+    .log-count {
+      background: rgba(59,130,246,0.15); color: var(--accent-blue);
+      padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.65rem; font-family: var(--font-mono);
+    }
+
+    .log-toggle { font-size: 0.75rem; color: var(--text-muted); transition: transform 0.2s; }
+
+    .log-body {
+      max-height: 300px; overflow-y: auto; padding: 0.75rem 1.25rem;
+      font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.7; color: var(--text-secondary);
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+
+    .log-body.collapsed { display: none; }
+    .log-entry { white-space: pre-wrap; word-break: break-word; }
+    .log-ts { color: var(--text-muted); }
+    .log-info { color: var(--accent-cyan); }
+    .log-ok { color: var(--accent-green); }
+    .log-warn { color: var(--accent-amber); }
+    .log-err { color: var(--accent-red); }
+
+    .footer { text-align: center; padding: 1.5rem; font-size: 0.72rem; color: var(--text-muted); border-top: 1px solid var(--border); }
+
+    .api-ref {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      padding: 1.25rem 1.5rem;
+    }
+
+    .api-ref h3 { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.75rem; }
+
+    .api-ref code {
+      display: block; padding: 0.4rem 0; font-family: var(--font-mono); font-size: 0.72rem;
+      color: var(--accent-cyan); border-bottom: 1px solid var(--border);
+    }
+
+    .api-ref code:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">EV</div>
+      <div><h1>PQ Benchmark <span>Suite</span></h1></div>
+    </div>
+    <div id="statusBadge" class="header-badge badge-loading pulse">Initializing</div>
+  </header>
+
+  <div class="container">
+    <div class="sys-info" id="sysInfo">
+      <div class="sys-info-item"><span class="sys-info-label">Engine</span><span class="sys-info-value" id="sysEngine">--</span></div>
+      <div class="sys-info-item"><span class="sys-info-label">WASM</span><span class="sys-info-value" id="sysWasm">--</span></div>
+      <div class="sys-info-item"><span class="sys-info-label">Bundle</span><span class="sys-info-value" id="sysBundle">--</span></div>
+      <div class="sys-info-item"><span class="sys-info-label">Platform</span><span class="sys-info-value" id="sysPlatform">--</span></div>
+    </div>
+
+    <div class="bench-grid">
+      <!-- Smoke -->
+      <div class="bench-card" id="cardSmoke">
+        <div class="bench-card-header">
+          <div>
+            <div class="bench-card-title">Smoke Test</div>
+            <div class="bench-card-subtitle">Quick validation — 1K vectors, 32D</div>
+          </div>
+          <span class="bench-card-tag tag-smoke">Verify</span>
+        </div>
+        <div class="bench-config">
+          <div class="config-field"><label>Vectors</label><input type="number" id="smokeN" value="1000" min="100" max="10000"></div>
+          <div class="config-field"><label>Dims</label><input type="number" id="smokeDims" value="32" min="8" max="768"></div>
+          <div class="config-field"><label>M</label><input type="number" id="smokeM" value="4" min="1" max="32"></div>
+          <div class="config-field"><label>Ksub</label><input type="number" id="smokeKsub" value="16" min="4" max="256"></div>
+        </div>
+        <div class="progress-bar" id="smokeProgress"><div class="progress-fill"></div></div>
+        <button class="btn-run" id="btnSmoke" disabled>Run Smoke Test</button>
+        <div class="bench-result" id="smokeResult"></div>
+      </div>
+
+      <!-- ADC -->
+      <div class="bench-card" id="cardADC">
+        <div class="bench-card-header">
+          <div>
+            <div class="bench-card-title">ADC Search Latency</div>
+            <div class="bench-card-subtitle">G2 Gate — Target: &lt;150ns/candidate P99</div>
+          </div>
+          <span class="bench-card-tag tag-g2">G2</span>
+        </div>
+        <div class="bench-config">
+          <div class="config-field"><label>Codes</label><input type="number" id="adcN" value="10000" min="100" max="1000000"></div>
+          <div class="config-field"><label>Queries</label><input type="number" id="adcQ" value="1" min="1" max="100"></div>
+          <div class="config-field"><label>Iterations</label><input type="number" id="adcIter" value="5" min="1" max="50"></div>
+          <div class="config-field"><label>Dims</label><input type="number" id="adcDims" value="768" min="8" max="1536"></div>
+          <div class="config-field"><label>M</label><input type="number" id="adcM" value="8" min="1" max="64"></div>
+          <div class="config-field"><label>Ksub</label><input type="number" id="adcKsub" value="256" min="4" max="256"></div>
+        </div>
+        <div class="progress-bar" id="adcProgress"><div class="progress-fill"></div></div>
+        <button class="btn-run" id="btnADC" disabled>Run ADC Benchmark</button>
+        <div class="bench-result" id="adcResult"></div>
+      </div>
+
+      <!-- Training -->
+      <div class="bench-card" id="cardTrain">
+        <div class="bench-card-header">
+          <div>
+            <div class="bench-card-title">Training Latency</div>
+            <div class="bench-card-subtitle">G4 Gate — Target: &lt;60s WASM (100K)</div>
+          </div>
+          <span class="bench-card-tag tag-g4">G4</span>
+        </div>
+        <div class="bench-config">
+          <div class="config-field"><label>Vectors</label><input type="number" id="trainN" value="1000" min="100" max="200000"></div>
+          <div class="config-field"><label>Iterations</label><input type="number" id="trainIter" value="3" min="1" max="20"></div>
+          <div class="config-field"><label>Dims</label><input type="number" id="trainDims" value="768" min="8" max="1536"></div>
+          <div class="config-field"><label>M</label><input type="number" id="trainM" value="8" min="1" max="64"></div>
+          <div class="config-field"><label>Ksub</label><input type="number" id="trainKsub" value="256" min="4" max="256"></div>
+          <div class="config-field"><label>Max Iters</label><input type="number" id="trainMaxIters" value="5" min="1" max="50"></div>
+        </div>
+        <div class="progress-bar" id="trainProgress"><div class="progress-fill"></div></div>
+        <button class="btn-run" id="btnTrain" disabled>Run Training Benchmark</button>
+        <div class="bench-result" id="trainResult"></div>
+      </div>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-header" id="logHeader">
+        <h3>Event Log <span class="log-count" id="logCount">0</span></h3>
+        <span class="log-toggle" id="logToggle">&#9660;</span>
+      </div>
+      <div class="log-body" id="logBody"></div>
+    </div>
+
+    <div class="api-ref">
+      <h3>Console API (for Playwright / DevTools)</h3>
+      <code>await benchADC(nCodes, nQueries, iterations, {dims, m, ksub, k, maxIters})</code>
+      <code>await benchTraining(nVectors, iterations, {dims, m, ksub, maxIters})</code>
+      <code>computeGroundTruth(vectors, n, dims, queries, k)</code>
+      <code>generateSyntheticVectors(n, dims, seed)</code>
+    </div>
+  </div>
+
+  <div class="footer">EdgeVec v0.9.0 — Product Quantization WASM Benchmark Suite — W47 Validation</div>
+
+  <script type="module">
+    import init, { trainPq } from '../../pkg-web/edgevec.js';
+
+    const logBody = document.getElementById('logBody');
+    const logCountEl = document.getElementById('logCount');
+    let logEntries = 0;
+
+    function log(msg, level) {
+      level = level || 'info';
+      logEntries++;
+      logCountEl.textContent = String(logEntries);
+      const ts = new Date().toISOString().slice(11, 23);
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const tsSpan = document.createElement('span');
+      tsSpan.className = 'log-ts';
+      tsSpan.textContent = ts + ' ';
+      const msgSpan = document.createElement('span');
+      msgSpan.className = 'log-' + level;
+      msgSpan.textContent = msg;
+      entry.appendChild(tsSpan);
+      entry.appendChild(msgSpan);
+      logBody.appendChild(entry);
+      logBody.scrollTop = logBody.scrollHeight;
+      console.log('[' + level.toUpperCase() + '] ' + msg);
+    }
+
+    document.getElementById('logHeader').addEventListener('click', function() {
+      logBody.classList.toggle('collapsed');
+      document.getElementById('logToggle').textContent = logBody.classList.contains('collapsed') ? '\u25B6' : '\u25BC';
+    });
+
+    function setStatus(state, text) {
+      var badge = document.getElementById('statusBadge');
+      var cls = {loading:'badge-loading',ready:'badge-ready',error:'badge-error',running:'badge-running'};
+      badge.className = 'header-badge ' + (cls[state]||'badge-loading') + (state==='loading'||state==='running' ? ' pulse' : '');
+      badge.textContent = text;
+    }
+
+    function showProgress(id) {
+      var el = document.getElementById(id);
+      el.classList.add('visible');
+      el.querySelector('.progress-fill').style.width = '10%';
+    }
+
+    function updateProgress(id, pct) {
+      document.getElementById(id).querySelector('.progress-fill').style.width = pct + '%';
+    }
+
+    function hideProgress(id) {
+      var el = document.getElementById(id);
+      el.querySelector('.progress-fill').style.width = '100%';
+      setTimeout(function() { el.classList.remove('visible'); }, 400);
+    }
+
+    function enableButtons(en) {
+      document.getElementById('btnSmoke').disabled = !en;
+      document.getElementById('btnADC').disabled = !en;
+      document.getElementById('btnTrain').disabled = !en;
+    }
+
+    // Safe DOM result rendering (no innerHTML)
+    function clearResult(id) {
+      var el = document.getElementById(id);
+      el.classList.remove('visible');
+      while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    function addMetric(grid, label, value, unit, cls) {
+      var metric = document.createElement('div');
+      metric.className = 'result-metric';
+      var lbl = document.createElement('span');
+      lbl.className = 'result-label';
+      lbl.textContent = label;
+      var val = document.createElement('span');
+      val.className = 'result-value' + (cls ? ' ' + cls : '');
+      val.textContent = value;
+      if (unit) {
+        var u = document.createElement('span');
+        u.className = 'result-unit';
+        u.textContent = unit;
+        val.appendChild(u);
+      }
+      metric.appendChild(lbl);
+      metric.appendChild(val);
+      grid.appendChild(metric);
+    }
+
+    function addDetails(container, lines) {
+      var det = document.createElement('div');
+      det.className = 'result-details';
+      det.textContent = lines.join('\n');
+      container.appendChild(det);
+    }
+
+    function renderADCResult(r) {
+      var el = document.getElementById('adcResult');
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.classList.add('visible');
+      var threshold = 150;
+      var grid = document.createElement('div');
+      grid.className = 'result-grid';
+      addMetric(grid, 'Median', r.median_ns_per_candidate, 'ns/cand', r.median_ns_per_candidate <= threshold ? 'pass' : 'fail');
+      addMetric(grid, 'P99', r.p99_ns_per_candidate, 'ns/cand', r.p99_ns_per_candidate <= threshold ? 'pass' : 'fail');
+      addMetric(grid, 'Training', r.trainMs, 'ms');
+      addMetric(grid, 'Encoding', r.encodeMs, 'ms');
+      el.appendChild(grid);
+      addDetails(el, [
+        'G2 Gate (' + threshold + 'ns P99): ' + (r.p99_ns_per_candidate <= threshold ? 'PASS' : 'FAIL') + ' | Candidates/iter: ' + r.totalCandidatesPerIter.toLocaleString() + ' | Config: ' + r.dims + 'D M=' + r.m + ' Ksub=' + r.ksub,
+        'Raw timings: [' + r.rawTimingsMs.join(', ') + '] ms'
+      ]);
+    }
+
+    function renderTrainResult(r) {
+      var el = document.getElementById('trainResult');
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.classList.add('visible');
+      var threshold = 60;
+      var grid = document.createElement('div');
+      grid.className = 'result-grid';
+      addMetric(grid, 'Median', r.median_s, 's', r.median_s <= threshold ? 'pass' : r.median_s <= threshold * 1.5 ? 'warn' : 'fail');
+      addMetric(grid, 'P99', r.p99_s, 's');
+      addMetric(grid, 'Min', r.min_s, 's');
+      addMetric(grid, 'Max', r.max_s, 's');
+      el.appendChild(grid);
+      addDetails(el, [
+        'G4 Gate (' + threshold + 's WASM): ' + (r.median_s <= threshold ? 'PASS' : 'FAIL') + ' | Vectors: ' + r.nVectors.toLocaleString() + ' | Config: ' + r.dims + 'D M=' + r.m + ' Ksub=' + r.ksub + ' iters=' + r.maxIters,
+        'Raw timings: [' + r.rawTimingsS.join(', ') + '] s'
+      ]);
+    }
+
+    function renderSmokeResult(r) {
+      var el = document.getElementById('smokeResult');
+      while (el.firstChild) el.removeChild(el.firstChild);
+      el.classList.add('visible');
+      var grid = document.createElement('div');
+      grid.className = 'result-grid';
+      addMetric(grid, 'Median', r.median_ns_per_candidate, 'ns/cand', 'pass');
+      addMetric(grid, 'Training', r.trainMs, 'ms');
+      el.appendChild(grid);
+      addDetails(el, ['Smoke OK | ' + r.nCodes + ' codes x ' + r.nQueries + ' queries | Config: ' + r.dims + 'D M=' + r.m + ' Ksub=' + r.ksub]);
+    }
+
+    // System info
+    var ua = navigator.userAgent;
+    var chromeMatch = ua.match(/Chrome\/(\d+\.\d+)/);
+    var engine = chromeMatch ? 'Chrome ' + chromeMatch[1] : ua.split(' ').pop();
+    document.getElementById('sysEngine').textContent = engine;
+    document.getElementById('sysWasm').textContent = typeof WebAssembly !== 'undefined' ? 'Supported' : 'Unsupported';
+    document.getElementById('sysPlatform').textContent = navigator.platform || 'Unknown';
+    window.__sysInfo = { engine: engine, ua: navigator.userAgent, platform: navigator.platform };
+
+    // Expose trainPq globally for pq_bench.js
+    window.__edgevec = { trainPq: trainPq };
+
+    try {
+      log('Initializing WASM module...');
+      await init();
+      log('WASM module loaded.', 'ok');
+
+      var data = new Float32Array(100 * 32);
+      for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      var cb = trainPq(data, 32, 100, 4, 16, 5);
+      log('Smoke codebook: dims=' + cb.dimensions() + ', M=' + cb.numSubquantizers() + ', Ksub=' + cb.ksub(), 'ok');
+      cb.free();
+
+      setStatus('ready', 'PQ WASM Ready');
+      log('PQ WASM Ready', 'ok');
+      document.getElementById('sysBundle').textContent = '~622 KB';
+      enableButtons(true);
+    } catch (e) {
+      setStatus('error', 'Init Failed');
+      log('FATAL: ' + e, 'err');
+      console.error(e);
+    }
+
+    await import('./pq_bench.js');
+    log('Benchmark harness loaded.', 'ok');
+
+    // Button handlers
+    document.getElementById('btnSmoke').addEventListener('click', async function() {
+      enableButtons(false);
+      setStatus('running', 'Running Smoke...');
+      showProgress('smokeProgress');
+      clearResult('smokeResult');
+      var n = +document.getElementById('smokeN').value;
+      var dims = +document.getElementById('smokeDims').value;
+      var m = +document.getElementById('smokeM').value;
+      var ksub = +document.getElementById('smokeKsub').value;
+      log('Smoke: n=' + n + ' dims=' + dims + ' M=' + m + ' Ksub=' + ksub);
+      try {
+        updateProgress('smokeProgress', 50);
+        var r = await benchADC(n, 1, 1, { dims: dims, m: m, ksub: ksub });
+        renderSmokeResult(r);
+        log('Smoke OK: ' + r.median_ns_per_candidate + 'ns/candidate', 'ok');
+      } catch (e) { log('Smoke FAIL: ' + e, 'err'); }
+      hideProgress('smokeProgress');
+      setStatus('ready', 'PQ WASM Ready');
+      enableButtons(true);
+    });
+
+    document.getElementById('btnADC').addEventListener('click', async function() {
+      enableButtons(false);
+      setStatus('running', 'Running ADC...');
+      showProgress('adcProgress');
+      clearResult('adcResult');
+      var n = +document.getElementById('adcN').value;
+      var q = +document.getElementById('adcQ').value;
+      var iters = +document.getElementById('adcIter').value;
+      var dims = +document.getElementById('adcDims').value;
+      var m = +document.getElementById('adcM').value;
+      var ksub = +document.getElementById('adcKsub').value;
+      log('ADC: n=' + n + ' q=' + q + ' iters=' + iters + ' dims=' + dims + ' M=' + m + ' Ksub=' + ksub);
+      try {
+        updateProgress('adcProgress', 30);
+        var r = await benchADC(n, q, iters, { dims: dims, m: m, ksub: ksub });
+        updateProgress('adcProgress', 90);
+        renderADCResult(r);
+        log('ADC: median=' + r.median_ns_per_candidate + 'ns P99=' + r.p99_ns_per_candidate + 'ns', r.p99_ns_per_candidate <= 150 ? 'ok' : 'warn');
+      } catch (e) { log('ADC FAIL: ' + e, 'err'); }
+      hideProgress('adcProgress');
+      setStatus('ready', 'PQ WASM Ready');
+      enableButtons(true);
+    });
+
+    document.getElementById('btnTrain').addEventListener('click', async function() {
+      enableButtons(false);
+      setStatus('running', 'Running Training...');
+      showProgress('trainProgress');
+      clearResult('trainResult');
+      var n = +document.getElementById('trainN').value;
+      var iters = +document.getElementById('trainIter').value;
+      var dims = +document.getElementById('trainDims').value;
+      var m = +document.getElementById('trainM').value;
+      var ksub = +document.getElementById('trainKsub').value;
+      var maxIters = +document.getElementById('trainMaxIters').value;
+      log('Training: n=' + n + ' iters=' + iters + ' dims=' + dims + ' M=' + m + ' Ksub=' + ksub + ' maxIters=' + maxIters);
+      try {
+        updateProgress('trainProgress', 20);
+        var r = await benchTraining(n, iters, { dims: dims, m: m, ksub: ksub, maxIters: maxIters });
+        updateProgress('trainProgress', 90);
+        renderTrainResult(r);
+        log('Training: median=' + r.median_s + 's P99=' + r.p99_s + 's', r.median_s <= 60 ? 'ok' : 'warn');
+      } catch (e) { log('Training FAIL: ' + e, 'err'); }
+      hideProgress('trainProgress');
+      setStatus('ready', 'PQ WASM Ready');
+      enableButtons(true);
+    });
+  </script>
+</body>
+</html>
