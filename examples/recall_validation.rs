@@ -396,7 +396,9 @@ fn main() {
 
     // Memory summary
     let f32_mem_mb = (n * dims * 4) as f64 / (1024.0 * 1024.0);
-    let bq_mem_mb = (n * 128) as f64 / (1024.0 * 1024.0); // QuantizedVector is 128 bytes (96 + padding)
+    let bq_mem_mb = (n * std::mem::size_of::<edgevec::quantization::binary::QuantizedVector>())
+        as f64
+        / (1024.0 * 1024.0);
     println!();
     println!(
         "  Memory: f32 base = {:.1}MB, BQ overhead = {:.1}MB, total = {:.1}MB",

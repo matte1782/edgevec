@@ -19,8 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `encode_batch()` — batch encoding with first-error-short-circuit
   - `scan_topk()` — exhaustive ADC search returning k-nearest by approximate distance
   - NaN/Inf validation at all entry points (train, encode, compute_distance_table)
-  - 33 PQ-specific tests, 1013 total library tests
+  - `train_with_convergence_threshold()` — explicit early-stop tuning for k-means
+  - `ZeroDimensions` error for empty-dimension vectors
+  - `InvalidConvergenceThreshold` error for NaN/Inf/negative thresholds
 - **PQ benchmark harness** (`benches/pq_bench.rs`) — Criterion benchmarks for encoding, ADC search, training (W46 Days 4-5)
+- **WASM PQ exports** — `train_pq()`, `encode_pq()`, `pq_search()` with opaque `PqCodebookHandle` (W47 Day 1)
+- **WASM PQ benchmark harness** — `tests/wasm/pq_bench.html` + `pq_bench.js` with Playwright automation (W47 Day 2)
+- **Rayon parallel subspace training** — `parallel` feature flag for native M-way parallelism (W47 Day 4)
+- **B4 recall comparison** — `examples/recall_validation.rs` with PQ vs BQ+rescore on real 768D embeddings (W47 Day 5)
+- PQ types re-exported from crate root: `edgevec::{PqCodebook, PqCode, DistanceTable, PqSearchResult, PqError}`
+- 1027 total library tests (W47: +14 PQ validation, convergence threshold, zero dimensions)
 - **FilterExpression object support** in `edgevec-langchain` — `similaritySearchVectorWithScore` now accepts both DSL strings and `FilterExpression` objects (`Filter.eq()`, `Filter.and()`, etc.)
 - Re-exported `Filter` and `FilterExpression` from `edgevec-langchain` for convenience
 - 6 new FilterExpression tests in `pkg/langchain/tests/store.test.ts` (W44, 134 total)
@@ -31,18 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **PQ seeding:** Switched from shared sequential RNG (`seed=42`) to per-subspace deterministic seeding (`seed=42+m`). Enables parallel training via rayon. **Breaking:** codebooks trained before this change will differ (PQ is unreleased, no external consumers affected).
-- **ROADMAP.md** updated to v7.2: W46 PQ Phase 2 complete, Phase 4 validation planned for W47
+- **ROADMAP.md** updated to v7.3: W47 PQ Phase 4 complete (CONDITIONAL GO)
+- **PQ training default:** Early-stop convergence (threshold 1e-4) enabled by default
 - `pkg/langchain/README.md`: documented both filter forms (DSL strings + FilterExpression), removed "Coming Next" section
 - `pkg/langchain/package.json` and `index.ts`: version bumped to 0.2.0
 
 ### Performance
-- **PQ GO/NO-GO Decision** (`docs/benchmarks/PQ_GO_NOGO_DECISION.md`) — CONDITIONAL GO (W46 Days 4-5)
+- **PQ GO/NO-GO Decision** (`docs/benchmarks/PQ_GO_NOGO_DECISION.md`) — **CONDITIONAL GO** (W46-W47)
   - G1 PASS: PQ memory 16.5% of BQ at 100K (threshold: <70%)
-  - G2 PASS (native): ADC 37.6 ns/candidate (threshold: <150ns)
-  - G3 INCONCLUSIVE: Recall 2% on synthetic uniform data (correct at 64D; real-embedding validation needed)
-  - G4 FAIL: Training 198.7s at 100K (threshold: <60s; optimization needed)
+  - G2 PASS: ADC 145 ns/candidate WASM P99 (threshold: <150ns) — Chrome 145, 100K scale
+  - G3 FAIL: Recall@10 = 0.39 (M=8) / 0.53 (M=16) on real 768D embeddings (threshold: >0.90)
+  - G4 CONDITIONAL: Native 9.05s PASS (<30s, rayon). WASM 124.6s FAIL (<60s, needs Web Workers)
   - G5 PASS: Implementation ~12h (threshold: <16h)
   - G6 PASS: Zero breaking API changes
+- **B4 comparison:** BQ+rescore recall@10 = 0.9920 vs PQ best = 0.5260 — BQ wins for recall-critical search
+- **Training optimization:** 198.7s → 9.05s (95% reduction) via early-stop + reduced iters + rayon parallel
 
 ### Research
 - **WebGPU Acceleration Spike** (`docs/research/WEBGPU_SPIKE.md`) — **NO-GO** for v0.10.0 (W44)

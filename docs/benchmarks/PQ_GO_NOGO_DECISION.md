@@ -14,8 +14,9 @@
 | **CPU** | Intel Core Ultra 9 285H (16 cores, 16 threads) |
 | **RAM** | 32 GB |
 | **Rust** | rustc 1.94.0-nightly (1aa9bab4e 2025-12-05) |
-| **Commit** | 7ec4219 (W46 Day 3) |
-| **Target** | Native x86_64 (non-WASM — see WASM caveat below) |
+| **Commit (W46)** | 7ec4219 (W46 Day 3) |
+| **Commits (W47)** | baeb7d4 (Day 1) through e911ee7 (Day 5) |
+| **Target** | Native x86_64 + WASM (Chrome 145, Playwright) |
 
 ---
 

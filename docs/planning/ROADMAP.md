@@ -1,8 +1,8 @@
-# EdgeVec Roadmap v7.2
+# EdgeVec Roadmap v7.3
 
-**Date:** 2026-03-28
+**Date:** 2026-03-06
 **Author:** PLANNER
-**Status:** [REVISED] — v0.9.0 Released, v0.10.0 PQ Phase 2 in progress
+**Status:** [REVISED] — v0.9.0 Released, v0.10.0 PQ Phase 4 complete (CONDITIONAL GO)
 **Current Version:** v0.9.0 (released 2026-02-27)
 **Next Version:** v0.10.0 (planned — Weeks 44-48)
 
@@ -31,7 +31,7 @@
 | v0.7.0 | **RELEASED** | SIMD Acceleration, First Community PR | 2025-12-30 |
 | v0.8.0 | **RELEASED** | Consolidation + Developer Experience | 2026-01-08 |
 | v0.9.0 | **RELEASED** | Sparse Vectors + Hybrid Search + Flat Index + LangChain.js | 2026-03-07 |
-| v0.10.0 | IN PROGRESS | WebGPU/Relaxed SIMD Research + PQ Research | Week 44-47 |
+| v0.10.0 | IN PROGRESS | WebGPU/Relaxed SIMD Research + PQ Validation | Week 44-48 |
 | v1.0 | PLANNED | Production Release | Week 48-52 |
 
 ---
@@ -452,7 +452,7 @@ v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD
 
 ### Milestone 10.4: Product Quantization Research + Implementation (Weeks 45-47)
 
-**Status:** W46 COMPLETE — CONDITIONAL GO. W47 validation pending.
+**Status:** W47 COMPLETE — CONDITIONAL GO. PQ ships as experimental compression method.
 **Source:** Industry trends (64x compression, 97% memory reduction)
 
 **Phase 1: Research (W45) — DONE**
@@ -472,15 +472,23 @@ v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD
 - Gate results: G1 PASS, G2 PASS (native), G3 INCONCLUSIVE, G4 FAIL, G5 PASS, G6 PASS
 - **Overall: CONDITIONAL GO** — implementation sound, W47 validation needed
 
-**Phase 4: Validation (W47) — PLANNED**
+**Phase 4: Validation (W47) — DONE (CONDITIONAL GO)**
 
-| Task | Gate | Priority |
-|:-----|:-----|:---------|
-| WASM PQ exports + benchmark harness | G2 | HIGH |
-| Real-embedding recall validation | G3 | HIGH |
-| Training optimization (early-stop + parallel) | G4 | HIGH |
-| BQ+rescore comparison on real data | B4 | MEDIUM |
-| PQ inline doc tests | — | LOW |
+| Task | Gate | Result |
+|:-----|:-----|:-------|
+| WASM PQ exports (train_pq, encode_pq, pq_search) + benchmark harness | G2 | **PASS** — P99=145ns < 150ns |
+| Real-embedding recall (50K all-mpnet-base-v2, 768D) | G3 | **FAIL** — M=8: 0.39, M=16: 0.53 (threshold >0.90) |
+| Training optimization (early-stop + rayon parallel) | G4 | **CONDITIONAL** — native 9.05s PASS (<30s), WASM 124.6s FAIL (<60s) |
+| B4 PQ vs BQ+rescore on real data | B4 | BQ+rescore 0.9920 >> PQ 0.5260 |
+| PQ types re-exported from crate root | — | DONE |
+| ZeroDimensions validation | — | DONE (PqError: 9 variants) |
+| PQ inline doc tests | — | DEFERRED (surplus) |
+
+**W47 Final Verdict: CONDITIONAL GO**
+- PQ ships as experimental compression method — primary value is memory (8 bytes/vector vs 96 for BQ)
+- For recall-critical search, BQ+rescore (recall 0.99) is recommended over PQ (recall 0.39-0.53)
+- Native training with rayon: 9.05s at 100K. WASM training needs Web Workers (future work)
+- See `docs/benchmarks/PQ_GO_NOGO_DECISION.md` for full gate results
 
 ### Milestone 10.5: LangChain.js v0.2.0 (Week 45)
 
@@ -699,6 +707,7 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 | v7.0 | 2026-03-17 | v0.9.0 RELEASED; W42-43 actuals; Milestone 10.0 (W44 research spikes) |
 | v7.1 | 2026-03-25 | Milestone 10.4 PQ Phase 1 pulled forward to W45; added Milestone 10.5 LangChain.js v0.2.0 |
 | v7.2 | 2026-03-28 | W46 PQ Phase 2 complete (CONDITIONAL GO); Milestone 10.4 Phases 2-3 done, Phase 4 planned for W47 |
+| v7.3 | 2026-03-06 | W47 PQ Phase 4 COMPLETE (CONDITIONAL GO): G2 PASS 145ns, G3 FAIL 0.39/0.53, G4 native PASS 9.05s / WASM FAIL 124.6s. BQ+rescore 0.99 >> PQ 0.53. 1027 tests |
 
 ---
 
