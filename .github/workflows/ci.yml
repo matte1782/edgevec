@@ -3,7 +3,8 @@
 # W18.2: CI Hardening — Documented timeouts and environment variables
 # W45.6: CI Optimization — Added Rust dependency caching, Miri skip filters
 # W46.2: Expanded Miri skips — hybrid::, quantization::product::, hnsw:: (all pure-safe, no UB risk)
-# W48.0: Split Miri into parallel jobs (core + sparse) to fix 25m timeout
+# W48.0: Split Miri into parallel jobs (core + sparse) + skip proptests under Miri
+#         Root cause: proptest cases under Miri take 1-3min each (Miri interprets every op)
 #
 # Local Simulation:
 #   cargo xtask ci-check
@@ -122,6 +123,7 @@ jobs:
   #   - hybrid:: — pure-safe search/fusion logic, very slow under Miri
   #   - quantization::product:: — pure-safe k-means/PQ, extremely slow under Miri
   #   - hnsw:: — graph search is safe-only, slow under Miri instrumentation
+  #   - proptests — property tests don't exercise unsafe, 1-3min/case under Miri
   #   - wasm — not available in Miri
   #   - test_bq_vs_f32_recall_comparison — slow integration test
   miri-core:
@@ -150,10 +152,10 @@ jobs:
             --skip metadata::error:: \
             --skip hybrid:: \
             --skip quantization::product:: \
-            --skip hnsw::
+            --skip hnsw:: \
+            --skip proptests
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
-          PROPTEST_CASES: "4"
 
   # Job 5b: Miri Safety Audit — Sparse feature (runs in parallel with 5a)
   # Skip rationale: see Job 5a comment block above
@@ -183,7 +185,7 @@ jobs:
             --skip metadata::error:: \
             --skip hybrid:: \
             --skip quantization::product:: \
-            --skip hnsw::
+            --skip hnsw:: \
+            --skip proptests
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
-          PROPTEST_CASES: "4"
