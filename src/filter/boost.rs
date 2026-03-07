@@ -124,7 +124,9 @@ impl MetadataBoost {
 
 /// Compute the total boost factor from a slice of boosts.
 ///
-/// Sums individual boost contributions and clamps to `[-1.0, 0.99]`.
+/// Individual boost contributions are **additively stacked**: if two boosts
+/// of weight 0.3 and 0.2 both match, the total factor is 0.5 (not 0.3×0.2).
+/// The sum is clamped to `[-1.0, 0.99]`.
 /// The upper clamp at 0.99 prevents distance from going to zero or negative.
 #[must_use]
 #[allow(clippy::implicit_hasher)]
@@ -234,9 +236,8 @@ mod tests {
     }
 
     #[test]
-    fn test_boost_combined_with_filter() {
-        // Test that boost computation is independent of filter logic
-        // (filter is applied at search_boosted level, not here)
+    fn test_boost_match_vs_no_match_independent() {
+        // Verify same boost returns weight on match and 0.0 on mismatch
         let boost = MetadataBoost::new(
             "category".into(),
             MetadataValue::String("tech".into()),
@@ -290,8 +291,8 @@ mod tests {
     }
 
     #[test]
-    fn test_boost_wasm_smoke() {
-        // Verify MetadataBoost is serde-friendly (needed for WASM JSON parsing)
+    fn test_boost_construction_validation() {
+        // Verify MetadataBoost construction, Clone, and error handling
         let boost = MetadataBoost::new(
             "entity_type".into(),
             MetadataValue::String("ORG".into()),
@@ -314,5 +315,36 @@ mod tests {
         assert!(
             MetadataBoost::new("x".into(), MetadataValue::Integer(1), f32::NEG_INFINITY).is_err()
         );
+    }
+
+    #[test]
+    fn test_boost_empty_metadata_map() {
+        let boost = MetadataBoost::new(
+            "entity_type".into(),
+            MetadataValue::String("ORG".into()),
+            0.3,
+        )
+        .unwrap();
+        let empty_meta: HashMap<String, MetadataValue> = HashMap::new();
+        assert!((boost.compute_boost(&empty_meta)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_boost_absent_field() {
+        let boost = MetadataBoost::new(
+            "missing_field".into(),
+            MetadataValue::String("value".into()),
+            0.5,
+        )
+        .unwrap();
+        let meta = make_metadata(vec![("other_field", MetadataValue::String("value".into()))]);
+        assert!((boost.compute_boost(&meta)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_compute_boost_factor_empty_boosts() {
+        let meta = make_metadata(vec![("x", MetadataValue::Integer(1))]);
+        let factor = compute_boost_factor(&[], &meta);
+        assert!((factor).abs() < f32::EPSILON);
     }
 }

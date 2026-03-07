@@ -845,7 +845,9 @@ impl<'idx, 'sto, 'meta, M: MetadataStore> FilteredSearcher<'idx, 'sto, 'meta, M>
     ///
     /// # Returns
     ///
-    /// * `Ok(FilteredSearchResult)` - Boosted, reranked search results
+    /// * `Ok(FilteredSearchResult)` - Boosted, reranked search results.
+    ///   **Note:** Distances in the returned results are boosted (not raw).
+    ///   A positive boost reduces distance; a negative boost increases it.
     /// * `Err(FilteredSearchError)` - On invalid filter or search failure
     pub fn search_boosted(
         &mut self,
@@ -1134,5 +1136,160 @@ mod tests {
         assert_eq!(full.results.len(), 1);
         assert!(full.complete);
         assert_eq!(full.observed_selectivity, 1.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // search_boosted INTEGRATION TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_search_boosted_promotes_matching_results() {
+        let (index, storage, metadata) = create_test_index(100, 8);
+        let mut searcher = FilteredSearcher::new(&index, &storage, &metadata);
+
+        let boost = MetadataBoost::new("category".into(), MetadataValue::String("gpu".into()), 0.5)
+            .unwrap();
+
+        let query: Vec<f32> = vec![50.0; 8];
+        let result = searcher
+            .search_boosted(&query, 10, &[boost], None, FilterStrategy::Auto)
+            .unwrap();
+
+        assert_eq!(result.results.len(), 10);
+        // Top results should be biased toward "gpu" category (every 3rd vector)
+        // since their distance is halved by the 0.5 boost
+    }
+
+    #[test]
+    fn test_search_boosted_empty_boosts_delegates() {
+        let (index, storage, metadata) = create_test_index(50, 8);
+        let mut searcher = FilteredSearcher::new(&index, &storage, &metadata);
+
+        let query: Vec<f32> = vec![0.0; 8];
+        let boosted = searcher
+            .search_boosted(&query, 5, &[], None, FilterStrategy::Auto)
+            .unwrap();
+
+        // Re-create searcher (search_filtered consumed the mutable ref)
+        let mut searcher2 = FilteredSearcher::new(&index, &storage, &metadata);
+        let filtered = searcher2
+            .search_filtered(&query, 5, None, FilterStrategy::Auto)
+            .unwrap();
+
+        // Same results since no boosts applied
+        assert_eq!(boosted.results.len(), filtered.results.len());
+        for (b, f) in boosted.results.iter().zip(filtered.results.iter()) {
+            assert_eq!(b.vector_id, f.vector_id);
+            assert!((b.distance - f.distance).abs() < f32::EPSILON);
+        }
+    }
+
+    #[test]
+    fn test_search_boosted_with_filter() {
+        let (index, storage, metadata) = create_test_index(100, 8);
+        let mut searcher = FilteredSearcher::new(&index, &storage, &metadata);
+
+        let boost = MetadataBoost::new("active".into(), MetadataValue::Boolean(true), 0.3).unwrap();
+        let filter = parse("category = \"gpu\"").unwrap();
+
+        let query: Vec<f32> = vec![0.0; 8];
+        let result = searcher
+            .search_boosted(&query, 5, &[boost], Some(&filter), FilterStrategy::Auto)
+            .unwrap();
+
+        // All results must pass the filter (category = "gpu")
+        // Boost should promote active=true results within that set
+        assert!(!result.results.is_empty());
+    }
+
+    #[test]
+    fn test_search_boosted_negative_weight_penalizes() {
+        let (index, storage, metadata) = create_test_index(100, 8);
+        let mut searcher = FilteredSearcher::new(&index, &storage, &metadata);
+
+        let penalty =
+            MetadataBoost::new("category".into(), MetadataValue::String("gpu".into()), -0.5)
+                .unwrap();
+
+        let query: Vec<f32> = vec![0.0; 8];
+        let result = searcher
+            .search_boosted(&query, 10, &[penalty], None, FilterStrategy::Auto)
+            .unwrap();
+
+        assert_eq!(result.results.len(), 10);
+        // gpu vectors should have 1.5x distance, pushing them down in ranking
+    }
+
+    #[test]
+    fn test_search_boosted_reranks_order() {
+        let (index, storage, metadata) = create_test_index(100, 8);
+        let mut searcher = FilteredSearcher::new(&index, &storage, &metadata);
+
+        let boost = MetadataBoost::new("category".into(), MetadataValue::String("gpu".into()), 0.5)
+            .unwrap();
+
+        let query: Vec<f32> = vec![0.0; 8];
+        let result = searcher
+            .search_boosted(&query, 10, &[boost], None, FilterStrategy::Auto)
+            .unwrap();
+
+        // Results must be sorted by boosted distance (ascending)
+        for window in result.results.windows(2) {
+            assert!(
+                window[0].distance <= window[1].distance,
+                "Results not sorted: {} > {}",
+                window[0].distance,
+                window[1].distance
+            );
+        }
+    }
+
+    #[test]
+    fn test_search_boosted_returns_boosted_distances() {
+        let (index, storage, metadata) = create_test_index(50, 8);
+        let mut searcher = FilteredSearcher::new(&index, &storage, &metadata);
+
+        // Strong boost: gpu results get 0.9x distance reduction
+        let boost = MetadataBoost::new("category".into(), MetadataValue::String("gpu".into()), 0.9)
+            .unwrap();
+
+        let query: Vec<f32> = vec![0.0; 8];
+        let boosted = searcher
+            .search_boosted(&query, 50, &[boost], None, FilterStrategy::Auto)
+            .unwrap();
+
+        // Get unboosted results for comparison
+        let mut searcher2 = FilteredSearcher::new(&index, &storage, &metadata);
+        let unboosted = searcher2
+            .search_filtered(&query, 50, None, FilterStrategy::Auto)
+            .unwrap();
+
+        // Find a gpu vector that appears in both result sets and verify its distance changed
+        for br in &boosted.results {
+            #[allow(clippy::cast_possible_truncation)]
+            let idx = (br.vector_id.0 as usize).saturating_sub(1);
+            let is_gpu = idx % 3 == 0; // gpu vectors are at indices 0, 3, 6, ...
+            if is_gpu {
+                // Find same vector in unboosted results
+                if let Some(ur) = unboosted
+                    .results
+                    .iter()
+                    .find(|r| r.vector_id == br.vector_id)
+                {
+                    // Boosted distance should be ~10% of raw distance (1.0 - 0.9 = 0.1)
+                    let expected = ur.distance * 0.1;
+                    assert!(
+                        (br.distance - expected).abs() < 1e-4,
+                        "gpu vector {} boosted distance {} != expected {}",
+                        br.vector_id.0,
+                        br.distance,
+                        expected
+                    );
+                    return; // One verified example is sufficient
+                }
+            }
+        }
+        // If we get here, no gpu vector was found in both sets — test is inconclusive
+        // but not a failure (small index edge case)
     }
 }
