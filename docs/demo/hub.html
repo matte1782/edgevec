@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="EdgeVec Demo Hub - Interactive demos for the WASM-native vector database">
   <title>EdgeVec // Demo Hub</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -334,6 +334,11 @@
       color: #000;
     }
 
+    .card__badge--latest {
+      background: linear-gradient(135deg, var(--cyan), var(--cyan-dim));
+      color: #000;
+    }
+
     .card__badge--featured {
       background: linear-gradient(135deg, var(--magenta), var(--purple));
       color: #fff;
@@ -473,6 +478,7 @@
     /* Responsive */
     @media (min-width: 600px) {
       .grid--2 { grid-template-columns: repeat(2, 1fr); }
+      .grid--3 { grid-template-columns: repeat(3, 1fr); }
       .card { padding: 24px; }
       .card--featured { padding: 32px; }
       .hero { padding: 140px 24px 80px; }
@@ -487,12 +493,21 @@
     @media (max-width: 599px) {
       .header__nav { display: none; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      #matrix { display: none; }
+    }
   </style>
 </head>
 <body>
   <!-- Matrix Rain Canvas -->
-  <canvas id="matrix"></canvas>
-  <div class="gradient-overlay"></div>
+  <canvas id="matrix" aria-hidden="true"></canvas>
+  <div class="gradient-overlay" aria-hidden="true"></div>
 
   <!-- Header -->
   <header class="header">
@@ -501,10 +516,10 @@
         <span class="header__brand">EDGEVEC</span>
         <span class="header__tag">DEMO HUB</span>
       </div>
-      <nav class="header__nav">
-        <a href="https://github.com/matte1782/edgevec" class="header__link" target="_blank">GITHUB</a>
-        <a href="https://www.npmjs.com/package/edgevec" class="header__link" target="_blank">NPM</a>
-        <a href="https://crates.io/crates/edgevec" class="header__link" target="_blank">CRATES.IO</a>
+      <nav class="header__nav" aria-label="External links">
+        <a href="https://github.com/matte1782/edgevec" class="header__link" target="_blank" rel="noopener">GITHUB</a>
+        <a href="https://www.npmjs.com/package/edgevec" class="header__link" target="_blank" rel="noopener">NPM</a>
+        <a href="https://crates.io/crates/edgevec" class="header__link" target="_blank" rel="noopener">CRATES.IO</a>
       </nav>
     </div>
   </header>
@@ -512,12 +527,12 @@
   <!-- Hero -->
   <section class="hero">
     <p class="hero__eyebrow">
-      <span class="hero__dot"></span>
+      <span class="hero__dot" aria-hidden="true"></span>
       WASM-NATIVE VECTOR DATABASE
     </p>
     <h1 class="hero__title">DEMO_HUB</h1>
     <p class="hero__subtitle">
-      Explore EdgeVec capabilities. From visual filter building to performance benchmarks.
+      Explore EdgeVec capabilities. From entity-enhanced RAG to performance benchmarks — all running in-browser via WASM.
     </p>
     <div class="hero__stats">
       <div class="hero__stat">
@@ -532,30 +547,75 @@
         <div class="hero__stat-value">&lt;1ms</div>
         <div class="hero__stat-label">Latency</div>
       </div>
+      <div class="hero__stat">
+        <div class="hero__stat-value">8B</div>
+        <div class="hero__stat-label">PQ (exp.)</div>
+      </div>
     </div>
   </section>
 
   <!-- Main -->
   <main class="main">
 
-    <!-- Featured -->
-    <div class="category">
+    <!-- AI / RAG -->
+    <section class="category">
+      <div class="category__header">
+        <div class="category__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/><path d="M9.5 9.5L6.5 6.5M14.5 9.5l3-3M9.5 14.5l-3 3M14.5 14.5l3 3"/></svg>
+        </div>
+        <h2 class="category__title">AI / RAG</h2>
+      </div>
       <div class="grid">
-        <a href="index.html" class="card card--featured">
+        <a href="entity-rag/index.html" class="card card--featured">
           <div class="card__header">
             <div class="card__badges">
-              <span class="card__badge card__badge--version">v0.7.0</span>
-              <span class="card__badge card__badge--new">LATEST</span>
+              <span class="card__badge card__badge--version">v0.9.0</span>
+              <span class="card__badge card__badge--latest">LATEST</span>
+              <span class="card__badge card__badge--new">NEW</span>
               <span class="card__badge card__badge--featured">FEATURED</span>
             </div>
             <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </div>
           </div>
-          <div class="card__icon">
+          <div class="card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><circle cx="12" cy="12" r="1.5"/><path d="M12 7.5v3M10 13l-3.5 4.5M14 13l3.5 4.5"/></svg>
+          </div>
+          <h3 class="card__title">ENTITY_RAG</h3>
+          <p class="card__desc">Entity-enhanced RAG running entirely in-browser. MetadataBoost search on 1000 SQuAD paragraphs with named entity recognition — zero API calls.</p>
+          <p class="card__meta">March 2026 // MetadataBoost // WASM</p>
+          <div class="card__features">
+            <span class="card__feature">Entity NER</span>
+            <span class="card__feature">MetadataBoost</span>
+            <span class="card__feature">SQuAD Dataset</span>
+            <span class="card__feature">Live WASM</span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Core Features -->
+    <section class="category">
+      <div class="category__header">
+        <div class="category__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h2 class="category__title">Core Features</h2>
+      </div>
+      <div class="grid grid--3">
+        <a href="index.html" class="card">
+          <div class="card__header">
+            <div class="card__badges">
+              <span class="card__badge card__badge--version">v0.7.0</span>
+            </div>
+            <div class="card__arrow">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </div>
+          <div class="card__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
           </div>
-          <h2 class="card__title">FILTER_PLAYGROUND</h2>
+          <h3 class="card__title">FILTER_PLAYGROUND</h3>
           <p class="card__desc">Build SQL-like metadata queries visually. Test in real-time with WASM. Copy production-ready code.</p>
           <p class="card__meta">December 2024 // SIMD Acceleration</p>
           <div class="card__features">
@@ -565,31 +625,20 @@
             <span class="card__feature">Code Snippets</span>
           </div>
         </a>
-      </div>
-    </div>
 
-    <!-- Core Features -->
-    <div class="category">
-      <div class="category__header">
-        <div class="category__icon">
-          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        </div>
-        <span class="category__title">Core Features</span>
-      </div>
-      <div class="grid grid--2">
         <a href="cyberpunk.html" class="card">
           <div class="card__header">
             <div class="card__badges">
               <span class="card__badge card__badge--version">v0.6.0</span>
             </div>
             <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </div>
           </div>
-          <div class="card__icon">
+          <div class="card__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           </div>
-          <h2 class="card__title">CYBERPUNK_DEMO</h2>
+          <h3 class="card__title">CYBERPUNK_DEMO</h3>
           <p class="card__desc">Binary Quantization vs F32. Memory pressure. Performance benchmarks.</p>
           <p class="card__meta">Binary Quantization // 32x Memory</p>
           <div class="card__features">
@@ -605,13 +654,13 @@
               <span class="card__badge card__badge--version">v0.7.0</span>
             </div>
             <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </div>
           </div>
-          <div class="card__icon">
+          <div class="card__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </div>
-          <h2 class="card__title">SOFT_DELETE</h2>
+          <h3 class="card__title">SOFT_DELETE</h3>
           <p class="card__desc">O(1) delete with tombstones. Compaction.</p>
           <p class="card__meta">Tombstones // Compaction</p>
           <div class="card__features">
@@ -621,31 +670,30 @@
           </div>
         </a>
       </div>
-    </div>
+    </section>
 
     <!-- Performance -->
-    <div class="category">
+    <section class="category">
       <div class="category__header">
-        <div class="category__icon">
+        <div class="category__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
         </div>
-        <span class="category__title">Performance</span>
+        <h2 class="category__title">Performance</h2>
       </div>
       <div class="grid grid--2">
         <a href="simd_benchmark.html" class="card">
           <div class="card__header">
             <div class="card__badges">
               <span class="card__badge card__badge--version">v0.7.0</span>
-              <span class="card__badge card__badge--new">NEW</span>
             </div>
             <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </div>
           </div>
-          <div class="card__icon">
+          <div class="card__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </div>
-          <h2 class="card__title">SIMD_BENCHMARK</h2>
+          <h3 class="card__title">SIMD_BENCHMARK</h3>
           <p class="card__desc">Measure WASM SIMD128 acceleration. Includes @jsonMartin's 8.75x faster Hamming distance.</p>
           <p class="card__meta">SIMD128 // 2x+ Speedup // Contribution</p>
           <div class="card__features">
@@ -661,13 +709,13 @@
               <span class="card__badge card__badge--version">v0.7.0</span>
             </div>
             <div class="card__arrow">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </div>
           </div>
-          <div class="card__icon">
+          <div class="card__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M3 3v18h18M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
           </div>
-          <h2 class="card__title">BENCHMARK_DASHBOARD</h2>
+          <h3 class="card__title">BENCHMARK_DASHBOARD</h3>
           <p class="card__desc">Insert, search, memory at scale.</p>
           <p class="card__meta">Scaling Analysis // Charts</p>
           <div class="card__features">
@@ -676,13 +724,13 @@
           </div>
         </a>
       </div>
-    </div>
+    </section>
 
   </main>
 
   <!-- Footer -->
   <footer class="footer">
-    <div class="footer__brand">EDGEVEC v0.7.0</div>
+    <div class="footer__brand">EDGEVEC v0.9.0</div>
     <div class="footer__links">
       <a href="https://github.com/matte1782/edgevec" class="footer__link">GitHub</a>
       <a href="https://www.npmjs.com/package/edgevec" class="footer__link">npm</a>

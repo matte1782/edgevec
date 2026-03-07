@@ -1382,9 +1382,10 @@
 
         // Results cascade animation
         if (!prefersReducedMotion && typeof gsap !== 'undefined') {
-          gsap.from('.result-card', {
-            opacity: 0, y: 30, duration: 0.35, stagger: 0.06, ease: 'power2.out'
-          });
+          gsap.fromTo('.result-card',
+            { opacity: 0, y: 30 },
+            { opacity: 1, y: 0, duration: 0.35, stagger: 0.06, ease: 'power2.out', clearProps: 'opacity,transform' }
+          );
         }
 
       } catch (err) {
