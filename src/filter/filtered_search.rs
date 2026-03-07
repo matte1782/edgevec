@@ -51,6 +51,7 @@
 //! ```
 
 use crate::filter::ast::FilterExpr;
+use crate::filter::boost::{apply_boost, compute_boost_factor, MetadataBoost};
 use crate::filter::error::FilterError;
 use crate::filter::evaluator::evaluate;
 use crate::filter::strategy::{
@@ -61,6 +62,7 @@ use crate::hnsw::graph::{GraphError, HnswIndex};
 use crate::hnsw::search::{SearchContext, SearchResult};
 use crate::metadata::MetadataValue;
 use crate::storage::VectorStorage;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -818,6 +820,74 @@ impl<'idx, 'sto, 'meta, M: MetadataStore> FilteredSearcher<'idx, 'sto, 'meta, M>
             oversample_min,
             oversample_max,
         };
+        Ok(result)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BOOSTED SEARCH
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Search with metadata-based distance boosting.
+    ///
+    /// Performs a filtered search with oversampling, then reranks results using
+    /// multiplicative boosting: `final_distance = raw_distance * (1.0 - boost_factor)`.
+    ///
+    /// This is **scale-independent**: a weight of 0.3 reduces distance by 30%
+    /// regardless of whether L2 distances are 0.001 or 50000.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query vector (same dimensions as indexed vectors)
+    /// * `k` - Number of results to return
+    /// * `boosts` - Metadata boost specifications (empty = delegates to search_filtered)
+    /// * `filter` - Optional filter expression (None = no filtering)
+    /// * `strategy` - Filter strategy (Auto for automatic selection)
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(FilteredSearchResult)` - Boosted, reranked search results
+    /// * `Err(FilteredSearchError)` - On invalid filter or search failure
+    pub fn search_boosted(
+        &mut self,
+        query: &[f32],
+        k: usize,
+        boosts: &[MetadataBoost],
+        filter: Option<&FilterExpr>,
+        strategy: FilterStrategy,
+    ) -> Result<FilteredSearchResult, FilteredSearchError> {
+        // Empty boosts = standard filtered search
+        if boosts.is_empty() {
+            return self.search_filtered(query, k, filter, strategy);
+        }
+
+        // Oversample to get enough candidates for reranking
+        let oversample_k = (k * 3).clamp(50, 500);
+
+        // Run filtered search with oversampled k
+        let mut result = self.search_filtered(query, oversample_k, filter, strategy)?;
+
+        // Rerank results with boost factors
+        for r in &mut result.results {
+            // Convert VectorId to index (VectorId starts at 1, index at 0)
+            #[allow(clippy::cast_possible_truncation)]
+            let idx = (r.vector_id.0 as usize).saturating_sub(1);
+            if let Some(metadata) = self.metadata.get_metadata(idx) {
+                let factor = compute_boost_factor(boosts, metadata);
+                r.distance = apply_boost(r.distance, factor);
+            }
+        }
+
+        // Re-sort by boosted distance (NaN pushed to end via unwrap_or(Greater))
+        result.results.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .unwrap_or(Ordering::Greater)
+        });
+
+        // Truncate to requested k
+        result.results.truncate(k);
+        result.complete = result.results.len() >= k;
+
         Ok(result)
     }
 }

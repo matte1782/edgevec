@@ -56,6 +56,7 @@
 //! - [x] W23.3.4: Tautology/contradiction detection
 
 pub mod ast;
+pub mod boost;
 pub mod error;
 pub mod evaluator;
 pub mod filtered_search;
@@ -64,6 +65,7 @@ pub mod strategy;
 
 // Re-exports for convenience
 pub use ast::FilterExpr;
+pub use boost::{apply_boost, compute_boost_factor, BoostError, MetadataBoost};
 pub use error::FilterError;
 pub use evaluator::evaluate;
 pub use filtered_search::{
