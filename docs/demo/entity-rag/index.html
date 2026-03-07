@@ -795,7 +795,7 @@
         <span class="header__version">v0.9.0</span>
       </div>
       <nav class="header__nav">
-        <a href="../../docs/demo/hub.html" class="header__link">&larr; DEMO HUB</a>
+        <a href="../hub.html" class="header__link">&larr; DEMO HUB</a>
         <a href="https://github.com/matte1782/edgevec" class="header__link" target="_blank" rel="noopener">GITHUB</a>
       </nav>
     </div>
@@ -1456,7 +1456,7 @@
         $wasmStatus.textContent = 'LOADING...';
         $wasmStatus.className = 'status-bar__value status-bar__value--loading';
 
-        const wasm = await import('../../pkg/edgevec.js');
+        const wasm = await import('../pkg/edgevec.js');
         await wasm.default();
 
         $wasmStatus.textContent = 'READY';
