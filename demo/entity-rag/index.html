@@ -708,6 +708,75 @@
       text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
     }
 
+    /* Boost comparison banner */
+    .boost-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      background: rgba(0, 255, 136, 0.06);
+      border: 1px solid rgba(0, 255, 136, 0.2);
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--green);
+    }
+    .boost-banner--off {
+      background: rgba(0, 255, 255, 0.04);
+      border-color: rgba(0, 255, 255, 0.15);
+      color: var(--cyan-dim);
+    }
+    .boost-banner__icon { font-size: 14px; }
+    .boost-banner__text { flex: 1; }
+
+    /* Rank delta badge */
+    .result-card__delta {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+    .result-card__delta--up {
+      color: var(--green);
+      background: rgba(0, 255, 136, 0.1);
+    }
+    .result-card__delta--down {
+      color: var(--magenta);
+      background: rgba(255, 0, 255, 0.1);
+    }
+    .result-card__delta--same {
+      color: var(--gray-200);
+      background: rgba(106, 106, 128, 0.1);
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .hero { padding: 80px 12px 24px; }
+      .hero__title { font-size: clamp(16px, 5vw, 32px); word-break: break-word; }
+      .header__inner { padding: 0 10px; height: 48px; }
+      .header__brand { font-size: 16px; }
+      .header__version { font-size: 9px; padding: 2px 6px; }
+      .header__link { font-size: 10px; padding: 4px 8px; }
+      .status-bar { gap: 8px; }
+      .status-bar__item { padding: 4px 10px; }
+      .status-bar__label { font-size: 9px; }
+      .status-bar__value { font-size: 11px; }
+      .main { padding: 12px 10px 40px; }
+      .result-card { padding: 12px; }
+      .result-card__text { font-size: 11px; }
+      .entity-badge { font-size: 8px; padding: 2px 6px; }
+      .footer { padding: 20px 12px; }
+    }
+
+    @media (max-width: 420px) {
+      .header__nav { gap: 8px; }
+      .hero__subtitle { font-size: 11px; }
+      .status-bar { flex-direction: column; align-items: center; gap: 6px; }
+    }
+
     /* Reduced motion */
     @media (prefers-reduced-motion: reduce) {
       .glitch::before, .glitch::after { animation: none; }
@@ -833,6 +902,10 @@
           <span class="results-panel__title">RESULTS</span>
           <span class="results-panel__count" id="resultsCount"></span>
         </div>
+        <div class="boost-banner boost-banner--off" id="boostBanner" style="display:none;">
+          <span class="boost-banner__icon">&#9889;</span>
+          <span class="boost-banner__text" id="boostBannerText">ENTITY BOOST OFF</span>
+        </div>
         <div class="results-container" id="resultsContainer">
           <div class="placeholder">
             <div class="placeholder__title">AWAITING_INPUT...</div>
@@ -911,6 +984,8 @@
     const $progressText   = document.getElementById('progressText');
     const $resultsCount   = document.getElementById('resultsCount');
     const $resultsContainer = document.getElementById('resultsContainer');
+    const $boostBanner    = document.getElementById('boostBanner');
+    const $boostBannerText = document.getElementById('boostBannerText');
 
     // =========================================================================
     // STATE
@@ -921,6 +996,7 @@
     let docsMap = null; // Built once after data.json loads (M2 perf fix)
     let boostEnabled = false;
     let isIndexReady = false;
+    let lastUnboostedIds = []; // Track unboosted result order for rank deltas
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // =========================================================================
@@ -1016,7 +1092,10 @@
       if (isNaN(idx)) return;
       const q = SAMPLE_QUERIES[idx];
       updateBoostInfo(q.boosts);
-      if (isIndexReady) $searchBtn.disabled = false;
+      if (isIndexReady) {
+        $searchBtn.disabled = false;
+        executeSearch(); // auto-search on dropdown change
+      }
     });
 
     // m3 fix: Enter key triggers search
@@ -1052,6 +1131,18 @@
 
       // Auto re-search with reshuffle feedback
       if (isIndexReady && $querySelect.value !== '') {
+        // Capture unboosted baseline before boosted search
+        if (boostEnabled && lastUnboostedIds.length === 0) {
+          // Temporarily run unboosted to get baseline IDs
+          const idx = parseInt($querySelect.value, 10);
+          if (!isNaN(idx) && SAMPLE_QUERIES[idx]) {
+            try {
+              const rawResults = wasmIndex.search(SAMPLE_QUERIES[idx].queryArray, 10);
+              lastUnboostedIds = rawResults.map(r => r.id);
+            } catch (_) { /* proceed without deltas */ }
+          }
+        }
+
         if (!prefersReducedMotion && typeof gsap !== 'undefined') {
           // Flash status bar with re-ranking message
           const origBuild = $buildTime.textContent;
@@ -1113,11 +1204,11 @@
     // RESULT CARD CREATION
     // =========================================================================
 
-    function createResultCard(result, rank, docData) {
+    function createResultCard(result, rank, docData, delta) {
       const card = document.createElement('div');
       card.className = 'result-card';
 
-      // Header: rank + score
+      // Header: rank + score + delta badge
       const header = document.createElement('div');
       header.className = 'result-card__header';
 
@@ -1130,6 +1221,20 @@
       scoreEl.textContent = result.score.toFixed(4);
 
       header.appendChild(rankEl);
+
+      // Rank delta badge (shows position change from unboosted → boosted)
+      if (delta !== undefined && delta !== 0) {
+        const deltaEl = document.createElement('span');
+        if (delta > 0) {
+          deltaEl.className = 'result-card__delta result-card__delta--up';
+          deltaEl.textContent = `\u2191${delta}`;
+        } else {
+          deltaEl.className = 'result-card__delta result-card__delta--down';
+          deltaEl.textContent = `\u2193${Math.abs(delta)}`;
+        }
+        header.appendChild(deltaEl);
+      }
+
       header.appendChild(scoreEl);
       card.appendChild(header);
 
@@ -1221,11 +1326,43 @@
           );
         }
 
+        // If not boosted, store result IDs as baseline for rank delta calculation
+        if (!boostEnabled) {
+          lastUnboostedIds = results.map(r => r.id);
+        }
+
+        // Compute rank deltas (how many positions each result moved vs unboosted)
+        const deltas = [];
+        if (boostEnabled && lastUnboostedIds.length > 0) {
+          let rerankedCount = 0;
+          results.forEach((r, newRank) => {
+            const oldRank = lastUnboostedIds.indexOf(r.id);
+            if (oldRank === -1) {
+              deltas.push(undefined); // new entry, no delta
+              rerankedCount++;
+            } else {
+              const d = oldRank - newRank; // positive = moved up
+              deltas.push(d);
+              if (d !== 0) rerankedCount++;
+            }
+          });
+
+          // Show boost banner
+          $boostBanner.style.display = 'flex';
+          $boostBanner.className = 'boost-banner';
+          $boostBannerText.textContent = `ENTITY BOOST ACTIVE \u2014 ${rerankedCount}/${results.length} results reranked`;
+        } else {
+          $boostBanner.style.display = results.length > 0 ? 'flex' : 'none';
+          $boostBanner.className = 'boost-banner boost-banner--off';
+          $boostBannerText.textContent = 'STANDARD SEARCH \u2014 toggle boost to see entity-enhanced ranking';
+        }
+
         // Build result cards
         $resultsContainer.replaceChildren();
         $resultsCount.textContent = `${results.length} results`;
 
         if (results.length === 0) {
+          $boostBanner.style.display = 'none';
           const ph = document.createElement('div');
           ph.className = 'placeholder';
           const phTitle = document.createElement('div');
@@ -1242,7 +1379,8 @@
 
         results.forEach((r, i) => {
           const docData = docsMap.get(r.id);
-          const card = createResultCard(r, i, docData);
+          const delta = boostEnabled ? deltas[i] : undefined;
+          const card = createResultCard(r, i, docData, delta);
           $resultsContainer.appendChild(card);
         });
 
@@ -1375,26 +1513,19 @@
         $vectorCount.textContent = String(dataJson.documents.length);
 
         isIndexReady = true;
-        if ($querySelect.value !== '') $searchBtn.disabled = false;
+        $searchBtn.disabled = false;
 
         // Hide progress after a moment
         setTimeout(() => {
           $progressWrapper.style.display = 'none';
         }, 2000);
 
-        // Update placeholder
-        $resultsContainer.replaceChildren();
-        const ph = document.createElement('div');
-        ph.className = 'placeholder';
-        const phTitle = document.createElement('div');
-        phTitle.className = 'placeholder__title';
-        phTitle.textContent = 'INDEX_READY';
-        const phText = document.createElement('div');
-        phText.className = 'placeholder__text';
-        phText.textContent = `${dataJson.documents.length} vectors indexed. Select a query and search.`;
-        ph.appendChild(phTitle);
-        ph.appendChild(phText);
-        $resultsContainer.appendChild(ph);
+        // Auto-run first query so page isn't empty after indexing
+        if (SAMPLE_QUERIES.length > 0) {
+          $querySelect.value = '0';
+          updateBoostInfo(SAMPLE_QUERIES[0].boosts);
+          setTimeout(() => executeSearch(), 500); // slight delay for visual polish
+        }
 
         // Page load animations
         if (!prefersReducedMotion && typeof gsap !== 'undefined') {
