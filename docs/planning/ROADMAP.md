@@ -1,8 +1,8 @@
-# EdgeVec Roadmap v7.3
+# EdgeVec Roadmap v7.4
 
-**Date:** 2026-03-06
+**Date:** 2026-03-07
 **Author:** PLANNER
-**Status:** [REVISED] — v0.9.0 Released, v0.10.0 PQ Phase 4 complete (CONDITIONAL GO)
+**Status:** [REVISED] — v0.9.0 Released, v0.10.0 PQ Phase 4 complete (CONDITIONAL GO), W48 Growth Pivot complete
 **Current Version:** v0.9.0 (released 2026-02-27)
 **Next Version:** v0.10.0 (planned — Weeks 44-48)
 
@@ -31,7 +31,7 @@
 | v0.7.0 | **RELEASED** | SIMD Acceleration, First Community PR | 2025-12-30 |
 | v0.8.0 | **RELEASED** | Consolidation + Developer Experience | 2026-01-08 |
 | v0.9.0 | **RELEASED** | Sparse Vectors + Hybrid Search + Flat Index + LangChain.js | 2026-03-07 |
-| v0.10.0 | IN PROGRESS | WebGPU/Relaxed SIMD Research + PQ Validation | Week 44-48 |
+| v0.10.0 | IN PROGRESS | WebGPU/Relaxed SIMD Research + PQ Validation + MetadataBoost/Growth | Week 44-48 |
 | v1.0 | PLANNED | Production Release | Week 48-52 |
 
 ---
@@ -369,13 +369,13 @@ See Phase 10 (v0.10.0) for PQ research with proper RFC.
 
 ---
 
-## Phase 10: v0.10.0 Advanced Features (Weeks 44-47)
+## Phase 10: v0.10.0 Advanced Features (Weeks 44-48)
 
 ### Strategic Context
 
-v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD) via time-boxed research spikes with hard GO/NO-GO criteria. Also includes Product Quantization research and LangChain.js enhancements.
+v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD) via time-boxed research spikes with hard GO/NO-GO criteria. Also includes Product Quantization research, LangChain.js enhancements, and the Growth Pivot (MetadataBoost + entity-RAG demo).
 
-**Total Duration:** 4 weeks (~50 hours)
+**Total Duration:** 5 weeks (~60 hours)
 
 ### Milestone 10.0: Research Spikes + Housekeeping (Week 44, 32h)
 
@@ -500,6 +500,36 @@ v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD
 - [x] Usage examples and guide (`FILTER_GUIDE.md`)
 - [ ] npm publish `edgevec-langchain@0.2.0` (OTP required)
 
+### Phase 10.6: Growth — Entity-Enhanced RAG (Week 48)
+
+**Strategic Context:**
+Pivot from technical depth (PQ validation) to community growth.
+Riding the GraphRAG/entity-enhanced RAG trend.
+Baseline: 83 GitHub stars. Target: 10x visibility.
+
+#### Milestone 10.6.1: MetadataBoost API
+**Status:** COMPLETE
+**Deliverables:**
+- `src/filter/boost.rs` — MetadataBoost struct, compute_boost_factor(), apply_boost(), BoostError (~160 lines production code)
+- `search_boosted()` on FilteredSearcher — combines hard filtering + soft boosting
+- `searchBoosted()` WASM export for browser usage
+- 16 unit tests + 6 integration tests
+- Formula: `final_distance = raw_distance * (1.0 - boost_factor)` (multiplicative, scale-independent)
+
+#### Milestone 10.6.2: In-Browser Entity-RAG Demo
+**Status:** COMPLETE
+**Deliverables:**
+- `docs/demo/entity-rag/index.html` — cyberpunk UI, mobile responsive
+- `docs/demo/entity-rag/data.json` — 1000 SQuAD paragraphs, 384D embeddings (all-MiniLM-L6-v2), spaCy NER entities
+- Boost ON/OFF toggle, real-time search, zero API calls
+
+#### Milestone 10.6.3: Positioning Blog Post
+**Status:** COMPLETE
+**Deliverables:**
+- `docs/blog/entity-enhanced-rag.md` — 1577 words, 6 sections
+- Research citations: Xu et al. (2024), Palmonari (2025)
+- Comparison table: EdgeVec vs Qdrant vs Weaviate (deployment model focus)
+
 ### v0.10.0 Success Metrics
 
 | Metric | Target |
@@ -508,6 +538,7 @@ v0.10.0 explores next-generation browser capabilities (WebGPU, WASM Relaxed SIMD
 | Relaxed SIMD decision | Go/No-Go documented |
 | Research spikes | All exit criteria answered with data |
 | Bundle size | <700KB (with PQ — actual: 622KB) |
+| Growth pivot | MetadataBoost API + demo + blog shipped |
 
 ---
 
@@ -683,7 +714,7 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 | v0.7.0 | 2025-12-30 | SIMD Acceleration + First Community PR |
 | v0.8.0 | 2026-01-08 | Consolidation + Developer Experience |
 | v0.9.0 | 2026-03-07 | Sparse Vectors + Hybrid Search + Flat Index + LangChain.js |
-| v0.10.0 | TBD (W47) | WebGPU/Relaxed SIMD Research + PQ Research |
+| v0.10.0 | TBD (W48) | WebGPU/Relaxed SIMD Research + PQ Validation + MetadataBoost/Growth |
 | v1.0 | TBD (W52) | Production Release |
 
 ---
@@ -708,6 +739,7 @@ v1.0 signals production readiness. Focus on stability, security, performance gua
 | v7.1 | 2026-03-25 | Milestone 10.4 PQ Phase 1 pulled forward to W45; added Milestone 10.5 LangChain.js v0.2.0 |
 | v7.2 | 2026-03-28 | W46 PQ Phase 2 complete (CONDITIONAL GO); Milestone 10.4 Phases 2-3 done, Phase 4 planned for W47 |
 | v7.3 | 2026-03-06 | W47 PQ Phase 4 COMPLETE (CONDITIONAL GO): G2 PASS 145ns, G3 FAIL 0.39/0.53, G4 native PASS 9.05s / WASM FAIL 124.6s. BQ+rescore 0.99 >> PQ 0.53. 1027 tests |
+| v7.4 | 2026-03-07 | W48 Growth Pivot COMPLETE: MetadataBoost API (16 unit + 6 integration tests), entity-RAG demo (1000 SQuAD, cyberpunk UI), positioning blog (1577 words). Phase 10.6 added |
 
 ---
 
