@@ -3213,6 +3213,186 @@ impl EdgeVec {
     }
 
     // =========================================================================
+    // BOOSTED SEARCH API (v0.10.0 — Week 48 MetadataBoost)
+    // =========================================================================
+
+    /// Search with metadata-based distance boosting.
+    ///
+    /// Performs a filtered search with oversampling, then reranks results using
+    /// multiplicative boosting: `final_distance = raw_distance * (1.0 - boost_factor)`.
+    ///
+    /// This is **scale-independent**: a weight of 0.3 reduces distance by 30%
+    /// regardless of whether L2 distances are 0.001 or 50000.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query vector as `Float32Array`
+    /// * `k` - Number of results to return
+    /// * `boosts_json` - JSON array of boost configurations:
+    ///   `[{"field": "entity_type", "value": "ORG", "weight": 0.3}]`
+    /// * `options_json` - JSON options (same as `searchFiltered`):
+    ///   `{"filter": "category = \"gpu\"", "strategy": "auto"}`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Query dimensions don't match index
+    /// - Query contains non-finite values
+    /// - Boosts JSON is malformed or contains invalid weights
+    /// - Filter expression is invalid
+    /// - Options JSON is malformed
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const query = new Float32Array([0.1, 0.2, ...]);
+    /// const boosts = JSON.stringify([
+    ///     { field: "entity_type", value: "ORG", weight: 0.3 },
+    ///     { field: "is_verified", value: true, weight: 0.2 },
+    /// ]);
+    /// const options = JSON.stringify({ strategy: "auto", includeMetadata: true });
+    /// const result = JSON.parse(index.searchBoosted(query, 10, boosts, options));
+    /// console.log(`Found ${result.results.length} boosted results`);
+    /// ```
+    #[wasm_bindgen(js_name = "searchBoosted")]
+    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn search_boosted(
+        &mut self,
+        query: Float32Array,
+        k: usize,
+        boosts_json: &str,
+        options_json: &str,
+    ) -> Result<String, JsValue> {
+        use crate::filter::{parse, FilterStrategy, FilteredSearcher};
+
+        // Start total timing
+        let total_start = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now());
+
+        let (index, storage) = self.inner.as_hnsw()?;
+
+        // Validate query dimensions
+        let len = query.length();
+        if len != index.config.dimensions {
+            return Err(EdgeVecError::Graph(GraphError::DimensionMismatch {
+                expected: index.config.dimensions as usize,
+                actual: len as usize,
+            })
+            .into());
+        }
+
+        let query_vec = query.to_vec();
+        if query_vec.iter().any(|v| !v.is_finite()) {
+            return Err(EdgeVecError::Validation(
+                "Query vector contains non-finite values".to_string(),
+            )
+            .into());
+        }
+
+        // Parse boosts
+        let boost_configs: Vec<BoostConfig> = serde_json::from_str(boosts_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid boosts JSON: {e}")))?;
+
+        let boosts: Vec<crate::filter::boost::MetadataBoost> = boost_configs
+            .iter()
+            .map(boost_config_to_metadata_boost)
+            .collect::<Result<Vec<_>, String>>()
+            .map_err(|e| JsValue::from_str(&format!("Invalid boost config: {e}")))?;
+
+        // Parse options
+        let options: SearchFilteredOptions = serde_json::from_str(options_json)
+            .map_err(|e| JsValue::from_str(&format!("Invalid options JSON: {e}")))?;
+
+        // Parse filter if provided (and time it)
+        let filter_start = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now());
+
+        let filter = match &options.filter {
+            Some(filter_str) => {
+                Some(parse(filter_str).map_err(|e| filter::filter_error_to_jsvalue(&e))?)
+            }
+            None => None,
+        };
+
+        // Convert strategy
+        let strategy = match options.strategy.as_deref() {
+            Some("pre") => FilterStrategy::PreFilter,
+            Some("post") => FilterStrategy::PostFilter {
+                oversample: options.oversample_factor.unwrap_or(3.0),
+            },
+            Some("hybrid") => FilterStrategy::Hybrid {
+                oversample_min: 1.5,
+                oversample_max: options.oversample_factor.unwrap_or(10.0),
+            },
+            _ => FilterStrategy::Auto,
+        };
+
+        // Create metadata store adapter
+        let metadata_adapter = EdgeVecMetadataAdapter::new(&self.metadata, index.len());
+
+        // Execute boosted search
+        let mut searcher = FilteredSearcher::new(index, storage, &metadata_adapter);
+        let result = searcher
+            .search_boosted(&query_vec, k, &boosts, filter.as_ref(), strategy)
+            .map_err(|e| JsValue::from_str(&format!("Boosted search failed: {e}")))?;
+
+        // Calculate filter time (includes parsing + evaluation + boosting)
+        let filter_time_ms = match (
+            filter_start,
+            web_sys::window().and_then(|w| w.performance()),
+        ) {
+            (Some(start), Some(perf)) => perf.now() - start,
+            _ => 0.0,
+        };
+
+        // Check if metadata/vectors should be included
+        let include_metadata = options.include_metadata.unwrap_or(false);
+        let include_vectors = options.include_vectors.unwrap_or(false);
+
+        // Build response
+        let response = SearchFilteredResult {
+            results: result
+                .results
+                .iter()
+                .map(|r| {
+                    let id = r.vector_id.0 as u32;
+                    SearchFilteredItem {
+                        id,
+                        score: r.distance,
+                        metadata: if include_metadata {
+                            self.metadata
+                                .get_all(id)
+                                .and_then(|m| serde_json::to_value(m).ok())
+                        } else {
+                            None
+                        },
+                        vector: if include_vectors {
+                            Some(storage.get_vector(r.vector_id).to_vec())
+                        } else {
+                            None
+                        },
+                    }
+                })
+                .collect(),
+            complete: result.complete,
+            observed_selectivity: result.observed_selectivity,
+            strategy_used: strategy_to_string(&result.strategy_used),
+            vectors_evaluated: result.vectors_evaluated,
+            filter_time_ms,
+            total_time_ms: match (total_start, web_sys::window().and_then(|w| w.performance())) {
+                (Some(start), Some(perf)) => perf.now() - start,
+                _ => 0.0,
+            },
+        };
+
+        serde_json::to_string(&response)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {e}")))
+    }
+
+    // =========================================================================
     // MEMORY PRESSURE API (v0.6.0 — Week 28 RFC-002)
     // =========================================================================
 
@@ -4032,6 +4212,56 @@ struct SearchFilteredItem {
     /// Vector data (if requested).
     #[serde(skip_serializing_if = "Option::is_none")]
     vector: Option<Vec<f32>>,
+}
+
+/// Boost configuration for WASM (uses bare JSON values, NOT adjacently-tagged MetadataValue).
+///
+/// JSON format: `[{"field": "entity_type", "value": "ORG", "weight": 0.3}]`
+#[derive(Deserialize)]
+struct BoostConfig {
+    field: String,
+    value: serde_json::Value,
+    weight: f32,
+}
+
+/// Convert a bare JSON value to a `MetadataValue`.
+///
+/// Supports: String, Boolean, Number (integer/float), Array of strings.
+fn json_to_metadata_value(value: &serde_json::Value) -> Result<MetadataValue, String> {
+    match value {
+        serde_json::Value::String(s) => Ok(MetadataValue::String(s.clone())),
+        serde_json::Value::Bool(b) => Ok(MetadataValue::Boolean(*b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(MetadataValue::Integer(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(MetadataValue::Float(f))
+            } else {
+                Err(format!("Unsupported number: {n}"))
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            let strings: Result<Vec<String>, String> = arr
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .map(String::from)
+                        .ok_or_else(|| format!("Array elements must be strings, got: {v}"))
+                })
+                .collect();
+            Ok(MetadataValue::StringArray(strings?))
+        }
+        _ => Err(format!("Unsupported value type: {value}")),
+    }
+}
+
+/// Convert a `BoostConfig` (bare JSON) to a `MetadataBoost`.
+fn boost_config_to_metadata_boost(
+    config: &BoostConfig,
+) -> Result<crate::filter::boost::MetadataBoost, String> {
+    let value = json_to_metadata_value(&config.value)?;
+    crate::filter::boost::MetadataBoost::new(config.field.clone(), value, config.weight)
+        .map_err(|e| e.to_string())
 }
 
 /// Convert FilterStrategy to string for JSON response.
