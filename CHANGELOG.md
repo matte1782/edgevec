@@ -36,6 +36,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Filter usage guide** (`pkg/langchain/docs/FILTER_GUIDE.md`) — 4 real-world examples: e-commerce, RAG, multi-tenant, time-bounded
 - **edgevec-langchain CHANGELOG** (`pkg/langchain/CHANGELOG.md`) — v0.2.0 + v0.1.0 entries
 - Filter API quick reference table (25 rows) in `pkg/langchain/README.md`
+- **MetadataBoost API** — entity-enhanced search with multiplicative distance boosting (W48 Day 1)
+  - `MetadataBoost` struct — metadata field matching with configurable weights
+  - `compute_boost_factor()` — additive stacking with [-1.0, 0.99] clamping
+  - `apply_boost()` — scale-independent formula: `final_distance = raw_distance * (1.0 - boost_factor)`
+  - `BoostError` — NaN/Inf weight validation
+  - `search_boosted()` on `FilteredSearcher` — combines hard filtering + soft boosting
+  - Cross-type numeric matching (Integer/Float) for JSON compatibility
+  - StringArray contains() matching for multi-entity fields
+- **WASM `searchBoosted` export** — browser-side entity-enhanced search (W48 Day 2)
+- **In-browser entity-RAG demo** (`docs/demo/entity-rag/`) — 1000 SQuAD paragraphs, 384D embeddings, spaCy NER, boost ON/OFF toggle (W48 Day 4)
+- **Blog post:** "Entity-Enhanced RAG in 300KB" (`docs/blog/entity-enhanced-rag.md`) (W48 Day 5)
+- 16 MetadataBoost unit tests + 6 integration tests (W48 Days 1-2)
 
 ### Changed
 - **PQ seeding:** Switched from shared sequential RNG (`seed=42`) to per-subspace deterministic seeding (`seed=42+m`). Enables parallel training via rayon. **Breaking:** codebooks trained before this change will differ (PQ is unreleased, no external consumers affected).
