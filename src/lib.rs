@@ -235,7 +235,7 @@ pub use metric::Metric;
 
 // Re-export IndexType (defined in this crate root)
 // No `use` statement needed since it's already defined above
-pub use filter::{apply_boost, compute_boost_factor, BoostError, MetadataBoost};
+pub use filter::{BoostError, MetadataBoost};
 pub use persistence::ChunkedWriter;
 pub use quantization::{BinaryQuantizer, QuantizedVector, QuantizerConfig, ScalarQuantizer};
 pub use quantization::{DistanceTable, PqCode, PqCodebook, PqError, PqSearchResult};

@@ -112,6 +112,14 @@ impl MetadataBoost {
             (MetadataValue::Float(target), MetadataValue::Float(actual)) => {
                 (target - actual).abs() < f64::EPSILON
             }
+            // Cross-type numeric matching: JSON has no int/float distinction,
+            // so Integer(42) should match Float(42.0) and vice versa.
+            (MetadataValue::Integer(target), MetadataValue::Float(actual)) => {
+                (*target as f64 - actual).abs() < f64::EPSILON
+            }
+            (MetadataValue::Float(target), MetadataValue::Integer(actual)) => {
+                (target - *actual as f64).abs() < f64::EPSILON
+            }
             // StringArray: check if array contains the target string
             (MetadataValue::String(target), MetadataValue::StringArray(arr)) => {
                 arr.iter().any(|s| s == target)
@@ -339,6 +347,25 @@ mod tests {
         .unwrap();
         let meta = make_metadata(vec![("other_field", MetadataValue::String("value".into()))]);
         assert!((boost.compute_boost(&meta)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_boost_cross_type_numeric_match() {
+        // Integer boost target should match Float metadata and vice versa
+        // (JSON has no int/float distinction — C1 fix)
+        let boost_int =
+            MetadataBoost::new("score".into(), MetadataValue::Integer(42), 0.3).unwrap();
+        let meta_float = make_metadata(vec![("score", MetadataValue::Float(42.0))]);
+        assert!((boost_int.compute_boost(&meta_float) - 0.3).abs() < f32::EPSILON);
+
+        let boost_float =
+            MetadataBoost::new("score".into(), MetadataValue::Float(42.0), 0.3).unwrap();
+        let meta_int = make_metadata(vec![("score", MetadataValue::Integer(42))]);
+        assert!((boost_float.compute_boost(&meta_int) - 0.3).abs() < f32::EPSILON);
+
+        // Non-equal cross-type should NOT match
+        let meta_diff = make_metadata(vec![("score", MetadataValue::Float(42.5))]);
+        assert!((boost_int.compute_boost(&meta_diff)).abs() < f32::EPSILON);
     }
 
     #[test]

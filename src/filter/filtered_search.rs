@@ -849,6 +849,15 @@ impl<'idx, 'sto, 'meta, M: MetadataStore> FilteredSearcher<'idx, 'sto, 'meta, M>
     ///   **Note:** Distances in the returned results are boosted (not raw).
     ///   A positive boost reduces distance; a negative boost increases it.
     /// * `Err(FilteredSearchError)` - On invalid filter or search failure
+    ///
+    /// # Oversampling Behavior
+    ///
+    /// This method fetches `(k * 3).clamp(50, 500)` candidates from
+    /// `search_filtered`, which may apply its own strategy oversampling
+    /// (e.g., PostFilter multiplies by its oversample factor). The total
+    /// candidates evaluated can be up to ~9x the requested k for small k
+    /// with PostFilter. This compound oversampling ensures the reranking
+    /// pool is large enough for accurate boosted results.
     pub fn search_boosted(
         &mut self,
         query: &[f32],
@@ -1289,7 +1298,6 @@ mod tests {
                 }
             }
         }
-        // If we get here, no gpu vector was found in both sets — test is inconclusive
-        // but not a failure (small index edge case)
+        panic!("No gpu vector found in both boosted and unboosted result sets — test cannot verify distance correctness");
     }
 }
