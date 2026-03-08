@@ -49,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blog post:** "Entity-Enhanced RAG in 300KB" (`docs/blog/entity-enhanced-rag.md`) (W48 Day 5)
 - 16 MetadataBoost unit tests + 6 integration tests (W48 Days 1-2)
 
+### Fixed
+- **HNSW cosine/dot product ordering bug** — `DotProduct::distance()` now returns `1.0 - dot_product` (cosine distance) instead of raw dot product. HNSW's "lower distance = closer" invariant was violated, causing searches to return *least* similar vectors first for cosine and dot product metrics. FlatIndex is NOT affected (separate code path with `is_similarity()` sort reversal). **User-visible change:** WASM `search()` and `searchBoosted()` `score` field now returns distance (lower = better) instead of raw similarity for cosine/dot metrics. Range: [0, 2] for normalized vectors.
+- **Entity-RAG demo queries** — replaced 10 sample queries with topic-aligned queries matching the SQuAD dataset (Beyoncé, Chopin, Solar Energy, NYC, Buddhism, etc.). Previous queries ("capital of France", "moon landing") had no matching content, producing near-random results.
+
 ### Changed
 - **PQ seeding:** Switched from shared sequential RNG (`seed=42`) to per-subspace deterministic seeding (`seed=42+m`). Enables parallel training via rayon. **Breaking:** codebooks trained before this change will differ (PQ is unreleased, no external consumers affected).
 - **ROADMAP.md** updated to v7.3: W47 PQ Phase 4 complete (CONDITIONAL GO)

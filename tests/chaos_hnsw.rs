@@ -402,3 +402,170 @@ fn chaos_sequential_ids() {
         prev_id = id;
     }
 }
+
+/// Helper: normalize a vector to unit length.
+fn normalize(v: &mut [f32]) {
+    let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        v.iter_mut().for_each(|x| *x /= norm);
+    }
+}
+
+/// Test 16: HNSW cosine search returns most similar vectors first.
+///
+/// Inserts 6 normalized vectors with known cosine similarities to a query.
+/// Verifies results are sorted by ascending distance (most similar first).
+/// Compares against brute-force ground truth.
+#[test]
+fn test_hnsw_cosine_ordering_6_vectors() {
+    let dim = 16_usize;
+    let mut config = HnswConfig::new(dim as u32);
+    config.metric = HnswConfig::METRIC_COSINE;
+    config.ef_construction = 64;
+    config.ef_search = 64;
+
+    let mut storage = VectorStorage::new(&config, None);
+    let mut index = HnswIndex::new(config, &storage).unwrap();
+
+    // Query vector: unit vector along first axis
+    let mut query = vec![0.0_f32; dim];
+    query[0] = 1.0;
+
+    // Build 6 vectors with decreasing similarity to query:
+    // v0: nearly identical (high cosine sim ~ 0.97)
+    // v1: similar (cosine sim ~ 0.85)
+    // v2: moderately similar (cosine sim ~ 0.60)
+    // v3: weakly similar (cosine sim ~ 0.35)
+    // v4: nearly orthogonal (cosine sim ~ 0.10)
+    // v5: opposite direction (cosine sim ~ -0.70)
+    let similarities = [0.97, 0.85, 0.60, 0.35, 0.10, -0.70];
+    let mut ids = Vec::new();
+
+    for &target_sim in &similarities {
+        let mut v = vec![0.0_f32; dim];
+        // Set first component to target_sim, spread the rest
+        v[0] = target_sim;
+        let remainder = (1.0 - target_sim * target_sim).max(0.0).sqrt();
+        v[1] = remainder;
+        normalize(&mut v);
+        let id = index.insert(&v, &mut storage).unwrap();
+        ids.push(id);
+    }
+
+    // Search for top 6
+    let results = index.search(&query, 6, &storage).unwrap();
+    assert_eq!(results.len(), 6, "Should return all 6 vectors");
+
+    // Results must be sorted by ascending distance (most similar first)
+    for i in 1..results.len() {
+        assert!(
+            results[i - 1].distance <= results[i].distance,
+            "Results not sorted: distance[{}]={} > distance[{}]={}",
+            i - 1,
+            results[i - 1].distance,
+            i,
+            results[i].distance
+        );
+    }
+
+    // Most similar vector (sim ~ 0.97) should be first result
+    assert_eq!(
+        results[0].vector_id, ids[0],
+        "Most similar vector (sim~0.97) should be rank 1, got {:?}",
+        results[0].vector_id
+    );
+
+    // Least similar (sim ~ -0.70) should be last
+    assert_eq!(
+        results[5].vector_id, ids[5],
+        "Least similar vector (sim~-0.70) should be rank 6, got {:?}",
+        results[5].vector_id
+    );
+
+    // Distances should be positive for normalized vectors (cosine distance = 1 - sim)
+    for r in &results {
+        assert!(
+            r.distance >= -0.01, // small epsilon for floating point
+            "Distance should be non-negative for normalized vectors, got {}",
+            r.distance
+        );
+    }
+
+    // Brute-force ground truth: compute 1.0 - dot(query, v_i) for each
+    for (i, &target_sim) in similarities.iter().enumerate() {
+        let expected_dist = 1.0 - target_sim;
+        let actual_dist = results
+            .iter()
+            .find(|r| r.vector_id == ids[i])
+            .expect("Vector not found in results")
+            .distance;
+        assert!(
+            (actual_dist - expected_dist).abs() < 0.05,
+            "Vector {} distance mismatch: expected ~{:.3}, got {:.3}",
+            i,
+            expected_dist,
+            actual_dist
+        );
+    }
+}
+
+/// Test 17: HNSW dot product search returns highest-score vectors first.
+///
+/// Same structure as cosine test but with METRIC_DOT_PRODUCT.
+/// Since DotProduct::distance now returns 1.0 - dot(a,b),
+/// the ordering semantics are identical to cosine for normalized vectors.
+#[test]
+fn test_hnsw_dot_product_ordering_6_vectors() {
+    let dim = 16_usize;
+    let mut config = HnswConfig::new(dim as u32);
+    config.metric = HnswConfig::METRIC_DOT_PRODUCT;
+    config.ef_construction = 64;
+    config.ef_search = 64;
+
+    let mut storage = VectorStorage::new(&config, None);
+    let mut index = HnswIndex::new(config, &storage).unwrap();
+
+    // Query: unit vector along axis 0
+    let mut query = vec![0.0_f32; dim];
+    query[0] = 1.0;
+
+    // 5 vectors with known dot products to query (all normalized)
+    let target_dots = [0.95, 0.70, 0.40, 0.10, -0.50];
+    let mut ids = Vec::new();
+
+    for &dot_val in &target_dots {
+        let mut v = vec![0.0_f32; dim];
+        v[0] = dot_val;
+        v[1] = (1.0 - dot_val * dot_val).max(0.0).sqrt();
+        normalize(&mut v);
+        let id = index.insert(&v, &mut storage).unwrap();
+        ids.push(id);
+    }
+
+    let results = index.search(&query, 5, &storage).unwrap();
+    assert_eq!(results.len(), 5);
+
+    // Ascending distance order (most similar first)
+    for i in 1..results.len() {
+        assert!(
+            results[i - 1].distance <= results[i].distance,
+            "Dot product results not sorted: dist[{}]={} > dist[{}]={}",
+            i - 1,
+            results[i - 1].distance,
+            i,
+            results[i].distance
+        );
+    }
+
+    // Highest dot product (0.95) should be first (lowest distance)
+    assert_eq!(
+        results[0].vector_id, ids[0],
+        "Highest dot product vector should be rank 1"
+    );
+
+    // Lowest dot product (-0.50) should be last (highest distance)
+    assert_eq!(
+        results[4].vector_id, ids[4],
+        "Lowest dot product vector should be rank 5"
+    );
+}

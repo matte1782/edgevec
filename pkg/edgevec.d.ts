@@ -558,6 +558,47 @@ export class EdgeVec {
    */
   insertWithBq(vector: Float32Array): number;
   /**
+   * Search with metadata-based distance boosting.
+   *
+   * Performs a filtered search with oversampling, then reranks results using
+   * multiplicative boosting: `final_distance = raw_distance * (1.0 - boost_factor)`.
+   *
+   * This is **scale-independent**: a weight of 0.3 reduces distance by 30%
+   * regardless of whether L2 distances are 0.001 or 50000.
+   *
+   * # Arguments
+   *
+   * * `query` - Query vector as `Float32Array`
+   * * `k` - Number of results to return
+   * * `boosts_json` - JSON array of boost configurations:
+   *   `[{"field": "entity_type", "value": "ORG", "weight": 0.3}]`
+   * * `options_json` - JSON options (same as `searchFiltered`):
+   *   `{"filter": "category = \"gpu\"", "strategy": "auto"}`
+   *
+   * # Errors
+   *
+   * Returns an error if:
+   * - Query dimensions don't match index
+   * - Query contains non-finite values
+   * - Boosts JSON is malformed or contains invalid weights
+   * - Filter expression is invalid
+   * - Options JSON is malformed
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const query = new Float32Array([0.1, 0.2, ...]);
+   * const boosts = JSON.stringify([
+   *     { field: "entity_type", value: "ORG", weight: 0.3 },
+   *     { field: "is_verified", value: true, weight: 0.2 },
+   * ]);
+   * const options = JSON.stringify({ strategy: "auto", includeMetadata: true });
+   * const result = JSON.parse(index.searchBoosted(query, 10, boosts, options));
+   * console.log(`Found ${result.results.length} boosted results`);
+   * ```
+   */
+  searchBoosted(query: Float32Array, k: number, boosts_json: string, options_json: string): string;
+  /**
    * Deletes a metadata key for a vector.
    *
    * This operation is idempotent - deleting a non-existent key is not an error.
@@ -2159,3 +2200,169 @@ export function try_parse_filter_js(filter_str: string): any;
  * ```
  */
 export function validate_filter_js(filter_str: string): string;
+
+export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
+
+export interface InitOutput {
+  readonly memory: WebAssembly.Memory;
+  readonly __wbg_batchinsertconfig_free: (a: number, b: number) => void;
+  readonly __wbg_batchinsertresult_free: (a: number, b: number) => void;
+  readonly __wbg_edgevec_free: (a: number, b: number) => void;
+  readonly __wbg_edgevecconfig_free: (a: number, b: number) => void;
+  readonly __wbg_get_edgevecconfig_dimensions: (a: number) => number;
+  readonly __wbg_get_wasmcompactionresult_duration_ms: (a: number) => number;
+  readonly __wbg_get_wasmcompactionresult_new_size: (a: number) => number;
+  readonly __wbg_get_wasmcompactionresult_tombstones_removed: (a: number) => number;
+  readonly __wbg_jsmetadatavalue_free: (a: number, b: number) => void;
+  readonly __wbg_persistenceiterator_free: (a: number, b: number) => void;
+  readonly __wbg_pqcodebookhandle_free: (a: number, b: number) => void;
+  readonly __wbg_set_edgevecconfig_dimensions: (a: number, b: number) => void;
+  readonly __wbg_wasmbatchdeleteresult_free: (a: number, b: number) => void;
+  readonly __wbg_wasmcompactionresult_free: (a: number, b: number) => void;
+  readonly batchinsertconfig_new: () => number;
+  readonly batchinsertconfig_set_validateDimensions: (a: number, b: number) => void;
+  readonly batchinsertconfig_validateDimensions: (a: number) => number;
+  readonly batchinsertresult_ids: (a: number, b: number) => void;
+  readonly batchinsertresult_inserted: (a: number) => number;
+  readonly batchinsertresult_total: (a: number) => number;
+  readonly benchmarkHamming: (a: number, b: number) => number;
+  readonly benchmarkHammingBatch: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_canInsert: (a: number) => number;
+  readonly edgevec_compact: (a: number, b: number) => void;
+  readonly edgevec_compactionThreshold: (a: number, b: number) => void;
+  readonly edgevec_compactionWarning: (a: number, b: number) => void;
+  readonly edgevec_deleteAllMetadata: (a: number, b: number) => number;
+  readonly edgevec_deleteMetadata: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_deletedCount: (a: number, b: number) => void;
+  readonly edgevec_enableBQ: (a: number, b: number) => void;
+  readonly edgevec_getAllMetadata: (a: number, b: number) => number;
+  readonly edgevec_getMemoryConfig: (a: number, b: number) => void;
+  readonly edgevec_getMemoryPressure: (a: number, b: number) => void;
+  readonly edgevec_getMemoryRecommendation: (a: number, b: number) => void;
+  readonly edgevec_getMetadata: (a: number, b: number, c: number, d: number) => number;
+  readonly edgevec_hasBQ: (a: number) => number;
+  readonly edgevec_hasMetadata: (a: number, b: number, c: number, d: number) => number;
+  readonly edgevec_hasSparseStorage: (a: number) => number;
+  readonly edgevec_hybridSearch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+  readonly edgevec_initSparseStorage: (a: number) => void;
+  readonly edgevec_insert: (a: number, b: number, c: number) => void;
+  readonly edgevec_insertBatch: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_insertBatchFlat: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_insertBatchWithProgress: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_insertBinary: (a: number, b: number, c: number) => void;
+  readonly edgevec_insertSparse: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_insertWithBq: (a: number, b: number, c: number) => void;
+  readonly edgevec_insertWithMetadata: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_isDeleted: (a: number, b: number, c: number) => void;
+  readonly edgevec_liveCount: (a: number, b: number) => void;
+  readonly edgevec_load: (a: number, b: number) => number;
+  readonly edgevec_memoryUsage: (a: number) => number;
+  readonly edgevec_metadataKeyCount: (a: number, b: number) => number;
+  readonly edgevec_metadataVectorCount: (a: number) => number;
+  readonly edgevec_needsCompaction: (a: number, b: number) => void;
+  readonly edgevec_new: (a: number, b: number) => void;
+  readonly edgevec_save: (a: number, b: number, c: number) => number;
+  readonly edgevec_save_stream: (a: number, b: number, c: number) => void;
+  readonly edgevec_search: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchBQ: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchBQRescored: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_searchBinary: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchBinaryFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly edgevec_searchBinaryWithEf: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_searchBoosted: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+  readonly edgevec_searchFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly edgevec_searchHybrid: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchSparse: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly edgevec_searchWithFilter: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly edgevec_serializedSize: (a: number) => number;
+  readonly edgevec_setCompactionThreshold: (a: number, b: number, c: number) => void;
+  readonly edgevec_setMemoryConfig: (a: number, b: number, c: number) => void;
+  readonly edgevec_setMetadata: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly edgevec_softDelete: (a: number, b: number, c: number) => void;
+  readonly edgevec_softDeleteBatch: (a: number, b: number, c: number) => void;
+  readonly edgevec_softDeleteBatchCompat: (a: number, b: number, c: number) => void;
+  readonly edgevec_sparseCount: (a: number) => number;
+  readonly edgevec_tombstoneRatio: (a: number, b: number) => void;
+  readonly edgevec_totalMetadataCount: (a: number) => number;
+  readonly edgevecconfig_indexType: (a: number) => number;
+  readonly edgevecconfig_isFlat: (a: number) => number;
+  readonly edgevecconfig_isHnsw: (a: number) => number;
+  readonly edgevecconfig_new: (a: number) => number;
+  readonly edgevecconfig_setMetricType: (a: number, b: number) => void;
+  readonly edgevecconfig_set_ef_construction: (a: number, b: number) => void;
+  readonly edgevecconfig_set_ef_search: (a: number, b: number) => void;
+  readonly edgevecconfig_set_indexType: (a: number, b: number) => void;
+  readonly edgevecconfig_set_m: (a: number, b: number) => void;
+  readonly edgevecconfig_set_m0: (a: number, b: number) => void;
+  readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
+  readonly edgevecconfig_set_vector_type: (a: number, b: number) => void;
+  readonly edgevecconfig_vector_type: (a: number) => number;
+  readonly getSimdBackend: (a: number) => void;
+  readonly get_filter_info_js: (a: number, b: number, c: number) => void;
+  readonly init_logging: () => void;
+  readonly jsmetadatavalue_asBoolean: (a: number) => number;
+  readonly jsmetadatavalue_asFloat: (a: number, b: number) => void;
+  readonly jsmetadatavalue_asInteger: (a: number, b: number) => void;
+  readonly jsmetadatavalue_asString: (a: number, b: number) => void;
+  readonly jsmetadatavalue_asStringArray: (a: number) => number;
+  readonly jsmetadatavalue_fromBoolean: (a: number) => number;
+  readonly jsmetadatavalue_fromFloat: (a: number) => number;
+  readonly jsmetadatavalue_fromInteger: (a: number, b: number) => void;
+  readonly jsmetadatavalue_fromString: (a: number, b: number) => number;
+  readonly jsmetadatavalue_fromStringArray: (a: number, b: number) => void;
+  readonly jsmetadatavalue_getType: (a: number, b: number) => void;
+  readonly jsmetadatavalue_isBoolean: (a: number) => number;
+  readonly jsmetadatavalue_isFloat: (a: number) => number;
+  readonly jsmetadatavalue_isInteger: (a: number) => number;
+  readonly jsmetadatavalue_isString: (a: number) => number;
+  readonly jsmetadatavalue_isStringArray: (a: number) => number;
+  readonly jsmetadatavalue_toJS: (a: number) => number;
+  readonly parse_filter_js: (a: number, b: number, c: number) => void;
+  readonly persistenceiterator_next_chunk: (a: number) => number;
+  readonly pqcodebookhandle_dimensions: (a: number) => number;
+  readonly pqcodebookhandle_encodePq: (a: number, b: number, c: number, d: number) => void;
+  readonly pqcodebookhandle_ksub: (a: number) => number;
+  readonly pqcodebookhandle_numSubquantizers: (a: number) => number;
+  readonly pqcodebookhandle_pqSearch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+  readonly trainPq: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+  readonly try_parse_filter_js: (a: number, b: number) => number;
+  readonly validate_filter_js: (a: number, b: number, c: number) => void;
+  readonly wasmbatchdeleteresult_allValid: (a: number) => number;
+  readonly wasmbatchdeleteresult_alreadyDeleted: (a: number) => number;
+  readonly wasmbatchdeleteresult_anyDeleted: (a: number) => number;
+  readonly wasmbatchdeleteresult_deleted: (a: number) => number;
+  readonly wasmbatchdeleteresult_invalidIds: (a: number) => number;
+  readonly wasmbatchdeleteresult_total: (a: number) => number;
+  readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
+  readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
+  readonly __wasm_bindgen_func_elem_2147: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_2131: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_2698: (a: number, b: number, c: number, d: number) => void;
+  readonly __wbindgen_export: (a: number, b: number) => number;
+  readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_export3: (a: number) => void;
+  readonly __wbindgen_export4: (a: number, b: number, c: number) => void;
+  readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
+}
+
+export type SyncInitInput = BufferSource | WebAssembly.Module;
+
+/**
+* Instantiates the given `module`, which can either be bytes or
+* a precompiled `WebAssembly.Module`.
+*
+* @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
+*
+* @returns {InitOutput}
+*/
+export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
+
+/**
+* If `module_or_path` is {RequestInfo} or {URL}, makes a request and
+* for everything else, calls `WebAssembly.instantiate` directly.
+*
+* @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
+*
+* @returns {Promise<InitOutput>}
+*/
+export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;

@@ -92,7 +92,8 @@ Try EdgeVec directly in your browser:
 
 | Demo | Description |
 |:-----|:------------|
-| [**Filter Playground v0.7.0**](https://matte1782.github.io/edgevec/demo/) | Visual filter builder with live sandbox (NEW!) |
+| [**Entity-RAG Demo**](https://matte1782.github.io/edgevec/demo/entity-rag/) | Entity-enhanced search on 1000 SQuAD paragraphs, boost ON/OFF toggle (NEW!) |
+| [**Filter Playground v0.7.0**](https://matte1782.github.io/edgevec/demo/) | Visual filter builder with live sandbox |
 | [**v0.6.0 Cyberpunk Demo**](https://matte1782.github.io/edgevec/demo/cyberpunk.html) | BQ vs F32 comparison, metadata filtering, memory pressure |
 | [**Demo Hub**](https://matte1782.github.io/edgevec/demo/hub.html) | All demos in one place |
 
@@ -111,6 +112,28 @@ cd edgevec
 python -m http.server 8080
 # Open http://localhost:8080/wasm/examples/index.html
 ```
+
+---
+
+## Entity-Enhanced RAG
+
+EdgeVec supports **metadata boosting** for entity-enhanced retrieval — improve search relevance by incorporating entity signals (ORG, PERSON, GPE) extracted via NER, without building a knowledge graph.
+
+```rust
+use edgevec::filter::{MetadataBoost, FilteredSearcher, FilterStrategy};
+use edgevec::metadata::MetadataValue;
+
+let boosts = vec![
+    MetadataBoost::new("entity_type".to_string(), MetadataValue::String("ORG".to_string()), 0.3)?,
+];
+let results = searcher.search_boosted(&query, 10, &boosts, None, FilterStrategy::Auto)?;
+```
+
+Boosts are *soft* signals that rerank results by reducing distance for matches. Combine with `FilterExpression` for hard constraints + soft boosting in a single query.
+
+**[Try the in-browser demo](https://matte1782.github.io/edgevec/demo/entity-rag/)** — 1,000 SQuAD paragraphs, entity boost ON/OFF toggle, zero API calls.
+
+Read more: [Entity-Enhanced RAG in 300KB](docs/blog/entity-enhanced-rag.md)
 
 ---
 

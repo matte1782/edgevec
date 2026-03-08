@@ -1,11 +1,22 @@
 //! Dot Product distance metric.
+//!
+//! Returns `1.0 - dot_product(a, b)` so that HNSW's "lower distance = closer"
+//! invariant works correctly for similarity metrics. For normalized vectors,
+//! this equals cosine distance with range [0, 2].
 
 use super::Metric;
 
-/// Dot Product metric.
+/// Dot Product metric (converted to distance).
 ///
-/// Calculates `sum(a_i * b_i)`.
-/// Used for Cosine Similarity when vectors are normalized.
+/// Returns `1.0 - sum(a_i * b_i)`, converting similarity to distance.
+/// For normalized vectors this equals cosine distance:
+/// - Identical vectors: distance = 0.0
+/// - Orthogonal vectors: distance = 1.0
+/// - Opposite vectors: distance = 2.0
+///
+/// # Note
+/// Assumes normalized vectors for cosine distance interpretation.
+/// For non-normalized vectors, the distance may fall outside [0, 2].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DotProduct;
 
@@ -30,11 +41,11 @@ impl Metric<f32> for DotProduct {
                          assert!(!(x.is_nan() || y.is_nan()), "NaN detected in input");
                          sum += x * y;
                      }
-                     return sum;
+                     return 1.0 - sum;
                 }
                 let result = super::simd::wasm::dot_product(a, b);
                 assert!(!result.is_nan(), "NaN detected in input");
-                result
+                1.0 - result
             } else if #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))] {
                  if a.len() < 256 {
                      let mut sum = 0.0;
@@ -42,18 +53,18 @@ impl Metric<f32> for DotProduct {
                          assert!(!(x.is_nan() || y.is_nan()), "NaN detected in input");
                          sum += x * y;
                      }
-                     return sum;
+                     return 1.0 - sum;
                 }
                 let result = super::simd::x86::dot_product(a, b);
                 assert!(!result.is_nan(), "NaN detected in input");
-                result
+                1.0 - result
             } else {
                 let mut sum = 0.0;
                 for (x, y) in a.iter().zip(b.iter()) {
                     assert!(!(x.is_nan() || y.is_nan()), "NaN detected in input");
                     sum += x * y;
                 }
-                sum
+                1.0 - sum
             }
         }
     }

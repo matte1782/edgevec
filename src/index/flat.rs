@@ -107,6 +107,12 @@ pub enum DistanceMetric {
     /// Dot product: sum(a[i] * b[i]).
     /// Result is unbounded. Higher = more similar.
     /// Search returns highest dot product first.
+    ///
+    /// **Note:** FlatIndex uses raw dot product internally with `is_similarity()`
+    /// sort reversal (higher = better). HNSW uses `DotProduct::distance()` from
+    /// `src/metric/dot.rs` which returns `1.0 - dot_product` (a distance where
+    /// lower = closer). These are separate code paths that achieve the same
+    /// correct ordering through different mechanisms.
     DotProduct,
 
     /// L2 (Euclidean) distance: sqrt(sum((a[i] - b[i])^2)).

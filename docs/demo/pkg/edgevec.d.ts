@@ -203,6 +203,26 @@ export class EdgeVec {
    */
   hasMetadata(vector_id: number, key: string): boolean;
   /**
+   * Get approximate memory usage in bytes.
+   *
+   * Returns the total memory used by the index, including:
+   * - Vector storage (binary vectors)
+   * - HNSW graph structure (nodes and neighbor lists)
+   * - Internal metadata
+   *
+   * # Returns
+   *
+   * Total bytes used by the index.
+   *
+   * # Example
+   *
+   * ```javascript
+   * const bytes = index.memoryUsage();
+   * console.log(`Index using ${(bytes / 1024 / 1024).toFixed(2)} MB`);
+   * ```
+   */
+  memoryUsage(): number;
+  /**
    * Sets metadata for a vector (upsert operation).
    *
    * If the key already exists, its value is overwritten. If the key is new,
@@ -234,6 +254,20 @@ export class EdgeVec {
    */
   setMetadata(vector_id: number, key: string, value: JsMetadataValue): void;
   /**
+   * Get the number of sparse vectors stored.
+   *
+   * # Returns
+   *
+   * Number of sparse vectors, or 0 if sparse storage is not initialized.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * console.log(`Sparse vectors: ${db.sparseCount()}`);
+   * ```
+   */
+  sparseCount(): number;
+  /**
    * Get the count of deleted (tombstoned) vectors.
    *
    * # Returns
@@ -241,6 +275,174 @@ export class EdgeVec {
    * The number of vectors that have been soft-deleted but not yet compacted.
    */
   deletedCount(): number;
+  /**
+   * Perform hybrid search combining dense and sparse retrieval.
+   *
+   * # Arguments
+   *
+   * * `dense_query` - Float32Array dense embedding vector
+   * * `sparse_indices` - Uint32Array sparse query indices (sorted)
+   * * `sparse_values` - Float32Array sparse query values
+   * * `sparse_dim` - Dimension of sparse space (vocabulary size)
+   * * `options_json` - JSON configuration string
+   *
+   * # Options JSON Schema
+   *
+   * ```json
+   * {
+   *   "dense_k": 20,      // Results from dense search (default: 20)
+   *   "sparse_k": 20,     // Results from sparse search (default: 20)
+   *   "k": 10,            // Final results to return (required)
+   *   "fusion": "rrf"     // or { "type": "linear", "alpha": 0.7 }
+   * }
+   * ```
+   *
+   * # Returns
+   *
+   * JSON string:
+   * ```json
+   * [
+   *   {
+   *     "id": 42,
+   *     "score": 0.032,
+   *     "dense_rank": 1,
+   *     "dense_score": 0.95,
+   *     "sparse_rank": 3,
+   *     "sparse_score": 4.2
+   *   }
+   * ]
+   * ```
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Sparse storage not initialized
+   * - Dense query dimensions mismatch index
+   * - Sparse indices/values length mismatch
+   * - Invalid options JSON
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const denseQuery = new Float32Array([0.1, 0.2, ...]);
+   * const sparseIndices = new Uint32Array([0, 5, 10]);
+   * const sparseValues = new Float32Array([1.0, 2.0, 3.0]);
+   *
+   * const results = JSON.parse(db.hybridSearch(
+   *     denseQuery,
+   *     sparseIndices,
+   *     sparseValues,
+   *     10000,
+   *     JSON.stringify({ k: 10, fusion: 'rrf' })
+   * ));
+   * ```
+   */
+  hybridSearch(dense_query: Float32Array, sparse_indices: Uint32Array, sparse_values: Float32Array, sparse_dim: number, options_json: string): string;
+  /**
+   * Inserts a pre-packed binary vector into the index.
+   *
+   * This method is for binary vectors (1-bit quantized) using Hamming distance.
+   * Use this when you have pre-quantized data (e.g., from Turso's `f1bit_blob`).
+   *
+   * # Arguments
+   *
+   * * `vector` - A Uint8Array containing packed binary data. Length must equal
+   *   `ceil(dimensions / 8)` bytes.
+   *
+   * # Returns
+   *
+   * The assigned Vector ID (u32).
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Storage is not in Binary mode (metric != "hamming")
+   * - Byte length doesn't match expected bytes for dimensions
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const config = new EdgeVecConfig(1024); // 1024 bits = 128 bytes
+   * config.metric = 'hamming';
+   * const db = new EdgeVec(config);
+   *
+   * // Direct binary insertion (e.g., from Turso f1bit_blob)
+   * const binaryVector = new Uint8Array(128); // 1024 bits packed
+   * const id = db.insertBinary(binaryVector);
+   * ```
+   */
+  insertBinary(vector: Uint8Array): number;
+  /**
+   * Insert a sparse vector (e.g., BM25 scores).
+   *
+   * # Arguments
+   *
+   * * `indices` - Uint32Array of sparse indices (must be sorted ascending)
+   * * `values` - Float32Array of sparse values (same length as indices)
+   * * `dim` - Dimension of the sparse space (vocabulary size)
+   *
+   * # Returns
+   *
+   * The assigned sparse vector ID as a number (f64).
+   *
+   * **Note:** JavaScript numbers have integer precision up to 2^53.
+   * For most use cases (<9 quadrillion vectors), this is not a concern.
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Sparse storage not initialized (call `initSparseStorage()` first)
+   * - `indices` and `values` have different lengths
+   * - `indices` are not sorted ascending
+   * - `indices` contain duplicates
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * db.initSparseStorage();
+   * const indices = new Uint32Array([0, 5, 10]);
+   * const values = new Float32Array([1.0, 2.0, 3.0]);
+   * const id = db.insertSparse(indices, values, 10000);
+   * console.log(`Inserted sparse vector with ID: ${id}`);
+   * ```
+   */
+  insertSparse(indices: Uint32Array, values: Float32Array, dim: number): number;
+  /**
+   * Searches for nearest neighbors using a binary query vector.
+   *
+   * Uses Hamming distance to find the K most similar binary vectors.
+   *
+   * # Arguments
+   *
+   * * `query` - A Uint8Array containing the binary query vector.
+   * * `k` - The number of neighbors to return.
+   *
+   * # Returns
+   *
+   * An array of objects: `[{ id: u32, score: f32 }, ...]` where `score` is
+   * the Hamming distance (number of differing bits).
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Storage is not in Binary mode (metric != "hamming")
+   * - Query byte length doesn't match expected
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const config = new EdgeVecConfig(1024);
+   * config.metric = 'hamming';
+   * const db = new EdgeVec(config);
+   *
+   * // ... insert binary vectors ...
+   *
+   * const queryBinary = new Uint8Array(128);
+   * const results = db.searchBinary(queryBinary, 10);
+   * results.forEach(r => console.log(`ID: ${r.id}, Hamming Distance: ${r.score}`));
+   * ```
+   */
+  searchBinary(query: Uint8Array, k: number): any;
   /**
    * Hybrid search combining BQ speed with metadata filtering.
    *
@@ -285,6 +487,117 @@ export class EdgeVec {
    * ```
    */
   searchHybrid(query: Float32Array, options: any): any;
+  /**
+   * Search sparse vectors by query.
+   *
+   * # Arguments
+   *
+   * * `indices` - Uint32Array of sparse query indices (sorted ascending)
+   * * `values` - Float32Array of sparse query values (same length as indices)
+   * * `dim` - Dimension of the sparse space (vocabulary size)
+   * * `k` - Number of results to return
+   *
+   * # Returns
+   *
+   * JSON string: `[{ "id": number, "score": number }, ...]`
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Sparse storage not initialized
+   * - `indices` and `values` have different lengths
+   * - `indices` are not sorted ascending
+   * - `k` is 0
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const indices = new Uint32Array([0, 5, 10]);
+   * const values = new Float32Array([1.0, 2.0, 3.0]);
+   * const resultsJson = db.searchSparse(indices, values, 10000, 10);
+   * const results = JSON.parse(resultsJson);
+   * for (const r of results) {
+   *     console.log(`ID: ${r.id}, Score: ${r.score}`);
+   * }
+   * ```
+   */
+  searchSparse(indices: Uint32Array, values: Float32Array, dim: number, k: number): string;
+  /**
+   * Inserts an f32 vector with automatic binary quantization.
+   *
+   * The vector is converted to binary (1 bit per dimension) using sign quantization:
+   * - Positive values → 1
+   * - Non-positive values → 0
+   *
+   * # Arguments
+   *
+   * * `vector` - A Float32Array containing the vector data (must match dimensions).
+   *
+   * # Returns
+   *
+   * The assigned Vector ID (u32).
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Storage is not in Binary mode (metric != "hamming")
+   * - Dimensions don't match
+   * - Vector contains NaNs
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const config = new EdgeVecConfig(1024);
+   * config.metric = 'hamming';
+   * const db = new EdgeVec(config);
+   *
+   * // Insert f32 vector with automatic binary quantization
+   * const f32Vector = new Float32Array(1024).fill(0.5); // Gets quantized to all 1s
+   * const id = db.insertWithBq(f32Vector);
+   * ```
+   */
+  insertWithBq(vector: Float32Array): number;
+  /**
+   * Search with metadata-based distance boosting.
+   *
+   * Performs a filtered search with oversampling, then reranks results using
+   * multiplicative boosting: `final_distance = raw_distance * (1.0 - boost_factor)`.
+   *
+   * This is **scale-independent**: a weight of 0.3 reduces distance by 30%
+   * regardless of whether L2 distances are 0.001 or 50000.
+   *
+   * # Arguments
+   *
+   * * `query` - Query vector as `Float32Array`
+   * * `k` - Number of results to return
+   * * `boosts_json` - JSON array of boost configurations:
+   *   `[{"field": "entity_type", "value": "ORG", "weight": 0.3}]`
+   * * `options_json` - JSON options (same as `searchFiltered`):
+   *   `{"filter": "category = \"gpu\"", "strategy": "auto"}`
+   *
+   * # Errors
+   *
+   * Returns an error if:
+   * - Query dimensions don't match index
+   * - Query contains non-finite values
+   * - Boosts JSON is malformed or contains invalid weights
+   * - Filter expression is invalid
+   * - Options JSON is malformed
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const query = new Float32Array([0.1, 0.2, ...]);
+   * const boosts = JSON.stringify([
+   *     { field: "entity_type", value: "ORG", weight: 0.3 },
+   *     { field: "is_verified", value: true, weight: 0.2 },
+   * ]);
+   * const options = JSON.stringify({ strategy: "auto", includeMetadata: true });
+   * const result = JSON.parse(index.searchBoosted(query, 10, boosts, options));
+   * console.log(`Found ${result.results.length} boosted results`);
+   * ```
+   */
+  searchBoosted(query: Float32Array, k: number, boosts_json: string, options_json: string): string;
   /**
    * Deletes a metadata key for a vector.
    *
@@ -409,6 +722,14 @@ export class EdgeVec {
    * ```
    */
   searchFiltered(query: Float32Array, k: number, options_json: string): string;
+  /**
+   * Get estimated serialized size in bytes.
+   *
+   * Returns an estimate of the size when saved to disk.
+   * For Flat indexes, this is just the header + vector data.
+   * For HNSW indexes, includes graph overhead.
+   */
+  serializedSize(): number;
   /**
    * Get the ratio of deleted to total vectors.
    *
@@ -586,6 +907,22 @@ export class EdgeVec {
    * ```
    */
   compactionWarning(): string | undefined;
+  /**
+   * Check if sparse storage is initialized.
+   *
+   * # Returns
+   *
+   * `true` if sparse storage is ready for use, `false` otherwise.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * if (!db.hasSparseStorage()) {
+   *     db.initSparseStorage();
+   * }
+   * ```
+   */
+  hasSparseStorage(): boolean;
   /**
    * Returns the number of metadata keys for a vector.
    *
@@ -783,6 +1120,24 @@ export class EdgeVec {
    */
   getVectorMetadata(id: number): any;
   /**
+   * Initialize sparse storage for hybrid search.
+   *
+   * Must be called before using sparse or hybrid search functions.
+   * Sparse storage is lazily initialized to minimize memory footprint
+   * for users who don't need hybrid search.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const db = new EdgeVec(config);
+   * db.initSparseStorage();  // Enable hybrid search
+   *
+   * // Now sparse/hybrid methods are available
+   * const id = db.insertSparse(indices, values, 10000);
+   * ```
+   */
+  initSparseStorage(): void;
+  /**
    * Get the current compaction threshold.
    *
    * # Returns
@@ -864,6 +1219,75 @@ export class EdgeVec {
    * ```
    */
   metadataVectorCount(): number;
+  /**
+   * Searches binary vectors with a custom ef_search parameter.
+   *
+   * This allows tuning the recall/speed tradeoff per-query:
+   * - Lower ef_search = faster, lower recall
+   * - Higher ef_search = slower, higher recall
+   *
+   * # Arguments
+   *
+   * * `query` - A Uint8Array containing the binary query vector.
+   * * `k` - The number of neighbors to return.
+   * * `ef_search` - Size of dynamic candidate list (must be >= k).
+   *
+   * # Returns
+   *
+   * An array of objects: `[{ id: u32, score: f32 }, ...]`
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * // Low ef_search = fast, ~90% recall
+   * const fastResults = db.searchBinaryWithEf(query, 10, 20);
+   *
+   * // High ef_search = slower, ~99% recall
+   * const accurateResults = db.searchBinaryWithEf(query, 10, 200);
+   * ```
+   */
+  searchBinaryWithEf(query: Uint8Array, k: number, ef_search: number): any;
+  /**
+   * Searches binary vectors with optional metadata filtering.
+   *
+   * Combines binary vector search (Hamming distance) with metadata filtering.
+   *
+   * # Arguments
+   *
+   * * `query` - Binary query vector as Uint8Array (packed bits, ceil(dimensions/8) bytes)
+   * * `k` - Maximum number of results to return
+   * * `options_json` - JSON string with search options:
+   *   - `filter`: Optional SQL-like filter expression (e.g., `"category = \"gpu\""`)
+   *   - `strategy`: Filter strategy - `"auto"`, `"pre"`, `"post"`, or `"hybrid"`
+   *   - `oversample_factor`: Oversample factor for post/hybrid strategies (default: 3.0)
+   *   - `include_metadata`: Whether to include metadata in results (default: false)
+   *
+   * # Returns
+   *
+   * JSON string containing search results with Hamming distances.
+   *
+   * # Errors
+   *
+   * Returns error if:
+   * - Storage is not in Binary mode (metric != "hamming")
+   * - Query byte length doesn't match expected dimensions
+   * - Options JSON is invalid
+   * - Filter expression parsing fails
+   * - Search fails
+   *
+   * # Example
+   *
+   * ```javascript
+   * const queryBinary = new Uint8Array(128); // 1024 bits
+   * const result = JSON.parse(db.searchBinaryFiltered(queryBinary, 10, JSON.stringify({
+   *   filter: 'category = "gpu"',
+   *   strategy: 'auto',
+   *   include_metadata: true
+   * })));
+   * console.log(`Found ${result.results.length} binary matches with filter`);
+   * ```
+   */
+  searchBinaryFiltered(query: Uint8Array, k: number, options_json: string): string;
   /**
    * Set the compaction threshold.
    *
@@ -1141,17 +1565,58 @@ export class EdgeVecConfig {
   free(): void;
   [Symbol.dispose](): void;
   /**
+   * Set distance metric using typed enum.
+   *
+   * # Example
+   *
+   * ```javascript
+   * const config = new EdgeVecConfig(768);
+   * config.setMetricType(MetricType.Cosine);
+   * ```
+   */
+  setMetricType(metric_type: MetricType): void;
+  /**
    * Create a new configuration with required dimensions.
    */
   constructor(dimensions: number);
+  /**
+   * Check if this configuration uses a Flat index.
+   */
+  isFlat(): boolean;
+  /**
+   * Check if this configuration uses an HNSW index (default).
+   */
+  isHnsw(): boolean;
   /**
    * Vector dimensionality.
    */
   dimensions: number;
   /**
-   * Set distance metric ("l2", "cosine", "dot").
+   * Get the configured index type.
+   */
+  indexType: JsIndexType;
+  /**
+   * Set distance metric ("l2", "cosine", "dot", "hamming").
    */
   set metric(value: string);
+  /**
+   * Get the configured vector type.
+   */
+  get vector_type(): VectorType | undefined;
+  /**
+   * Set vector storage type.
+   *
+   * Use `VectorType.Binary` with `MetricType.Hamming` for binary vectors.
+   *
+   * # Example
+   *
+   * ```javascript
+   * const config = new EdgeVecConfig(1024);
+   * config.setVectorType(VectorType.Binary);
+   * config.setMetricType(MetricType.Hamming);
+   * ```
+   */
+  set vector_type(value: VectorType);
   /**
    * Set ef_search parameter.
    */
@@ -1168,6 +1633,53 @@ export class EdgeVecConfig {
    * Set M0 parameter (max connections per node in layer 0).
    */
   set m0(value: number);
+}
+
+/**
+ * Index type for EdgeVec.
+ *
+ * Determines the search algorithm and performance characteristics.
+ *
+ * ## Performance Comparison
+ *
+ * | Index Type | Insert | Search (1M) | Recall | Best For |
+ * |------------|--------|-------------|--------|----------|
+ * | Flat       | O(1) ~1μs | O(n) ~5-10ms | 100% (exact) | Real-time apps, <1M vectors |
+ * | HNSW       | O(log n) ~2ms | O(log n) ~2ms | 90-95% | Large datasets, batch insert |
+ *
+ * ## Example (JavaScript)
+ *
+ * ```javascript
+ * import { EdgeVecConfig, IndexType } from 'edgevec';
+ *
+ * // Create a flat index for insert-heavy workloads
+ * const config = new EdgeVecConfig(1024);
+ * config.indexType = IndexType.Flat;
+ *
+ * // Create an HNSW index for large-scale search (default)
+ * const hnswConfig = new EdgeVecConfig(1024);
+ * hnswConfig.indexType = IndexType.Hnsw; // This is the default
+ * ```
+ */
+export enum JsIndexType {
+  /**
+   * Brute force search (O(1) insert, O(n) search).
+   *
+   * Best for:
+   * - Insert-heavy workloads (semantic caching)
+   * - Datasets < 1M vectors
+   * - When 100% recall (exact search) is required
+   */
+  Flat = 0,
+  /**
+   * HNSW graph index (O(log n) insert, O(log n) search).
+   *
+   * Best for:
+   * - Large datasets (>1M vectors)
+   * - Read-heavy workloads
+   * - When approximate nearest neighbors is acceptable
+   */
+  Hnsw = 1,
 }
 
 export class JsMetadataValue {
@@ -1296,6 +1808,30 @@ export class JsMetadataValue {
   isString(): boolean;
 }
 
+/**
+ * Distance metric type for EdgeVec.
+ *
+ * Determines how vector similarity is calculated.
+ */
+export enum MetricType {
+  /**
+   * L2 Squared (Euclidean) distance.
+   */
+  L2 = 0,
+  /**
+   * Cosine similarity (converted to distance).
+   */
+  Cosine = 1,
+  /**
+   * Dot product (converted to distance).
+   */
+  Dot = 2,
+  /**
+   * Hamming distance (for binary vectors).
+   */
+  Hamming = 3,
+}
+
 export class PersistenceIterator {
   private constructor();
   free(): void;
@@ -1313,6 +1849,105 @@ export class PersistenceIterator {
    * Panics if the parent `EdgeVec` instance has been freed.
    */
   next_chunk(): Uint8Array | undefined;
+}
+
+export class PqCodebookHandle {
+  private constructor();
+  free(): void;
+  [Symbol.dispose](): void;
+  /**
+   * Returns the vector dimensionality this codebook was trained on.
+   */
+  dimensions(): number;
+  /**
+   * Returns the number of subquantizers (M) in this codebook.
+   */
+  numSubquantizers(): number;
+  /**
+   * Returns the number of centroids per subspace (Ksub).
+   */
+  ksub(): number;
+  /**
+   * Encode a single vector into a PQ code.
+   *
+   * Returns a `Uint8Array` of length M (one centroid index per subspace).
+   *
+   * # Arguments
+   *
+   * * `vector` - A `Float32Array` of length `dims` (the dimensionality
+   *   used during training).
+   *
+   * # Errors
+   *
+   * Returns a string error if:
+   * - `vector` has wrong dimensionality
+   * - `vector` contains NaN or Infinity
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const code = codebook.encodePq(new Float32Array([0.1, 0.2, ...]));
+   * console.log(code.length); // M (e.g., 8)
+   * ```
+   */
+  encodePq(vector: Float32Array): Uint8Array;
+  /**
+   * Search over PQ-encoded vectors using Asymmetric Distance Computation.
+   *
+   * Given a flat byte array of PQ codes and a query vector, computes
+   * approximate distances and returns the top-k nearest results.
+   *
+   * # Arguments
+   *
+   * * `codes` - Flat `Uint8Array` of all PQ codes: `n_codes * M` bytes.
+   *   Each consecutive M bytes form one PQ code.
+   * * `n_codes` - Number of encoded vectors in `codes`.
+   * * `query` - Query vector (`Float32Array` of length `dims`).
+   * * `k` - Number of nearest neighbors to return.
+   *
+   * # Returns
+   *
+   * A JavaScript `Array` of objects `{index: number, distance: number}`,
+   * sorted by distance ascending (nearest first). Length is `min(k, n_codes)`.
+   *
+   * # Errors
+   *
+   * Returns a string error if:
+   * - `query` contains NaN or Infinity
+   * - `query` has wrong dimensionality
+   * - `codes.length != n_codes * M`
+   * - `k` is 0
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * // Encode 1000 vectors, then search
+   * const allCodes = new Uint8Array(1000 * 8); // M=8
+   * // ... fill allCodes from encodePq() calls ...
+   * const results = codebook.pqSearch(allCodes, 1000, query, 10);
+   * for (const r of results) {
+   *     console.log(`Index: ${r.index}, Distance: ${r.distance}`);
+   * }
+   * ```
+   */
+  pqSearch(codes: Uint8Array, n_codes: number, query: Float32Array, k: number): any;
+}
+
+/**
+ * Vector storage type for EdgeVec.
+ *
+ * Determines how vectors are stored and processed.
+ */
+export enum VectorType {
+  /**
+   * Standard 32-bit floating point vectors.
+   */
+  Float32 = 0,
+  /**
+   * Binary vectors (1-bit per dimension, packed into bytes).
+   * Use with `metric = "hamming"`.
+   */
+  Binary = 1,
 }
 
 export class WasmBatchDeleteResult {
@@ -1378,18 +2013,34 @@ export class WasmCompactionResult {
 export function benchmarkHamming(bytes: number, iterations: number): number;
 
 /**
- * Side-by-side benchmark: New WASM SIMD128 vs Current runtime dispatcher.
+ * Batch benchmark: Compare SIMD implementations searching through N vectors.
  *
- * Compares:
- * 1. **New** (`metric::simd::hamming_distance`): Compile-time SIMD128 detection → uses WASM SIMD
- * 2. **Current** (`simd::popcount::simd_popcount_xor`): Runtime detection → falls to scalar in WASM
+ * This is a realistic benchmark that simulates searching through a dataset:
+ * - Accepts vectors from JavaScript (same path as real insertions)
+ * - For each iteration, computes hamming distance from query to ALL vectors
+ * - Compares new WASM SIMD128 vs current scalar fallback
  *
- * Returns a JSON string with timings:
+ * # Arguments
+ *
+ * * `vectors_js` - Array of Uint8Array vectors (created in JavaScript)
+ * * `query_js` - Query vector as Uint8Array
+ * * `iterations` - Number of full scans to perform
+ *
+ * Returns JSON with throughput metrics:
  * ```json
- * {"new_us": 0.15, "current_us": 0.42, "speedup": 2.8, "new_backend": "wasm_simd128", "current_backend": "scalar"}
+ * {
+ *   "num_vectors": 10000,
+ *   "bytes_per_vector": 128,
+ *   "iterations": 100,
+ *   "new_ms": 1.23,
+ *   "current_ms": 3.45,
+ *   "speedup": 2.8,
+ *   "new_throughput": "8.1M vec/s",
+ *   "current_throughput": "2.9M vec/s"
+ * }
  * ```
  */
-export function benchmarkHammingComparison(bytes: number, iterations: number): string;
+export function benchmarkHammingBatch(vectors_js: Array<any>, query_js: Uint8Array, iterations: number): string;
 
 /**
  * Get the SIMD backend being used for distance calculations.
@@ -1461,6 +2112,45 @@ export function init_logging(): void;
 export function parse_filter_js(filter_str: string): string;
 
 /**
+ * Train a PQ codebook from flat vector data.
+ *
+ * Takes a flat `Float32Array` of `n_vectors * dims` elements and trains
+ * a Product Quantization codebook with `m` subquantizers, each having
+ * `ksub` centroids, using `max_iters` k-means iterations.
+ *
+ * # Arguments
+ *
+ * * `data` - Flat `Float32Array`: `n_vectors` vectors of `dims` dimensions each,
+ *   stored contiguously (row-major).
+ * * `dims` - Dimensionality of each vector. Must be > 0 and divisible by `m`.
+ * * `n_vectors` - Number of vectors in `data`. Must be >= `ksub`.
+ * * `m` - Number of subquantizers. Must be >= 1.
+ * * `ksub` - Centroids per subspace. Must be in \[2, 256\].
+ * * `max_iters` - Maximum k-means iterations per subspace.
+ *
+ * # Returns
+ *
+ * A `PqCodebookHandle` that can be used for encoding and searching.
+ *
+ * # Errors
+ *
+ * Returns a string error if:
+ * - `data` contains NaN or Infinity values
+ * - `data.length != n_vectors * dims`
+ * - `dims` is not divisible by `m`
+ * - Fewer than `ksub` vectors are provided
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const data = new Float32Array(1000 * 128); // 1000 vectors, 128 dims
+ * // ... fill data ...
+ * const codebook = trainPq(data, 128, 1000, 8, 256, 25);
+ * ```
+ */
+export function trainPq(data: Float32Array, dims: number, n_vectors: number, m: number, ksub: number, max_iters: number): PqCodebookHandle;
+
+/**
  * Try to parse a filter string, returning null on error.
  *
  * # Arguments
@@ -1525,6 +2215,7 @@ export interface InitOutput {
   readonly __wbg_get_wasmcompactionresult_tombstones_removed: (a: number) => number;
   readonly __wbg_jsmetadatavalue_free: (a: number, b: number) => void;
   readonly __wbg_persistenceiterator_free: (a: number, b: number) => void;
+  readonly __wbg_pqcodebookhandle_free: (a: number, b: number) => void;
   readonly __wbg_set_edgevecconfig_dimensions: (a: number, b: number) => void;
   readonly __wbg_wasmbatchdeleteresult_free: (a: number, b: number) => void;
   readonly __wbg_wasmcompactionresult_free: (a: number, b: number) => void;
@@ -1535,14 +2226,14 @@ export interface InitOutput {
   readonly batchinsertresult_inserted: (a: number) => number;
   readonly batchinsertresult_total: (a: number) => number;
   readonly benchmarkHamming: (a: number, b: number) => number;
-  readonly benchmarkHammingComparison: (a: number, b: number, c: number) => void;
+  readonly benchmarkHammingBatch: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_canInsert: (a: number) => number;
   readonly edgevec_compact: (a: number, b: number) => void;
-  readonly edgevec_compactionThreshold: (a: number) => number;
+  readonly edgevec_compactionThreshold: (a: number, b: number) => void;
   readonly edgevec_compactionWarning: (a: number, b: number) => void;
   readonly edgevec_deleteAllMetadata: (a: number, b: number) => number;
   readonly edgevec_deleteMetadata: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly edgevec_deletedCount: (a: number) => number;
+  readonly edgevec_deletedCount: (a: number, b: number) => void;
   readonly edgevec_enableBQ: (a: number, b: number) => void;
   readonly edgevec_getAllMetadata: (a: number, b: number) => number;
   readonly edgevec_getMemoryConfig: (a: number, b: number) => void;
@@ -1551,40 +2242,61 @@ export interface InitOutput {
   readonly edgevec_getMetadata: (a: number, b: number, c: number, d: number) => number;
   readonly edgevec_hasBQ: (a: number) => number;
   readonly edgevec_hasMetadata: (a: number, b: number, c: number, d: number) => number;
+  readonly edgevec_hasSparseStorage: (a: number) => number;
+  readonly edgevec_hybridSearch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+  readonly edgevec_initSparseStorage: (a: number) => void;
   readonly edgevec_insert: (a: number, b: number, c: number) => void;
   readonly edgevec_insertBatch: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_insertBatchFlat: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_insertBatchWithProgress: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_insertBinary: (a: number, b: number, c: number) => void;
+  readonly edgevec_insertSparse: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_insertWithBq: (a: number, b: number, c: number) => void;
   readonly edgevec_insertWithMetadata: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_isDeleted: (a: number, b: number, c: number) => void;
-  readonly edgevec_liveCount: (a: number) => number;
+  readonly edgevec_liveCount: (a: number, b: number) => void;
   readonly edgevec_load: (a: number, b: number) => number;
+  readonly edgevec_memoryUsage: (a: number) => number;
   readonly edgevec_metadataKeyCount: (a: number, b: number) => number;
   readonly edgevec_metadataVectorCount: (a: number) => number;
-  readonly edgevec_needsCompaction: (a: number) => number;
+  readonly edgevec_needsCompaction: (a: number, b: number) => void;
   readonly edgevec_new: (a: number, b: number) => void;
   readonly edgevec_save: (a: number, b: number, c: number) => number;
-  readonly edgevec_save_stream: (a: number, b: number) => number;
+  readonly edgevec_save_stream: (a: number, b: number, c: number) => void;
   readonly edgevec_search: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_searchBQ: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_searchBQRescored: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_searchBinary: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchBinaryFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly edgevec_searchBinaryWithEf: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_searchBoosted: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
   readonly edgevec_searchFiltered: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_searchHybrid: (a: number, b: number, c: number, d: number) => void;
+  readonly edgevec_searchSparse: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_searchWithFilter: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly edgevec_setCompactionThreshold: (a: number, b: number) => void;
+  readonly edgevec_serializedSize: (a: number) => number;
+  readonly edgevec_setCompactionThreshold: (a: number, b: number, c: number) => void;
   readonly edgevec_setMemoryConfig: (a: number, b: number, c: number) => void;
   readonly edgevec_setMetadata: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_softDelete: (a: number, b: number, c: number) => void;
   readonly edgevec_softDeleteBatch: (a: number, b: number, c: number) => void;
   readonly edgevec_softDeleteBatchCompat: (a: number, b: number, c: number) => void;
-  readonly edgevec_tombstoneRatio: (a: number) => number;
+  readonly edgevec_sparseCount: (a: number) => number;
+  readonly edgevec_tombstoneRatio: (a: number, b: number) => void;
   readonly edgevec_totalMetadataCount: (a: number) => number;
+  readonly edgevecconfig_indexType: (a: number) => number;
+  readonly edgevecconfig_isFlat: (a: number) => number;
+  readonly edgevecconfig_isHnsw: (a: number) => number;
   readonly edgevecconfig_new: (a: number) => number;
+  readonly edgevecconfig_setMetricType: (a: number, b: number) => void;
   readonly edgevecconfig_set_ef_construction: (a: number, b: number) => void;
   readonly edgevecconfig_set_ef_search: (a: number, b: number) => void;
+  readonly edgevecconfig_set_indexType: (a: number, b: number) => void;
   readonly edgevecconfig_set_m: (a: number, b: number) => void;
   readonly edgevecconfig_set_m0: (a: number, b: number) => void;
   readonly edgevecconfig_set_metric: (a: number, b: number, c: number) => void;
+  readonly edgevecconfig_set_vector_type: (a: number, b: number) => void;
+  readonly edgevecconfig_vector_type: (a: number) => number;
   readonly getSimdBackend: (a: number) => void;
   readonly get_filter_info_js: (a: number, b: number, c: number) => void;
   readonly init_logging: () => void;
@@ -1607,6 +2319,12 @@ export interface InitOutput {
   readonly jsmetadatavalue_toJS: (a: number) => number;
   readonly parse_filter_js: (a: number, b: number, c: number) => void;
   readonly persistenceiterator_next_chunk: (a: number) => number;
+  readonly pqcodebookhandle_dimensions: (a: number) => number;
+  readonly pqcodebookhandle_encodePq: (a: number, b: number, c: number, d: number) => void;
+  readonly pqcodebookhandle_ksub: (a: number) => number;
+  readonly pqcodebookhandle_numSubquantizers: (a: number) => number;
+  readonly pqcodebookhandle_pqSearch: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+  readonly trainPq: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
   readonly try_parse_filter_js: (a: number, b: number) => number;
   readonly validate_filter_js: (a: number, b: number, c: number) => void;
   readonly wasmbatchdeleteresult_allValid: (a: number) => number;
@@ -1617,9 +2335,9 @@ export interface InitOutput {
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
   readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
-  readonly __wasm_bindgen_func_elem_1747: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_1731: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_2259: (a: number, b: number, c: number, d: number) => void;
+  readonly __wasm_bindgen_func_elem_2147: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_2131: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_2698: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export3: (a: number) => void;

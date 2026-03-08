@@ -119,16 +119,16 @@ def main():
     # Step 4: Generate sample queries with embeddings
     print(f"Generating {args.num_queries} sample queries...")
     sample_queries = [
-        "Who was the first person to walk on the moon?",
-        "What is the capital of France?",
-        "How does photosynthesis work in plants?",
-        "When was the Declaration of Independence signed?",
-        "What causes earthquakes and tectonic activity?",
-        "Who invented the telephone?",
-        "What is the theory of general relativity?",
-        "How do vaccines protect against diseases?",
-        "What is the largest ocean on Earth?",
-        "When did World War II end?",
+        "Who is Beyoncé and what are her biggest achievements?",
+        "When did Chopin move to Paris and what was his life like?",
+        "How does solar energy work and what are its applications?",
+        "What is the history of New York City?",
+        "What are the core beliefs and practices of Buddhism?",
+        "What caused the Wenchuan earthquake and its aftermath?",
+        "Who is Kanye West and how did he start his career?",
+        "What is the plot of To Kill a Mockingbird?",
+        "When was the iPod released and how did it evolve?",
+        "How did American Idol impact the music industry?",
     ]
     sample_queries = sample_queries[: args.num_queries]
 

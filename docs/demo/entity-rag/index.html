@@ -850,10 +850,10 @@
 
             <!-- Entity Boost Toggle -->
             <div>
-              <label class="control-label">ENTITY_BOOST</label>
+              <label class="control-label" id="boostLabel">ENTITY_BOOST</label>
               <div class="toggle-wrapper">
                 <span class="toggle-label toggle-label--off">OFF</span>
-                <div class="toggle-rail" id="boostToggle" role="switch" aria-checked="false" tabindex="0">
+                <div class="toggle-rail" id="boostToggle" role="switch" aria-checked="false" aria-labelledby="boostLabel" tabindex="0">
                   <div class="toggle-thumb"></div>
                 </div>
                 <span class="toggle-label">ON</span>
@@ -864,8 +864,8 @@
             <hr class="divider">
 
             <!-- Search Button -->
-            <button class="btn btn--green" id="searchBtn" disabled>
-              &#9654; SEARCH
+            <button class="btn btn--green" id="searchBtn" disabled aria-label="Execute search">
+              <span aria-hidden="true">&#9654;</span> SEARCH
             </button>
 
             <hr class="divider">
@@ -934,16 +934,16 @@
     // Boost configs keyed by query text — matched dynamically from data.json queries.
     // This avoids hard-coded index alignment (M1 fix from hostile review).
     const BOOST_MAP = {
-      "Who was the first person to walk on the moon?":       [{ field:"entity_types", value:"PERSON", weight:0.4 }],
-      "What is the capital of France?":                      [{ field:"entity_types", value:"GPE",    weight:0.5 }],
-      "How does photosynthesis work in plants?":             [],
-      "When was the Declaration of Independence signed?":    [{ field:"entity_types", value:"DATE",   weight:0.4 }],
-      "What causes earthquakes and tectonic activity?":      [],
-      "Who invented the telephone?":                         [{ field:"entity_types", value:"PERSON", weight:0.4 }],
-      "What is the theory of general relativity?":           [{ field:"entity_types", value:"PERSON", weight:0.3 }],
-      "How do vaccines protect against diseases?":           [{ field:"entity_types", value:"ORG",    weight:0.3 }],
-      "What is the largest ocean on Earth?":                 [{ field:"entity_types", value:"GPE",    weight:0.3 }],
-      "When did World War II end?":                          [{ field:"entity_types", value:"DATE",   weight:0.4 }, { field:"entity_types", value:"GPE", weight:0.2 }],
+      "Who is Beyoncé and what are her biggest achievements?":         [{ field:"entity_types", value:"PERSON", weight:0.4 }],
+      "When did Chopin move to Paris and what was his life like?":     [{ field:"entity_types", value:"PERSON", weight:0.4 }, { field:"entity_types", value:"GPE", weight:0.3 }],
+      "How does solar energy work and what are its applications?":     [{ field:"entity_types", value:"ORG",    weight:0.2 }],
+      "What is the history of New York City?":                         [{ field:"entity_types", value:"GPE",    weight:0.5 }, { field:"entity_types", value:"DATE", weight:0.3 }],
+      "What are the core beliefs and practices of Buddhism?":          [{ field:"entity_types", value:"PERSON", weight:0.3 }],
+      "What caused the Wenchuan earthquake and its aftermath?":        [{ field:"entity_types", value:"GPE",    weight:0.4 }, { field:"entity_types", value:"DATE", weight:0.3 }],
+      "Who is Kanye West and how did he start his career?":            [{ field:"entity_types", value:"PERSON", weight:0.4 }],
+      "What is the plot of To Kill a Mockingbird?":                    [{ field:"entity_types", value:"PERSON", weight:0.3 }],
+      "When was the iPod released and how did it evolve?":             [{ field:"entity_types", value:"DATE",   weight:0.4 }, { field:"entity_types", value:"ORG", weight:0.2 }],
+      "How did American Idol impact the music industry?":              [{ field:"entity_types", value:"PERSON", weight:0.4 }],
     };
 
     // Default boost for queries not in BOOST_MAP
@@ -1214,7 +1214,8 @@
 
       const scoreEl = document.createElement('span');
       scoreEl.className = 'result-card__score';
-      scoreEl.textContent = result.score.toFixed(4);
+      const similarity = 1.0 - result.score; // Convert distance to similarity
+      scoreEl.textContent = similarity.toFixed(4);
 
       header.appendChild(rankEl);
 
@@ -1469,7 +1470,7 @@
         $footerBundle.textContent = bundle;
 
         // Step 2: Load data.json
-        const response = await fetch('data.json');
+        const response = await fetch('data.json?v=0.9.0');
         if (!response.ok) throw new Error(`Failed to load data.json: ${response.status}`);
         dataJson = await response.json();
 
@@ -1526,10 +1527,10 @@
 
         // Page load animations
         if (!prefersReducedMotion && typeof gsap !== 'undefined') {
-          gsap.from('.header',           { y: -80, opacity: 0, duration: 0.6, ease: 'power3.out' });
-          gsap.from('.hero__title',      { opacity: 0, duration: 0.8, delay: 0.3, ease: 'power2.out' });
-          gsap.from('.status-bar__item', { opacity: 0, y: 20, stagger: 0.12, duration: 0.5, delay: 0.5 });
-          gsap.from('.sidebar',          { x: -40, opacity: 0, duration: 0.7, delay: 0.7, ease: 'power2.out' });
+          gsap.fromTo('.header',           { y: -80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'power3.out', clearProps: 'opacity,transform' });
+          gsap.fromTo('.hero__title',      { opacity: 0 }, { opacity: 1, duration: 0.8, delay: 0.3, ease: 'power2.out', clearProps: 'opacity' });
+          gsap.fromTo('.status-bar__item', { opacity: 0, y: 20 }, { opacity: 1, y: 0, stagger: 0.12, duration: 0.5, delay: 0.5, clearProps: 'opacity,transform' });
+          gsap.fromTo('.sidebar',          { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.7, delay: 0.7, ease: 'power2.out', clearProps: 'opacity,transform' });
         }
 
       } catch (err) {

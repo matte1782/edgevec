@@ -27,9 +27,11 @@ proptest! {
             })
             .sum();
 
-        let oracle_dot: f32 = a.iter().zip(b.iter())
+        let oracle_dot_raw: f32 = a.iter().zip(b.iter())
             .map(|(x, y)| x * y)
             .sum();
+        // DotProduct::distance returns 1.0 - dot_product (cosine distance for normalized vectors)
+        let oracle_dot = 1.0 - oracle_dot_raw;
 
         // Implementation Under Test
         let impl_l2 = L2Squared::distance(a, b);
@@ -41,7 +43,7 @@ proptest! {
         prop_assert!((impl_l2 - oracle_l2).abs() <= l2_tol,
             "L2 Mismatch: Impl={}, Oracle={}, Tol={}", impl_l2, oracle_l2, l2_tol);
 
-        let dot_tol = EPSILON.max(oracle_dot.abs() * 1e-4);
+        let dot_tol = EPSILON.max(oracle_dot_raw.abs() * 1e-4);
         prop_assert!((impl_dot - oracle_dot).abs() <= dot_tol,
             "Dot Mismatch: Impl={}, Oracle={}, Tol={}", impl_dot, oracle_dot, dot_tol);
     }

@@ -1593,6 +1593,10 @@ impl EdgeVec {
     /// # Returns
     ///
     /// An array of objects: `[{ id: u32, score: f32 }, ...]`.
+    /// The `score` field contains **distance** (lower = closer) for cosine and
+    /// dot product metrics. For normalized vectors, range is `[0, 2]` where
+    /// `0` = identical and `2` = opposite. Results are sorted by ascending
+    /// distance (most similar first).
     ///
     /// # Errors
     ///
@@ -3241,6 +3245,12 @@ impl EdgeVec {
     /// - Boosts JSON is malformed or contains invalid weights
     /// - Filter expression is invalid
     /// - Options JSON is malformed
+    ///
+    /// # Returns
+    ///
+    /// JSON string with `{ results: [{ id, score, metadata? }], total }`.
+    /// The `score` field contains boosted **distance** (lower = closer).
+    /// For cosine/dot metrics on normalized vectors, unboosted range is `[0, 2]`.
     ///
     /// # Example (JavaScript)
     ///

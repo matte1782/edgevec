@@ -1,4 +1,4 @@
-import { IndexedDbBackend } from './snippets/edgevec-78d8c49bd24b079a/src/js/storage.js';
+import { IndexedDbBackend } from './snippets/edgevec-59b9f14da3349a9d/src/js/storage.js';
 
 let wasm;
 
@@ -15,6 +15,12 @@ function _assertClass(instance, klass) {
     if (!(instance instanceof klass)) {
         throw new Error(`expected instance of ${klass.name}`);
     }
+}
+
+function addBorrowedObject(obj) {
+    if (stack_pointer == 1) throw new Error('out of js stack');
+    heap[--stack_pointer] = obj;
+    return stack_pointer;
 }
 
 const CLOSURE_DTORS = (typeof FinalizationRegistry === 'undefined')
@@ -217,6 +223,20 @@ function makeMutClosure(arg0, arg1, dtor, f) {
     return real;
 }
 
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArrayF32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getFloat32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
 function passStringToWasm0(arg, malloc, realloc) {
     if (realloc === undefined) {
         const buf = cachedTextEncoder.encode(arg);
@@ -254,6 +274,8 @@ function passStringToWasm0(arg, malloc, realloc) {
     return ptr;
 }
 
+let stack_pointer = 128;
+
 function takeObject(idx) {
     const ret = getObject(idx);
     dropObject(idx);
@@ -289,12 +311,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_1747(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_1747(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_2147(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_2147(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_2259(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_2259(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_2698(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_2698(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -320,6 +342,10 @@ const JsMetadataValueFinalization = (typeof FinalizationRegistry === 'undefined'
 const PersistenceIteratorFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_persistenceiterator_free(ptr >>> 0, 1));
+
+const PqCodebookHandleFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_pqcodebookhandle_free(ptr >>> 0, 1));
 
 const WasmBatchDeleteResultFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -440,6 +466,10 @@ if (Symbol.dispose) BatchInsertResult.prototype[Symbol.dispose] = BatchInsertRes
  *
  * This struct is serializable for persistence via `postcard`.
  * The `liveness` field is skipped as it is runtime state.
+ *
+ * Supports both Flat and HNSW index types via the `indexType` configuration.
+ * Use `IndexType.Flat` for insert-heavy workloads with exact search,
+ * or `IndexType.Hnsw` (default) for large-scale approximate search.
  *
  * # Safety Note
  *
@@ -576,8 +606,19 @@ export class EdgeVec {
      * @returns {number}
      */
     liveCount() {
-        const ret = wasm.edgevec_liveCount(this.__wbg_ptr);
-        return ret >>> 0;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_liveCount(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return r0 >>> 0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Creates an iterator to save the database in chunks.
@@ -598,8 +639,19 @@ export class EdgeVec {
      * @returns {PersistenceIterator}
      */
     save_stream(chunk_size) {
-        const ret = wasm.edgevec_save_stream(this.__wbg_ptr, isLikeNone(chunk_size) ? 0x100000001 : (chunk_size) >>> 0);
-        return PersistenceIterator.__wrap(ret);
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_save_stream(retptr, this.__wbg_ptr, isLikeNone(chunk_size) ? 0x100000001 : (chunk_size) >>> 0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return PersistenceIterator.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Soft delete a vector by marking it as a tombstone.
@@ -707,6 +759,30 @@ export class EdgeVec {
         return ret !== 0;
     }
     /**
+     * Get approximate memory usage in bytes.
+     *
+     * Returns the total memory used by the index, including:
+     * - Vector storage (binary vectors)
+     * - HNSW graph structure (nodes and neighbor lists)
+     * - Internal metadata
+     *
+     * # Returns
+     *
+     * Total bytes used by the index.
+     *
+     * # Example
+     *
+     * ```javascript
+     * const bytes = index.memoryUsage();
+     * console.log(`Index using ${(bytes / 1024 / 1024).toFixed(2)} MB`);
+     * ```
+     * @returns {number}
+     */
+    memoryUsage() {
+        const ret = wasm.edgevec_memoryUsage(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Sets metadata for a vector (upsert operation).
      *
      * If the key already exists, its value is overwritten. If the key is new,
@@ -756,6 +832,24 @@ export class EdgeVec {
         }
     }
     /**
+     * Get the number of sparse vectors stored.
+     *
+     * # Returns
+     *
+     * Number of sparse vectors, or 0 if sparse storage is not initialized.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * console.log(`Sparse vectors: ${db.sparseCount()}`);
+     * ```
+     * @returns {number}
+     */
+    sparseCount() {
+        const ret = wasm.edgevec_sparseCount(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Get the count of deleted (tombstoned) vectors.
      *
      * # Returns
@@ -764,8 +858,269 @@ export class EdgeVec {
      * @returns {number}
      */
     deletedCount() {
-        const ret = wasm.edgevec_deletedCount(this.__wbg_ptr);
-        return ret >>> 0;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_deletedCount(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return r0 >>> 0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Perform hybrid search combining dense and sparse retrieval.
+     *
+     * # Arguments
+     *
+     * * `dense_query` - Float32Array dense embedding vector
+     * * `sparse_indices` - Uint32Array sparse query indices (sorted)
+     * * `sparse_values` - Float32Array sparse query values
+     * * `sparse_dim` - Dimension of sparse space (vocabulary size)
+     * * `options_json` - JSON configuration string
+     *
+     * # Options JSON Schema
+     *
+     * ```json
+     * {
+     *   "dense_k": 20,      // Results from dense search (default: 20)
+     *   "sparse_k": 20,     // Results from sparse search (default: 20)
+     *   "k": 10,            // Final results to return (required)
+     *   "fusion": "rrf"     // or { "type": "linear", "alpha": 0.7 }
+     * }
+     * ```
+     *
+     * # Returns
+     *
+     * JSON string:
+     * ```json
+     * [
+     *   {
+     *     "id": 42,
+     *     "score": 0.032,
+     *     "dense_rank": 1,
+     *     "dense_score": 0.95,
+     *     "sparse_rank": 3,
+     *     "sparse_score": 4.2
+     *   }
+     * ]
+     * ```
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Sparse storage not initialized
+     * - Dense query dimensions mismatch index
+     * - Sparse indices/values length mismatch
+     * - Invalid options JSON
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const denseQuery = new Float32Array([0.1, 0.2, ...]);
+     * const sparseIndices = new Uint32Array([0, 5, 10]);
+     * const sparseValues = new Float32Array([1.0, 2.0, 3.0]);
+     *
+     * const results = JSON.parse(db.hybridSearch(
+     *     denseQuery,
+     *     sparseIndices,
+     *     sparseValues,
+     *     10000,
+     *     JSON.stringify({ k: 10, fusion: 'rrf' })
+     * ));
+     * ```
+     * @param {Float32Array} dense_query
+     * @param {Uint32Array} sparse_indices
+     * @param {Float32Array} sparse_values
+     * @param {number} sparse_dim
+     * @param {string} options_json
+     * @returns {string}
+     */
+    hybridSearch(dense_query, sparse_indices, sparse_values, sparse_dim, options_json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(options_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.edgevec_hybridSearch(retptr, this.__wbg_ptr, addHeapObject(dense_query), addHeapObject(sparse_indices), addHeapObject(sparse_values), sparse_dim, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            var ptr2 = r0;
+            var len2 = r1;
+            if (r3) {
+                ptr2 = 0; len2 = 0;
+                throw takeObject(r2);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * Inserts a pre-packed binary vector into the index.
+     *
+     * This method is for binary vectors (1-bit quantized) using Hamming distance.
+     * Use this when you have pre-quantized data (e.g., from Turso's `f1bit_blob`).
+     *
+     * # Arguments
+     *
+     * * `vector` - A Uint8Array containing packed binary data. Length must equal
+     *   `ceil(dimensions / 8)` bytes.
+     *
+     * # Returns
+     *
+     * The assigned Vector ID (u32).
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Storage is not in Binary mode (metric != "hamming")
+     * - Byte length doesn't match expected bytes for dimensions
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const config = new EdgeVecConfig(1024); // 1024 bits = 128 bytes
+     * config.metric = 'hamming';
+     * const db = new EdgeVec(config);
+     *
+     * // Direct binary insertion (e.g., from Turso f1bit_blob)
+     * const binaryVector = new Uint8Array(128); // 1024 bits packed
+     * const id = db.insertBinary(binaryVector);
+     * ```
+     * @param {Uint8Array} vector
+     * @returns {number}
+     */
+    insertBinary(vector) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_insertBinary(retptr, this.__wbg_ptr, addHeapObject(vector));
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return r0 >>> 0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Insert a sparse vector (e.g., BM25 scores).
+     *
+     * # Arguments
+     *
+     * * `indices` - Uint32Array of sparse indices (must be sorted ascending)
+     * * `values` - Float32Array of sparse values (same length as indices)
+     * * `dim` - Dimension of the sparse space (vocabulary size)
+     *
+     * # Returns
+     *
+     * The assigned sparse vector ID as a number (f64).
+     *
+     * **Note:** JavaScript numbers have integer precision up to 2^53.
+     * For most use cases (<9 quadrillion vectors), this is not a concern.
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Sparse storage not initialized (call `initSparseStorage()` first)
+     * - `indices` and `values` have different lengths
+     * - `indices` are not sorted ascending
+     * - `indices` contain duplicates
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * db.initSparseStorage();
+     * const indices = new Uint32Array([0, 5, 10]);
+     * const values = new Float32Array([1.0, 2.0, 3.0]);
+     * const id = db.insertSparse(indices, values, 10000);
+     * console.log(`Inserted sparse vector with ID: ${id}`);
+     * ```
+     * @param {Uint32Array} indices
+     * @param {Float32Array} values
+     * @param {number} dim
+     * @returns {number}
+     */
+    insertSparse(indices, values, dim) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_insertSparse(retptr, this.__wbg_ptr, addHeapObject(indices), addHeapObject(values), dim);
+            var r0 = getDataViewMemory0().getFloat64(retptr + 8 * 0, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            if (r3) {
+                throw takeObject(r2);
+            }
+            return r0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Searches for nearest neighbors using a binary query vector.
+     *
+     * Uses Hamming distance to find the K most similar binary vectors.
+     *
+     * # Arguments
+     *
+     * * `query` - A Uint8Array containing the binary query vector.
+     * * `k` - The number of neighbors to return.
+     *
+     * # Returns
+     *
+     * An array of objects: `[{ id: u32, score: f32 }, ...]` where `score` is
+     * the Hamming distance (number of differing bits).
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Storage is not in Binary mode (metric != "hamming")
+     * - Query byte length doesn't match expected
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const config = new EdgeVecConfig(1024);
+     * config.metric = 'hamming';
+     * const db = new EdgeVec(config);
+     *
+     * // ... insert binary vectors ...
+     *
+     * const queryBinary = new Uint8Array(128);
+     * const results = db.searchBinary(queryBinary, 10);
+     * results.forEach(r => console.log(`ID: ${r.id}, Hamming Distance: ${r.score}`));
+     * ```
+     * @param {Uint8Array} query
+     * @param {number} k
+     * @returns {any}
+     */
+    searchBinary(query, k) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_searchBinary(retptr, this.__wbg_ptr, addHeapObject(query), k);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Hybrid search combining BQ speed with metadata filtering.
@@ -826,6 +1181,193 @@ export class EdgeVec {
             return takeObject(r0);
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Search sparse vectors by query.
+     *
+     * # Arguments
+     *
+     * * `indices` - Uint32Array of sparse query indices (sorted ascending)
+     * * `values` - Float32Array of sparse query values (same length as indices)
+     * * `dim` - Dimension of the sparse space (vocabulary size)
+     * * `k` - Number of results to return
+     *
+     * # Returns
+     *
+     * JSON string: `[{ "id": number, "score": number }, ...]`
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Sparse storage not initialized
+     * - `indices` and `values` have different lengths
+     * - `indices` are not sorted ascending
+     * - `k` is 0
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const indices = new Uint32Array([0, 5, 10]);
+     * const values = new Float32Array([1.0, 2.0, 3.0]);
+     * const resultsJson = db.searchSparse(indices, values, 10000, 10);
+     * const results = JSON.parse(resultsJson);
+     * for (const r of results) {
+     *     console.log(`ID: ${r.id}, Score: ${r.score}`);
+     * }
+     * ```
+     * @param {Uint32Array} indices
+     * @param {Float32Array} values
+     * @param {number} dim
+     * @param {number} k
+     * @returns {string}
+     */
+    searchSparse(indices, values, dim, k) {
+        let deferred2_0;
+        let deferred2_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_searchSparse(retptr, this.__wbg_ptr, addHeapObject(indices), addHeapObject(values), dim, k);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            var ptr1 = r0;
+            var len1 = r1;
+            if (r3) {
+                ptr1 = 0; len1 = 0;
+                throw takeObject(r2);
+            }
+            deferred2_0 = ptr1;
+            deferred2_1 = len1;
+            return getStringFromWasm0(ptr1, len1);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred2_0, deferred2_1, 1);
+        }
+    }
+    /**
+     * Inserts an f32 vector with automatic binary quantization.
+     *
+     * The vector is converted to binary (1 bit per dimension) using sign quantization:
+     * - Positive values → 1
+     * - Non-positive values → 0
+     *
+     * # Arguments
+     *
+     * * `vector` - A Float32Array containing the vector data (must match dimensions).
+     *
+     * # Returns
+     *
+     * The assigned Vector ID (u32).
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Storage is not in Binary mode (metric != "hamming")
+     * - Dimensions don't match
+     * - Vector contains NaNs
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const config = new EdgeVecConfig(1024);
+     * config.metric = 'hamming';
+     * const db = new EdgeVec(config);
+     *
+     * // Insert f32 vector with automatic binary quantization
+     * const f32Vector = new Float32Array(1024).fill(0.5); // Gets quantized to all 1s
+     * const id = db.insertWithBq(f32Vector);
+     * ```
+     * @param {Float32Array} vector
+     * @returns {number}
+     */
+    insertWithBq(vector) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_insertWithBq(retptr, this.__wbg_ptr, addHeapObject(vector));
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return r0 >>> 0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Search with metadata-based distance boosting.
+     *
+     * Performs a filtered search with oversampling, then reranks results using
+     * multiplicative boosting: `final_distance = raw_distance * (1.0 - boost_factor)`.
+     *
+     * This is **scale-independent**: a weight of 0.3 reduces distance by 30%
+     * regardless of whether L2 distances are 0.001 or 50000.
+     *
+     * # Arguments
+     *
+     * * `query` - Query vector as `Float32Array`
+     * * `k` - Number of results to return
+     * * `boosts_json` - JSON array of boost configurations:
+     *   `[{"field": "entity_type", "value": "ORG", "weight": 0.3}]`
+     * * `options_json` - JSON options (same as `searchFiltered`):
+     *   `{"filter": "category = \"gpu\"", "strategy": "auto"}`
+     *
+     * # Errors
+     *
+     * Returns an error if:
+     * - Query dimensions don't match index
+     * - Query contains non-finite values
+     * - Boosts JSON is malformed or contains invalid weights
+     * - Filter expression is invalid
+     * - Options JSON is malformed
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const query = new Float32Array([0.1, 0.2, ...]);
+     * const boosts = JSON.stringify([
+     *     { field: "entity_type", value: "ORG", weight: 0.3 },
+     *     { field: "is_verified", value: true, weight: 0.2 },
+     * ]);
+     * const options = JSON.stringify({ strategy: "auto", includeMetadata: true });
+     * const result = JSON.parse(index.searchBoosted(query, 10, boosts, options));
+     * console.log(`Found ${result.results.length} boosted results`);
+     * ```
+     * @param {Float32Array} query
+     * @param {number} k
+     * @param {string} boosts_json
+     * @param {string} options_json
+     * @returns {string}
+     */
+    searchBoosted(query, k, boosts_json, options_json) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(boosts_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passStringToWasm0(options_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len1 = WASM_VECTOR_LEN;
+            wasm.edgevec_searchBoosted(retptr, this.__wbg_ptr, addHeapObject(query), k, ptr0, len0, ptr1, len1);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            var ptr3 = r0;
+            var len3 = r1;
+            if (r3) {
+                ptr3 = 0; len3 = 0;
+                throw takeObject(r2);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred4_0, deferred4_1, 1);
         }
     }
     /**
@@ -1023,6 +1565,18 @@ export class EdgeVec {
         }
     }
     /**
+     * Get estimated serialized size in bytes.
+     *
+     * Returns an estimate of the size when saved to disk.
+     * For Flat indexes, this is just the header + vector data.
+     * For HNSW indexes, includes graph overhead.
+     * @returns {number}
+     */
+    serializedSize() {
+        const ret = wasm.edgevec_serializedSize(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Get the ratio of deleted to total vectors.
      *
      * # Returns
@@ -1032,8 +1586,19 @@ export class EdgeVec {
      * @returns {number}
      */
     tombstoneRatio() {
-        const ret = wasm.edgevec_tombstoneRatio(this.__wbg_ptr);
-        return ret;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_tombstoneRatio(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getFloat64(retptr + 8 * 0, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            if (r3) {
+                throw takeObject(r2);
+            }
+            return r0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Gets all metadata for a vector as a JavaScript object.
@@ -1080,8 +1645,19 @@ export class EdgeVec {
      * @returns {boolean}
      */
     needsCompaction() {
-        const ret = wasm.edgevec_needsCompaction(this.__wbg_ptr);
-        return ret !== 0;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_needsCompaction(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return r0 !== 0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Get the current memory configuration.
@@ -1279,6 +1855,11 @@ export class EdgeVec {
             wasm.edgevec_compactionWarning(retptr, this.__wbg_ptr);
             var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
             var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            if (r3) {
+                throw takeObject(r2);
+            }
             let v1;
             if (r0 !== 0) {
                 v1 = getStringFromWasm0(r0, r1).slice();
@@ -1288,6 +1869,26 @@ export class EdgeVec {
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
+    }
+    /**
+     * Check if sparse storage is initialized.
+     *
+     * # Returns
+     *
+     * `true` if sparse storage is ready for use, `false` otherwise.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * if (!db.hasSparseStorage()) {
+     *     db.initSparseStorage();
+     * }
+     * ```
+     * @returns {boolean}
+     */
+    hasSparseStorage() {
+        const ret = wasm.edgevec_hasSparseStorage(this.__wbg_ptr);
+        return ret !== 0;
     }
     /**
      * Returns the number of metadata keys for a vector.
@@ -1554,6 +2155,26 @@ export class EdgeVec {
         return takeObject(ret);
     }
     /**
+     * Initialize sparse storage for hybrid search.
+     *
+     * Must be called before using sparse or hybrid search functions.
+     * Sparse storage is lazily initialized to minimize memory footprint
+     * for users who don't need hybrid search.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const db = new EdgeVec(config);
+     * db.initSparseStorage();  // Enable hybrid search
+     *
+     * // Now sparse/hybrid methods are available
+     * const id = db.insertSparse(indices, values, 10000);
+     * ```
+     */
+    initSparseStorage() {
+        wasm.edgevec_initSparseStorage(this.__wbg_ptr);
+    }
+    /**
      * Get the current compaction threshold.
      *
      * # Returns
@@ -1563,8 +2184,19 @@ export class EdgeVec {
      * @returns {number}
      */
     compactionThreshold() {
-        const ret = wasm.edgevec_compactionThreshold(this.__wbg_ptr);
-        return ret;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_compactionThreshold(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getFloat64(retptr + 8 * 0, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            if (r3) {
+                throw takeObject(r2);
+            }
+            return r0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Insert a vector with associated metadata in a single operation.
@@ -1665,6 +2297,122 @@ export class EdgeVec {
         return ret >>> 0;
     }
     /**
+     * Searches binary vectors with a custom ef_search parameter.
+     *
+     * This allows tuning the recall/speed tradeoff per-query:
+     * - Lower ef_search = faster, lower recall
+     * - Higher ef_search = slower, higher recall
+     *
+     * # Arguments
+     *
+     * * `query` - A Uint8Array containing the binary query vector.
+     * * `k` - The number of neighbors to return.
+     * * `ef_search` - Size of dynamic candidate list (must be >= k).
+     *
+     * # Returns
+     *
+     * An array of objects: `[{ id: u32, score: f32 }, ...]`
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * // Low ef_search = fast, ~90% recall
+     * const fastResults = db.searchBinaryWithEf(query, 10, 20);
+     *
+     * // High ef_search = slower, ~99% recall
+     * const accurateResults = db.searchBinaryWithEf(query, 10, 200);
+     * ```
+     * @param {Uint8Array} query
+     * @param {number} k
+     * @param {number} ef_search
+     * @returns {any}
+     */
+    searchBinaryWithEf(query, k, ef_search) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_searchBinaryWithEf(retptr, this.__wbg_ptr, addHeapObject(query), k, ef_search);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Searches binary vectors with optional metadata filtering.
+     *
+     * Combines binary vector search (Hamming distance) with metadata filtering.
+     *
+     * # Arguments
+     *
+     * * `query` - Binary query vector as Uint8Array (packed bits, ceil(dimensions/8) bytes)
+     * * `k` - Maximum number of results to return
+     * * `options_json` - JSON string with search options:
+     *   - `filter`: Optional SQL-like filter expression (e.g., `"category = \"gpu\""`)
+     *   - `strategy`: Filter strategy - `"auto"`, `"pre"`, `"post"`, or `"hybrid"`
+     *   - `oversample_factor`: Oversample factor for post/hybrid strategies (default: 3.0)
+     *   - `include_metadata`: Whether to include metadata in results (default: false)
+     *
+     * # Returns
+     *
+     * JSON string containing search results with Hamming distances.
+     *
+     * # Errors
+     *
+     * Returns error if:
+     * - Storage is not in Binary mode (metric != "hamming")
+     * - Query byte length doesn't match expected dimensions
+     * - Options JSON is invalid
+     * - Filter expression parsing fails
+     * - Search fails
+     *
+     * # Example
+     *
+     * ```javascript
+     * const queryBinary = new Uint8Array(128); // 1024 bits
+     * const result = JSON.parse(db.searchBinaryFiltered(queryBinary, 10, JSON.stringify({
+     *   filter: 'category = "gpu"',
+     *   strategy: 'auto',
+     *   include_metadata: true
+     * })));
+     * console.log(`Found ${result.results.length} binary matches with filter`);
+     * ```
+     * @param {Uint8Array} query
+     * @param {number} k
+     * @param {string} options_json
+     * @returns {string}
+     */
+    searchBinaryFiltered(query, k, options_json) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passStringToWasm0(options_json, wasm.__wbindgen_export, wasm.__wbindgen_export2);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.edgevec_searchBinaryFiltered(retptr, this.__wbg_ptr, addHeapObject(query), k, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            var ptr2 = r0;
+            var len2 = r1;
+            if (r3) {
+                ptr2 = 0; len2 = 0;
+                throw takeObject(r2);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
      * Set the compaction threshold.
      *
      * # Arguments
@@ -1673,7 +2421,17 @@ export class EdgeVec {
      * @param {number} ratio
      */
     setCompactionThreshold(ratio) {
-        wasm.edgevec_setCompactionThreshold(this.__wbg_ptr, ratio);
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_setCompactionThreshold(retptr, this.__wbg_ptr, ratio);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            if (r1) {
+                throw takeObject(r0);
+            }
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Soft-delete multiple vectors using number array (Safari 14 compatible).
@@ -2118,7 +2876,15 @@ export class EdgeVecConfig {
         wasm.__wbg_set_edgevecconfig_dimensions(this.__wbg_ptr, arg0);
     }
     /**
-     * Set distance metric ("l2", "cosine", "dot").
+     * Get the configured index type.
+     * @returns {JsIndexType}
+     */
+    get indexType() {
+        const ret = wasm.edgevecconfig_indexType(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * Set distance metric ("l2", "cosine", "dot", "hamming").
      * @param {string} metric
      */
     set metric(metric) {
@@ -2127,11 +2893,74 @@ export class EdgeVecConfig {
         wasm.edgevecconfig_set_metric(this.__wbg_ptr, ptr0, len0);
     }
     /**
+     * Get the configured vector type.
+     * @returns {VectorType | undefined}
+     */
+    get vector_type() {
+        const ret = wasm.edgevecconfig_vector_type(this.__wbg_ptr);
+        return ret === 2 ? undefined : ret;
+    }
+    /**
      * Set ef_search parameter.
      * @param {number} ef
      */
     set ef_search(ef) {
         wasm.edgevecconfig_set_ef_search(this.__wbg_ptr, ef);
+    }
+    /**
+     * Set the index type (Flat or HNSW).
+     *
+     * - `Flat`: Brute force search (O(1) insert, O(n) search). Best for insert-heavy
+     *   workloads, datasets < 1M vectors, or when 100% recall is required.
+     * - `HNSW`: Graph-based search (O(log n) insert, O(log n) search). Best for
+     *   large datasets and read-heavy workloads.
+     *
+     * # Example
+     *
+     * ```javascript
+     * // For insert-heavy workloads (semantic caching)
+     * const config = new EdgeVecConfig(1024);
+     * config.indexType = IndexType.Flat;
+     *
+     * // For large-scale search (default)
+     * const config2 = new EdgeVecConfig(1024);
+     * config2.indexType = IndexType.Hnsw;
+     * ```
+     * @param {JsIndexType} index_type
+     */
+    set indexType(index_type) {
+        wasm.edgevecconfig_set_indexType(this.__wbg_ptr, index_type);
+    }
+    /**
+     * Set distance metric using typed enum.
+     *
+     * # Example
+     *
+     * ```javascript
+     * const config = new EdgeVecConfig(768);
+     * config.setMetricType(MetricType.Cosine);
+     * ```
+     * @param {MetricType} metric_type
+     */
+    setMetricType(metric_type) {
+        wasm.edgevecconfig_setMetricType(this.__wbg_ptr, metric_type);
+    }
+    /**
+     * Set vector storage type.
+     *
+     * Use `VectorType.Binary` with `MetricType.Hamming` for binary vectors.
+     *
+     * # Example
+     *
+     * ```javascript
+     * const config = new EdgeVecConfig(1024);
+     * config.setVectorType(VectorType.Binary);
+     * config.setMetricType(MetricType.Hamming);
+     * ```
+     * @param {VectorType} vt
+     */
+    set vector_type(vt) {
+        wasm.edgevecconfig_set_vector_type(this.__wbg_ptr, vt);
     }
     /**
      * Set ef_construction parameter.
@@ -2164,8 +2993,72 @@ export class EdgeVecConfig {
     set m0(m0) {
         wasm.edgevecconfig_set_m0(this.__wbg_ptr, m0);
     }
+    /**
+     * Check if this configuration uses a Flat index.
+     * @returns {boolean}
+     */
+    isFlat() {
+        const ret = wasm.edgevecconfig_isFlat(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * Check if this configuration uses an HNSW index (default).
+     * @returns {boolean}
+     */
+    isHnsw() {
+        const ret = wasm.edgevecconfig_isHnsw(this.__wbg_ptr);
+        return ret !== 0;
+    }
 }
 if (Symbol.dispose) EdgeVecConfig.prototype[Symbol.dispose] = EdgeVecConfig.prototype.free;
+
+/**
+ * Index type for EdgeVec.
+ *
+ * Determines the search algorithm and performance characteristics.
+ *
+ * ## Performance Comparison
+ *
+ * | Index Type | Insert | Search (1M) | Recall | Best For |
+ * |------------|--------|-------------|--------|----------|
+ * | Flat       | O(1) ~1μs | O(n) ~5-10ms | 100% (exact) | Real-time apps, <1M vectors |
+ * | HNSW       | O(log n) ~2ms | O(log n) ~2ms | 90-95% | Large datasets, batch insert |
+ *
+ * ## Example (JavaScript)
+ *
+ * ```javascript
+ * import { EdgeVecConfig, IndexType } from 'edgevec';
+ *
+ * // Create a flat index for insert-heavy workloads
+ * const config = new EdgeVecConfig(1024);
+ * config.indexType = IndexType.Flat;
+ *
+ * // Create an HNSW index for large-scale search (default)
+ * const hnswConfig = new EdgeVecConfig(1024);
+ * hnswConfig.indexType = IndexType.Hnsw; // This is the default
+ * ```
+ * @enum {0 | 1}
+ */
+export const JsIndexType = Object.freeze({
+    /**
+     * Brute force search (O(1) insert, O(n) search).
+     *
+     * Best for:
+     * - Insert-heavy workloads (semantic caching)
+     * - Datasets < 1M vectors
+     * - When 100% recall (exact search) is required
+     */
+    Flat: 0, "0": "Flat",
+    /**
+     * HNSW graph index (O(log n) insert, O(log n) search).
+     *
+     * Best for:
+     * - Large datasets (>1M vectors)
+     * - Read-heavy workloads
+     * - When approximate nearest neighbors is acceptable
+     */
+    Hnsw: 1, "1": "Hnsw",
+});
 
 /**
  * JavaScript-friendly metadata value representation.
@@ -2464,6 +3357,31 @@ export class JsMetadataValue {
 if (Symbol.dispose) JsMetadataValue.prototype[Symbol.dispose] = JsMetadataValue.prototype.free;
 
 /**
+ * Distance metric type for EdgeVec.
+ *
+ * Determines how vector similarity is calculated.
+ * @enum {0 | 1 | 2 | 3}
+ */
+export const MetricType = Object.freeze({
+    /**
+     * L2 Squared (Euclidean) distance.
+     */
+    L2: 0, "0": "L2",
+    /**
+     * Cosine similarity (converted to distance).
+     */
+    Cosine: 1, "1": "Cosine",
+    /**
+     * Dot product (converted to distance).
+     */
+    Dot: 2, "2": "Dot",
+    /**
+     * Hamming distance (for binary vectors).
+     */
+    Hamming: 3, "3": "Hamming",
+});
+
+/**
  * Iterator for saving the database in chunks.
  *
  * This avoids large allocations by serializing the database incrementally.
@@ -2514,6 +3432,198 @@ export class PersistenceIterator {
     }
 }
 if (Symbol.dispose) PersistenceIterator.prototype[Symbol.dispose] = PersistenceIterator.prototype.free;
+
+/**
+ * WASM handle for a trained PQ codebook.
+ *
+ * Wraps a [`PqCodebook`] as an opaque handle that can be passed between
+ * JavaScript and WASM. The codebook lives entirely on the WASM heap;
+ * only query vectors and results cross the JS/WASM boundary.
+ *
+ * # JavaScript Usage
+ *
+ * ```javascript
+ * // Train a codebook from flat Float32Array data
+ * const codebook = trainPq(data, 128, 1000, 8, 256, 25);
+ *
+ * // Encode a single vector
+ * const code = codebook.encodePq(vector); // Uint8Array of length M
+ *
+ * // Search over encoded vectors
+ * const results = codebook.pqSearch(allCodes, 1000, query, 10);
+ * // results = [{index: 42, distance: 0.123}, ...]
+ * ```
+ */
+export class PqCodebookHandle {
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(PqCodebookHandle.prototype);
+        obj.__wbg_ptr = ptr;
+        PqCodebookHandleFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        PqCodebookHandleFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_pqcodebookhandle_free(ptr, 0);
+    }
+    /**
+     * Returns the vector dimensionality this codebook was trained on.
+     * @returns {number}
+     */
+    dimensions() {
+        const ret = wasm.pqcodebookhandle_dimensions(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Returns the number of subquantizers (M) in this codebook.
+     * @returns {number}
+     */
+    numSubquantizers() {
+        const ret = wasm.pqcodebookhandle_numSubquantizers(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Returns the number of centroids per subspace (Ksub).
+     * @returns {number}
+     */
+    ksub() {
+        const ret = wasm.pqcodebookhandle_ksub(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Encode a single vector into a PQ code.
+     *
+     * Returns a `Uint8Array` of length M (one centroid index per subspace).
+     *
+     * # Arguments
+     *
+     * * `vector` - A `Float32Array` of length `dims` (the dimensionality
+     *   used during training).
+     *
+     * # Errors
+     *
+     * Returns a string error if:
+     * - `vector` has wrong dimensionality
+     * - `vector` contains NaN or Infinity
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const code = codebook.encodePq(new Float32Array([0.1, 0.2, ...]));
+     * console.log(code.length); // M (e.g., 8)
+     * ```
+     * @param {Float32Array} vector
+     * @returns {Uint8Array}
+     */
+    encodePq(vector) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArrayF32ToWasm0(vector, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.pqcodebookhandle_encodePq(retptr, this.__wbg_ptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            if (r3) {
+                throw takeObject(r2);
+            }
+            var v2 = getArrayU8FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export4(r0, r1 * 1, 1);
+            return v2;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Search over PQ-encoded vectors using Asymmetric Distance Computation.
+     *
+     * Given a flat byte array of PQ codes and a query vector, computes
+     * approximate distances and returns the top-k nearest results.
+     *
+     * # Arguments
+     *
+     * * `codes` - Flat `Uint8Array` of all PQ codes: `n_codes * M` bytes.
+     *   Each consecutive M bytes form one PQ code.
+     * * `n_codes` - Number of encoded vectors in `codes`.
+     * * `query` - Query vector (`Float32Array` of length `dims`).
+     * * `k` - Number of nearest neighbors to return.
+     *
+     * # Returns
+     *
+     * A JavaScript `Array` of objects `{index: number, distance: number}`,
+     * sorted by distance ascending (nearest first). Length is `min(k, n_codes)`.
+     *
+     * # Errors
+     *
+     * Returns a string error if:
+     * - `query` contains NaN or Infinity
+     * - `query` has wrong dimensionality
+     * - `codes.length != n_codes * M`
+     * - `k` is 0
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * // Encode 1000 vectors, then search
+     * const allCodes = new Uint8Array(1000 * 8); // M=8
+     * // ... fill allCodes from encodePq() calls ...
+     * const results = codebook.pqSearch(allCodes, 1000, query, 10);
+     * for (const r of results) {
+     *     console.log(`Index: ${r.index}, Distance: ${r.distance}`);
+     * }
+     * ```
+     * @param {Uint8Array} codes
+     * @param {number} n_codes
+     * @param {Float32Array} query
+     * @param {number} k
+     * @returns {any}
+     */
+    pqSearch(codes, n_codes, query, k) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray8ToWasm0(codes, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passArrayF32ToWasm0(query, wasm.__wbindgen_export);
+            const len1 = WASM_VECTOR_LEN;
+            wasm.pqcodebookhandle_pqSearch(retptr, this.__wbg_ptr, ptr0, len0, n_codes, ptr1, len1, k);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return takeObject(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+}
+if (Symbol.dispose) PqCodebookHandle.prototype[Symbol.dispose] = PqCodebookHandle.prototype.free;
+
+/**
+ * Vector storage type for EdgeVec.
+ *
+ * Determines how vectors are stored and processed.
+ * @enum {0 | 1}
+ */
+export const VectorType = Object.freeze({
+    /**
+     * Standard 32-bit floating point vectors.
+     */
+    Float32: 0, "0": "Float32",
+    /**
+     * Binary vectors (1-bit per dimension, packed into bytes).
+     * Use with `metric = "hamming"`.
+     */
+    Binary: 1, "1": "Binary",
+});
 
 /**
  * Result of a batch delete operation (W18.4/W18.5).
@@ -2665,26 +3775,43 @@ export function benchmarkHamming(bytes, iterations) {
 }
 
 /**
- * Side-by-side benchmark: New WASM SIMD128 vs Current runtime dispatcher.
+ * Batch benchmark: Compare SIMD implementations searching through N vectors.
  *
- * Compares:
- * 1. **New** (`metric::simd::hamming_distance`): Compile-time SIMD128 detection → uses WASM SIMD
- * 2. **Current** (`simd::popcount::simd_popcount_xor`): Runtime detection → falls to scalar in WASM
+ * This is a realistic benchmark that simulates searching through a dataset:
+ * - Accepts vectors from JavaScript (same path as real insertions)
+ * - For each iteration, computes hamming distance from query to ALL vectors
+ * - Compares new WASM SIMD128 vs current scalar fallback
  *
- * Returns a JSON string with timings:
+ * # Arguments
+ *
+ * * `vectors_js` - Array of Uint8Array vectors (created in JavaScript)
+ * * `query_js` - Query vector as Uint8Array
+ * * `iterations` - Number of full scans to perform
+ *
+ * Returns JSON with throughput metrics:
  * ```json
- * {"new_us": 0.15, "current_us": 0.42, "speedup": 2.8, "new_backend": "wasm_simd128", "current_backend": "scalar"}
+ * {
+ *   "num_vectors": 10000,
+ *   "bytes_per_vector": 128,
+ *   "iterations": 100,
+ *   "new_ms": 1.23,
+ *   "current_ms": 3.45,
+ *   "speedup": 2.8,
+ *   "new_throughput": "8.1M vec/s",
+ *   "current_throughput": "2.9M vec/s"
+ * }
  * ```
- * @param {number} bytes
+ * @param {Array<any>} vectors_js
+ * @param {Uint8Array} query_js
  * @param {number} iterations
  * @returns {string}
  */
-export function benchmarkHammingComparison(bytes, iterations) {
+export function benchmarkHammingBatch(vectors_js, query_js, iterations) {
     let deferred1_0;
     let deferred1_1;
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        wasm.benchmarkHammingComparison(retptr, bytes, iterations);
+        wasm.benchmarkHammingBatch(retptr, addBorrowedObject(vectors_js), addHeapObject(query_js), iterations);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         deferred1_0 = r0;
@@ -2692,6 +3819,7 @@ export function benchmarkHammingComparison(bytes, iterations) {
         return getStringFromWasm0(r0, r1);
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
+        heap[stack_pointer++] = undefined;
         wasm.__wbindgen_export4(deferred1_0, deferred1_1, 1);
     }
 }
@@ -2834,6 +3962,68 @@ export function parse_filter_js(filter_str) {
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
         wasm.__wbindgen_export4(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
+ * Train a PQ codebook from flat vector data.
+ *
+ * Takes a flat `Float32Array` of `n_vectors * dims` elements and trains
+ * a Product Quantization codebook with `m` subquantizers, each having
+ * `ksub` centroids, using `max_iters` k-means iterations.
+ *
+ * # Arguments
+ *
+ * * `data` - Flat `Float32Array`: `n_vectors` vectors of `dims` dimensions each,
+ *   stored contiguously (row-major).
+ * * `dims` - Dimensionality of each vector. Must be > 0 and divisible by `m`.
+ * * `n_vectors` - Number of vectors in `data`. Must be >= `ksub`.
+ * * `m` - Number of subquantizers. Must be >= 1.
+ * * `ksub` - Centroids per subspace. Must be in \[2, 256\].
+ * * `max_iters` - Maximum k-means iterations per subspace.
+ *
+ * # Returns
+ *
+ * A `PqCodebookHandle` that can be used for encoding and searching.
+ *
+ * # Errors
+ *
+ * Returns a string error if:
+ * - `data` contains NaN or Infinity values
+ * - `data.length != n_vectors * dims`
+ * - `dims` is not divisible by `m`
+ * - Fewer than `ksub` vectors are provided
+ *
+ * # Example (JavaScript)
+ *
+ * ```javascript
+ * const data = new Float32Array(1000 * 128); // 1000 vectors, 128 dims
+ * // ... fill data ...
+ * const codebook = trainPq(data, 128, 1000, 8, 256, 25);
+ * ```
+ * @param {Float32Array} data
+ * @param {number} dims
+ * @param {number} n_vectors
+ * @param {number} m
+ * @param {number} ksub
+ * @param {number} max_iters
+ * @returns {PqCodebookHandle}
+ */
+export function trainPq(data, dims, n_vectors, m, ksub, max_iters) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF32ToWasm0(data, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.trainPq(retptr, ptr0, len0, dims, n_vectors, m, ksub, max_iters);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+        if (r2) {
+            throw takeObject(r1);
+        }
+        return PqCodebookHandle.__wrap(r0);
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
     }
 }
 
@@ -3180,7 +4370,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_2259(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_2698(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -3253,7 +4443,7 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_randomFillSync_ac0988aba3254290 = function() { return handleError(function (arg0, arg1) {
         getObject(arg0).randomFillSync(takeObject(arg1));
     }, arguments) };
-    imports.wbg.__wbg_read_034630817ee5f3b2 = function() { return handleError(function (arg0, arg1) {
+    imports.wbg.__wbg_read_dea6f95550ae9794 = function() { return handleError(function (arg0, arg1) {
         const ret = IndexedDbBackend.read(getStringFromWasm0(arg0, arg1));
         return addHeapObject(ret);
     }, arguments) };
@@ -3317,10 +4507,15 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_warn_6e567d0d926ff881 = function(arg0) {
         console.warn(getObject(arg0));
     };
-    imports.wbg.__wbg_write_a14711ba121961c2 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
+    imports.wbg.__wbg_write_91f31b73380b0c53 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
         const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getArrayU8FromWasm0(arg2, arg3));
         return addHeapObject(ret);
     }, arguments) };
+    imports.wbg.__wbindgen_cast_0578849e8f68f9d8 = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 138, function: Function { arguments: [Externref], shim_idx: 139, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_2131, __wasm_bindgen_func_elem_2147);
+        return addHeapObject(ret);
+    };
     imports.wbg.__wbindgen_cast_2241b6af4c4b2941 = function(arg0, arg1) {
         // Cast intrinsic for `Ref(String) -> Externref`.
         const ret = getStringFromWasm0(arg0, arg1);
@@ -3339,11 +4534,6 @@ function __wbg_get_imports() {
     imports.wbg.__wbindgen_cast_d6cd19b81560fd6e = function(arg0) {
         // Cast intrinsic for `F64 -> Externref`.
         const ret = arg0;
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbindgen_cast_f0471e20a57dc27a = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 127, function: Function { arguments: [Externref], shim_idx: 128, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_1731, __wasm_bindgen_func_elem_1747);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_object_clone_ref = function(arg0) {
