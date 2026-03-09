@@ -119,7 +119,7 @@ python -m http.server 8080
 
 EdgeVec supports **metadata boosting** for entity-enhanced retrieval — improve search relevance by incorporating entity signals (ORG, PERSON, GPE) extracted via NER, without building a knowledge graph.
 
-```rust
+```rust,ignore
 use edgevec::filter::{MetadataBoost, FilteredSearcher, FilterStrategy};
 use edgevec::metadata::MetadataValue;
 
