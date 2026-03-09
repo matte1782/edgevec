@@ -1106,7 +1106,7 @@
       try {
         log('Initializing EdgeVec WASM module...', 'info');
 
-        const { default: init, EdgeVec, EdgeVecConfig } = await import('../../pkg/edgevec.js');
+        const { default: init, EdgeVec, EdgeVecConfig } = await import('./pkg/edgevec.js');
         await init();
 
         state.edgevec = { EdgeVec, EdgeVecConfig };
