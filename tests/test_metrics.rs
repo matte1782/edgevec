@@ -37,7 +37,8 @@ fn test_dot_product_basic() {
     let a = [1.0, 2.0, 3.0];
     let b = [4.0, 5.0, 6.0];
     // 1*4 + 2*5 + 3*6 = 4 + 10 + 18 = 32
-    assert_eq!(DotProduct::distance(&a, &b), 32.0);
+    // DotProduct::distance returns 1.0 - dot_product (lower = closer)
+    assert_eq!(DotProduct::distance(&a, &b), 1.0 - 32.0);
 }
 
 #[test]
