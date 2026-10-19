@@ -72,3 +72,12 @@ Sparse vectors and pairings remain runtime state, excluded from v0.9 snapshots;
 regenerate them after loading. These contracts are explicit in the API docs.
 
 No npm or crates.io version is published by this GitHub source/demo closeout.
+
+## Hosted reporting follow-up
+
+The first hosted closeout run passed all 12 PR checks and the four-device mobile
+job. It exposed an existing reporting error hidden by `continue-on-error`: both
+benchmark workflows attempted PR comments without integration write permission.
+Reports now use the Actions job summary and artifacts without requesting broader
+permissions. Regression failure status still propagates through `tee`, and an
+incomplete/failed check is no longer summarized as a successful benchmark run.

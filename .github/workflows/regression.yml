@@ -39,6 +39,9 @@ jobs:
     name: Performance Regression Check
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - uses: actions/checkout@v4
@@ -82,8 +85,8 @@ jobs:
         id: regression
         run: |
           echo "Checking for performance regressions..."
-          python benches/check_regression.py 2>&1 | tee regression_result.txt
-          RESULT=${PIPESTATUS[0]}
+          RESULT=0
+          python benches/check_regression.py 2>&1 | tee regression_result.txt || RESULT=$?
 
           # Set output for later steps
           if [ $RESULT -ne 0 ]; then
@@ -126,7 +129,10 @@ jobs:
           echo "## Performance Regression Check Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ "${{ steps.regression.outputs.regression_detected }}" = "true" ]; then
+          if [ "${{ steps.regression.outcome }}" != "success" ]; then
+            echo "### Check failed or did not complete" >> $GITHUB_STEP_SUMMARY
+            echo "Inspect the job logs and artifacts for the failure." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.regression.outputs.regression_detected }}" = "true" ]; then
             echo "### ❌ Regression Detected" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "Performance regression detected. Please review the benchmark results." >> $GITHUB_STEP_SUMMARY
@@ -150,62 +156,3 @@ jobs:
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "See artifacts for detailed Criterion reports." >> $GITHUB_STEP_SUMMARY
-
-      # Comment on PR with results
-      - name: Comment on PR
-        if: github.event_name == 'pull_request' && always()
-        continue-on-error: true  # Don't fail workflow if commenting fails (fork PRs lack write permission)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-
-            let summary = '## Performance Regression Check\n\n';
-
-            // Check if regression was detected
-            const regressionDetected = '${{ steps.regression.outputs.regression_detected }}' === 'true';
-
-            if (regressionDetected) {
-              summary += '### ❌ Performance Regression Detected\n\n';
-              summary += 'The benchmark results show performance degradation exceeding the 10% threshold.\n\n';
-            } else {
-              summary += '### ✅ No Performance Regression\n\n';
-              summary += 'All benchmarks are within acceptable thresholds.\n\n';
-            }
-
-            // Add benchmark table
-            summary += '| Benchmark | Status | Notes |\n';
-            summary += '|:----------|:-------|:------|\n';
-
-            // Read regression output if available
-            try {
-              const output = fs.readFileSync('regression_result.txt', 'utf8');
-              if (output.includes('PASS')) {
-                summary += '| Validation Suite | ✅ PASS | Within baseline |\n';
-              } else if (output.includes('FAIL')) {
-                summary += '| Validation Suite | ❌ FAIL | Regression detected |\n';
-              } else {
-                summary += '| Validation Suite | ⚠️ Unknown | Check logs |\n';
-              }
-            } catch (e) {
-              summary += '| Validation Suite | ⚠️ Unknown | Output not found |\n';
-            }
-
-            // Add P99 results
-            try {
-              const p99Output = fs.readFileSync('p99_output.txt', 'utf8');
-              if (p99Output.length > 0) {
-                summary += '| P99 Latency | ✅ Tracked | See artifacts |\n';
-              }
-            } catch (e) {
-              summary += '| P99 Latency | ⚠️ Unknown | Output not found |\n';
-            }
-
-            summary += '\n\n📊 See [benchmark artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for detailed results.';
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: summary
-            });

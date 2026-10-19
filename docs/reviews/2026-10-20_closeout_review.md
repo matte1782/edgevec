@@ -24,3 +24,11 @@ mobile-device checks, and fresh deployment/live-artifact verification.
 
 See [validation details](2026-10-20_closeout_validation.md) and
 [artifact/benchmark evidence](../benchmarks/2026-10-20_closeout.json).
+
+## CI reporting follow-up
+
+**Verdict: GO for publication.** The independent reviewer verified both workflow
+YAML files, explicit Bash failure propagation through `tee`, regression outputs,
+and success/failure/skipped summaries. Reports use summaries and artifacts rather
+than PR comment writes. Hosted CI and mobile checks must pass again on the final
+head before merge.

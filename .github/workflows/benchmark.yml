@@ -23,6 +23,9 @@ jobs:
   benchmark:
     name: Performance Regression Check
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - uses: actions/checkout@v4
@@ -56,22 +59,11 @@ jobs:
           # Benchmarks: insert_1k, search_10k, quantization_encode, hamming_distance
           cargo bench --bench validation -- --noplot
 
-      # [m2 FIX] Run check once and capture both stdout and PR comment in single pass
       - name: Check for regressions and generate report
         id: regression_check
         run: |
-          # Run regression check and save output
-          python benches/check_regression.py 2>&1 | tee regression_output.txt
-          RESULT=${PIPESTATUS[0]}
-
-          # Generate PR comment if on pull request
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python benches/check_regression.py --pr-comment > benchmark_comment.md
-          fi
-
-          # Exit with original result
-          exit $RESULT
-        continue-on-error: false
+          # pipefail preserves the regression check's failure through tee.
+          python benches/check_regression.py --pr-comment 2>&1 | tee regression_output.txt
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -84,30 +76,12 @@ jobs:
             regression_output.txt
           retention-days: 30
 
-      - name: Comment on PR with results
-        if: github.event_name == 'pull_request'
-        continue-on-error: true  # Don't fail workflow if commenting fails (fork PRs lack write permission)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let summary;
-            try {
-              summary = fs.readFileSync('benchmark_comment.md', 'utf8');
-            } catch (e) {
-              summary = '## Benchmark Results\n\n';
-              summary += '| Benchmark | Status |\n';
-              summary += '|:----------|:-------|\n';
-              summary += '| insert_1k | ✅ Completed |\n';
-              summary += '| search_10k | ✅ Completed |\n';
-              summary += '| quantization_encode | ✅ Completed |\n';
-              summary += '| hamming_distance | ✅ Completed |\n\n';
-              summary += 'See artifacts for detailed Criterion reports.';
-            }
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: summary
-            });
+      - name: Publish benchmark summary
+        if: always()
+        run: |
+          echo "## Performance Benchmarks" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f regression_output.txt ]; then
+            cat regression_output.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Benchmark check did not complete. See the job logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
