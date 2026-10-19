@@ -109,7 +109,7 @@ Both hosted Miri jobs must pass with the newly resolved dependency version and t
 
 The patches are ready for CI. Formatting passes, the mobile-page Node smoke passes 12/12, and the code/value equivalence and workflow command coverage were inspected. The implementing agent reported the earlier hosted Linux suite, WASM compilation/persistence, fuzz-build and x86 checks passing; the follow-up revision still needs its own hosted results.
 
-Before merge, verify the new revision's native lint, ARM build/tests/lint, both Miri jobs and configured BrowserStack matrix, together with the already-required main checks. A missing-secrets skip must be reported as a skip, not as executed mobile-browser coverage. The reviewer changed only this review appendix and performed no implementation or Git-state mutation.
+Before merge, verify the new revision's native lint, ARM build/tests/lint, both Miri jobs and configured BrowserStack matrix, together with the already-required main checks. A missing-secrets skip must be reported as a skip, not as executed mobile-browser coverage. The reviewer changed only this review document and performed no implementation or Git-state mutation.
 
 ### Additional ARM and BrowserStack corrections
 
