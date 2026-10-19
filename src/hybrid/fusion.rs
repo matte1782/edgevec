@@ -317,9 +317,8 @@ pub fn rrf_fusion(
 ///
 /// # Assumptions
 ///
-/// Input scores are expected to be non-negative (>= 0.0). This is true for:
-/// - Dense: cosine similarity in [0, 1]
-/// - Sparse: dot product of non-negative BM25/TF-IDF scores (>= 0)
+/// Input scores must be finite. Signed scores (including negative distances)
+/// are supported. Intermediate f64 arithmetic avoids overflowing the range.
 ///
 /// # Arguments
 ///
@@ -333,9 +332,14 @@ fn normalize_scores(results: &[(u64, f32)]) -> HashMap<u64, f32> {
         return HashMap::new();
     }
 
-    let scores: Vec<f32> = results.iter().map(|(_, s)| *s).collect();
-    let min = scores.iter().copied().fold(f32::INFINITY, f32::min);
-    let max = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let min = results
+        .iter()
+        .map(|(_, score)| f64::from(*score))
+        .fold(f64::INFINITY, f64::min);
+    let max = results
+        .iter()
+        .map(|(_, score)| f64::from(*score))
+        .fold(f64::NEG_INFINITY, f64::max);
 
     let range = max - min;
 
@@ -345,7 +349,10 @@ fn normalize_scores(results: &[(u64, f32)]) -> HashMap<u64, f32> {
             let normalized = if range == 0.0 {
                 1.0 // All same score → treat as max (includes single element)
             } else {
-                (score - min) / range
+                // Normalized value is bounded to [0, 1], representable in f32.
+                #[allow(clippy::cast_possible_truncation)]
+                let value = ((f64::from(*score) - min) / range) as f32;
+                value
             };
             (*id, normalized)
         })
@@ -376,9 +383,8 @@ fn normalize_scores(results: &[(u64, f32)]) -> HashMap<u64, f32> {
 ///
 /// # Note
 ///
-/// [HOSTILE_REVIEW: m4 Resolution] - This function expects non-negative scores.
-/// Dense similarity (cosine in [0,1]) and sparse BM25 scores (>= 0) satisfy this.
-/// If scores can be negative, normalization behavior is undefined.
+/// Accepts finite scores, including signed similarities. Larger is better.
+/// Convert distances to similarities before calling (for example, negate them).
 ///
 /// # Example
 ///
@@ -404,17 +410,6 @@ pub fn linear_fusion(
 
     // Clamp alpha to valid range [0.0, 1.0]
     let alpha = alpha.clamp(0.0, 1.0);
-
-    // Debug assertion: scores should be non-negative for proper normalization
-    // Dense similarity (cosine in [0,1]) and sparse BM25 scores (>= 0) satisfy this.
-    debug_assert!(
-        dense_results.iter().all(|(_, s)| *s >= 0.0),
-        "Dense scores must be non-negative for linear fusion normalization"
-    );
-    debug_assert!(
-        sparse_results.iter().all(|(_, s)| *s >= 0.0),
-        "Sparse scores must be non-negative for linear fusion normalization"
-    );
 
     // Normalize scores to [0, 1] using min-max normalization
     let dense_norm = normalize_scores(dense_results);

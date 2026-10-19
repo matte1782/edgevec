@@ -8,17 +8,14 @@ use crate::hybrid::{FusionMethod, HybridSearchConfig, HybridSearcher};
 use crate::metadata::validation::{validate_key, validate_value, MAX_KEYS_PER_VECTOR};
 use crate::metadata::MetadataStore;
 use crate::persistence::buffer::{self, PersistedIndex, PersistedIndexRef};
-use crate::persistence::{chunking::ChunkIter, ChunkedWriter, PersistenceError};
+use crate::persistence::PersistenceError;
 use crate::quantization::product::{PqCode, PqCodebook};
 #[cfg(feature = "sparse")]
 use crate::sparse::{SparseSearcher, SparseStorage, SparseVector};
 use crate::storage::VectorStorage;
 use js_sys::{Array, Float32Array, Function, Object, Reflect, Uint32Array, Uint8Array};
 use serde::{Deserialize, Serialize};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Once,
-};
+use std::sync::Once;
 use wasm_bindgen::prelude::*;
 
 mod batch;
@@ -654,15 +651,14 @@ pub struct EdgeVec {
     /// Future versions may add optional sparse persistence via separate file.
     #[cfg(feature = "sparse")]
     sparse_storage: Option<SparseStorage>,
-    /// Safety guard for iterators (runtime state, not persisted).
-    liveness: Arc<AtomicBool>,
-}
-
-impl Drop for EdgeVec {
-    fn drop(&mut self) {
-        // Signal to any active iterators that we are dead
-        self.liveness.store(false, Ordering::Release);
-    }
+    /// Runtime document pairing; standalone sparse IDs retain their own namespace.
+    /// Like sparse storage, these pairings are intentionally not in snapshots.
+    #[cfg(feature = "sparse")]
+    sparse_ids: HashMap<u64, u64>,
+    #[cfg(feature = "sparse")]
+    sparse_dense_ids: std::collections::HashSet<u64>,
+    #[cfg(feature = "sparse")]
+    next_sparse_dense_id: u64,
 }
 
 impl EdgeVec {
@@ -685,7 +681,12 @@ impl EdgeVec {
             memory_config: MemoryConfig::default(),
             #[cfg(feature = "sparse")]
             sparse_storage: None,
-            liveness: Arc::new(AtomicBool::new(true)),
+            #[cfg(feature = "sparse")]
+            sparse_ids: HashMap::new(),
+            #[cfg(feature = "sparse")]
+            sparse_dense_ids: std::collections::HashSet::new(),
+            #[cfg(feature = "sparse")]
+            next_sparse_dense_id: 1,
         })
     }
 }
@@ -788,7 +789,12 @@ impl EdgeVec {
             memory_config: MemoryConfig::default(),
             #[cfg(feature = "sparse")]
             sparse_storage: None,
-            liveness: Arc::new(AtomicBool::new(true)),
+            #[cfg(feature = "sparse")]
+            sparse_ids: HashMap::new(),
+            #[cfg(feature = "sparse")]
+            sparse_dense_ids: std::collections::HashSet::new(),
+            #[cfg(feature = "sparse")]
+            next_sparse_dense_id: 1,
         })
     }
 
@@ -1668,53 +1674,26 @@ impl EdgeVec {
     ///
     /// # Arguments
     ///
-    /// * `chunk_size` - Maximum size of each chunk in bytes (default: 10MB).
+    /// * `chunk_size` - Maximum chunk size (default: 10MB; minimum: 64 bytes).
     ///
     /// # Returns
     ///
     /// A `PersistenceIterator` that yields `Uint8Array` chunks.
     ///
-    /// # Safety
+    /// # Snapshot ownership
     ///
-    /// The returned iterator holds a reference to this `EdgeVec` instance.
-    /// You MUST ensure `EdgeVec` is not garbage collected or freed while using the iterator.
+    /// Serializes eagerly into an owned snapshot. Memory includes the complete
+    /// snapshot and one emitted chunk. The source may be mutated or freed while
+    /// iterating; concatenated chunks are identical to `toBytes()` at creation.
     #[wasm_bindgen]
     pub fn save_stream(&self, chunk_size: Option<usize>) -> Result<PersistenceIterator, JsValue> {
-        // HNSW-only: Chunked streaming is only implemented for HNSW
-        let (index, storage) = self.inner.as_hnsw()?;
-        let size = chunk_size.unwrap_or(DEFAULT_CHUNK_SIZE);
-        let writer = (storage, index);
-        let iter = writer.export_chunked(size);
-
-        // SAFETY: We transmute the lifetime from `'self` to `'static` because
-        // wasm-bindgen cannot express borrowed return types to JavaScript.
-        //
-        // (a) Liveness guard: The returned `PersistenceIterator` holds a clone of
-        //     `self.liveness` (an `Arc<AtomicBool>`). When `EdgeVec` is dropped, it
-        //     sets `liveness` to `false`, allowing consumers to detect invalidation.
-        //     This does NOT prevent use-after-free at the Rust level, but provides a
-        //     JS-visible signal.
-        //
-        // (b) TOCTOU gap: There is a theoretical time-of-check-to-time-of-use gap
-        //     between checking `liveness` and accessing the iterator data. A consumer
-        //     could check `liveness == true`, then `EdgeVec` could be dropped, then
-        //     the consumer calls `next()` on dangling data.
-        //
-        // (c) Why this is acceptable: JavaScript's single-threaded event loop
-        //     guarantees that `EdgeVec` cannot be garbage-collected or dropped
-        //     *during* a synchronous iteration step. The GC only runs between
-        //     microtask boundaries, so as long as the user does not `free()` the
-        //     `EdgeVec` while iterating, the reference remains valid. The doc comment
-        //     on `save_stream` explicitly states this contract.
-        //
-        // If wasm-bindgen gains lifetime support in the future, this transmute
-        // should be removed in favor of a safe borrowed return.
-        #[allow(unsafe_code)]
-        let static_iter = unsafe { std::mem::transmute::<ChunkIter<'_>, ChunkIter<'static>>(iter) };
-
+        let size = chunk_size
+            .unwrap_or(DEFAULT_CHUNK_SIZE)
+            .max(crate::persistence::chunking::MIN_CHUNK_SIZE);
         Ok(PersistenceIterator {
-            iter: static_iter,
-            liveness: self.liveness.clone(),
+            bytes: self.to_bytes()?,
+            position: 0,
+            chunk_size: size,
         })
     }
 
@@ -1898,9 +1877,10 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = deletedCount)]
     #[allow(clippy::cast_possible_truncation)]
     pub fn deleted_count(&self) -> Result<u32, JsValue> {
-        // HNSW-only: Soft delete is not supported for Flat index
-        let (index, _storage) = self.inner.as_hnsw()?;
-        Ok(index.deleted_count() as u32)
+        Ok(match &self.inner {
+            IndexVariant::Hnsw { index, .. } => index.deleted_count() as u32,
+            IndexVariant::Flat { .. } => 0,
+        })
     }
 
     /// Get the count of live (non-deleted) vectors.
@@ -1911,9 +1891,10 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = liveCount)]
     #[allow(clippy::cast_possible_truncation)]
     pub fn live_count(&self) -> Result<u32, JsValue> {
-        // HNSW-only: Soft delete is not supported for Flat index
-        let (index, _storage) = self.inner.as_hnsw()?;
-        Ok(index.live_count() as u32)
+        Ok(match &self.inner {
+            IndexVariant::Hnsw { index, .. } => index.live_count() as u32,
+            IndexVariant::Flat { index } => index.len() as u32,
+        })
     }
 
     /// Get the ratio of deleted to total vectors.
@@ -2030,15 +2011,69 @@ impl EdgeVec {
     pub fn compact(&mut self) -> Result<WasmCompactionResult, JsValue> {
         let (index, storage) = self.inner.as_hnsw_mut()?;
 
+        #[cfg(feature = "sparse")]
+        if !self.sparse_ids.is_empty() {
+            let existing_ids: std::collections::HashSet<u64> =
+                index.nodes.iter().map(|node| node.vector_id.0).collect();
+            if self
+                .sparse_ids
+                .values()
+                .any(|id| !existing_ids.contains(id))
+            {
+                return Err(JsValue::from_str("Cannot compact with pending sparse pairings; insert the reserved dense vectors first"));
+            }
+        }
+
         let (new_index, new_storage, result) = index
             .compact(storage)
             .map_err(|e| JsValue::from_str(&format!("compact failed: {e}")))?;
+
+        // Compaction assigns sequential IDs to surviving nodes. Move metadata
+        // to those IDs before replacing either part of the original state.
+        let mut metadata = MetadataStore::new();
+        #[cfg(feature = "sparse")]
+        let mut dense_ids = HashMap::new();
+        for (position, node) in index
+            .nodes
+            .iter()
+            .filter(|node| node.deleted == 0)
+            .enumerate()
+        {
+            let old_id = u32::try_from(node.vector_id.0)
+                .map_err(|_| JsValue::from_str("compact failed: metadata ID overflow"))?;
+            let new_id = u32::try_from(position + 1)
+                .map_err(|_| JsValue::from_str("compact failed: metadata ID overflow"))?;
+            #[cfg(feature = "sparse")]
+            dense_ids.insert(u64::from(old_id), u64::from(new_id));
+            if let Some(values) = self.metadata.get_all(old_id) {
+                for (key, value) in values {
+                    metadata
+                        .insert(new_id, key, value.clone())
+                        .map_err(|error| JsValue::from_str(&format!("compact failed: {error}")))?;
+                }
+            }
+        }
 
         // Replace internal state with compacted versions
         self.inner = IndexVariant::Hnsw {
             index: Box::new(new_index),
             storage: new_storage,
         };
+        self.metadata = metadata;
+        #[cfg(feature = "sparse")]
+        self.sparse_ids.retain(|_, dense_id| {
+            if let Some(new_id) = dense_ids.get(dense_id) {
+                *dense_id = *new_id;
+                true
+            } else {
+                false
+            }
+        });
+        #[cfg(feature = "sparse")]
+        {
+            self.sparse_dense_ids = self.sparse_ids.values().copied().collect();
+            self.next_sparse_dense_id = 1;
+        }
 
         Ok(WasmCompactionResult {
             tombstones_removed: result.tombstones_removed as u32,
@@ -3825,6 +3860,11 @@ impl EdgeVec {
     /// const id = db.insertSparse(indices, values, 10000);
     /// console.log(`Inserted sparse vector with ID: ${id}`);
     /// ```
+    ///
+    /// For hybrid search, pairs with the next unpaired live dense ID in order.
+    /// Sparse-first insertion reserves future dense IDs in the same order.
+    /// Use `insertSparseForVector()` for partial coverage or arbitrary order.
+    /// Standalone sparse result IDs still start at zero; hybrid results use dense IDs.
     #[cfg(feature = "sparse")]
     #[wasm_bindgen(js_name = "insertSparse")]
     #[allow(clippy::needless_pass_by_value)]
@@ -3834,6 +3874,72 @@ impl EdgeVec {
         indices: Uint32Array,
         values: Float32Array,
         dim: u32,
+    ) -> Result<f64, JsValue> {
+        let mut dense_id = self.next_sparse_dense_id;
+        loop {
+            let deleted = match &self.inner {
+                IndexVariant::Hnsw { index, .. } => {
+                    let position = usize::try_from(dense_id - 1).ok();
+                    let node = position.and_then(|position| index.nodes.get(position));
+                    let node = node
+                        .filter(|node| node.vector_id.0 == dense_id)
+                        .or_else(|| index.nodes.iter().find(|node| node.vector_id.0 == dense_id));
+                    node.is_some_and(|node| node.deleted != 0)
+                }
+                IndexVariant::Flat { .. } => false,
+            };
+            if !deleted && !self.sparse_dense_ids.contains(&dense_id) {
+                break;
+            }
+            dense_id = dense_id
+                .checked_add(1)
+                .ok_or_else(|| JsValue::from_str("Sparse pairing ID overflow"))?;
+        }
+        let next = dense_id
+            .checked_add(1)
+            .ok_or_else(|| JsValue::from_str("Sparse pairing ID overflow"))?;
+        let result = self.insert_sparse_paired(indices, values, dim, dense_id)?;
+        self.next_sparse_dense_id = next;
+        Ok(result)
+    }
+
+    /// Insert a sparse vector paired with a specific live dense vector.
+    /// Use this for arbitrary insertion order or partial sparse coverage.
+    #[cfg(feature = "sparse")]
+    #[wasm_bindgen(js_name = "insertSparseForVector")]
+    pub fn insert_sparse_for_vector(
+        &mut self,
+        vector_id: u32,
+        indices: Uint32Array,
+        values: Float32Array,
+        dim: u32,
+    ) -> Result<f64, JsValue> {
+        let (index, _) = self.inner.as_hnsw()?;
+        if !index
+            .nodes
+            .iter()
+            .any(|node| node.vector_id.0 == u64::from(vector_id) && node.deleted == 0)
+        {
+            return Err(JsValue::from_str(
+                "Sparse pairing requires a live dense vector",
+            ));
+        }
+        if self.sparse_dense_ids.contains(&u64::from(vector_id)) {
+            return Err(JsValue::from_str(
+                "Dense vector already has a sparse vector",
+            ));
+        }
+        self.insert_sparse_paired(indices, values, dim, u64::from(vector_id))
+    }
+
+    #[cfg(feature = "sparse")]
+    #[allow(clippy::needless_pass_by_value, clippy::cast_precision_loss)]
+    fn insert_sparse_paired(
+        &mut self,
+        indices: Uint32Array,
+        values: Float32Array,
+        dim: u32,
+        dense_id: u64,
     ) -> Result<f64, JsValue> {
         // Validate inputs
         if indices.length() != values.length() {
@@ -3857,6 +3963,8 @@ impl EdgeVec {
         let id = sparse_storage
             .insert(&vector)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.sparse_ids.insert(id.as_u64(), dense_id);
+        self.sparse_dense_ids.insert(dense_id);
 
         // Return as f64 (JavaScript number) - precision loss acceptable for IDs < 2^53
         Ok(id.as_u64() as f64)
@@ -3931,6 +4039,11 @@ impl EdgeVec {
         // Execute search
         let searcher = SparseSearcher::new(sparse_storage);
         let results = searcher.search(&query, k);
+        if results.iter().any(|hit| !hit.score.is_finite()) {
+            return Err(JsValue::from_str(
+                "Sparse search produced non-finite scores",
+            ));
+        }
 
         // Convert to JSON
         let json_results: Vec<serde_json::Value> = results
@@ -4086,9 +4199,18 @@ impl EdgeVec {
 
         // Execute hybrid search
         let searcher = HybridSearcher::new(hnsw_index, storage, sparse_storage);
+        let live_ids: std::collections::HashSet<u64> = hnsw_index
+            .nodes
+            .iter()
+            .filter(|node| node.deleted == 0)
+            .map(|node| node.vector_id.0)
+            .collect();
 
         let results = searcher
-            .search(&dense_vec, &sparse_query, &config)
+            .search_with_mapping(&dense_vec, &sparse_query, &config, |sparse_id| {
+                let dense_id = *self.sparse_ids.get(&sparse_id)?;
+                live_ids.contains(&dense_id).then_some(dense_id)
+            })
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         // Convert to JSON

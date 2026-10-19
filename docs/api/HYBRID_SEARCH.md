@@ -1,7 +1,7 @@
 # Hybrid Search API Reference
 
 **Version:** EdgeVec v0.9.0
-**Last Updated:** 2026-02-27
+**Last Updated:** 2026-10-20
 
 ---
 
@@ -74,7 +74,28 @@ score(d) = alpha * norm_dense(d) + (1 - alpha) * norm_sparse(d)
 
 **When to use:** Linear combination is useful when you want explicit control over the dense/sparse tradeoff, or when you have tuned `alpha` on a validation set for your domain.
 
-**Important:** Linear fusion expects non-negative scores. Dense cosine similarity in `[0, 1]` and sparse BM25/TF-IDF scores (`>= 0`) satisfy this requirement. Behavior is undefined for negative scores.
+Linear fusion accepts finite signed similarity scores. `HybridSearcher` converts
+HNSW distances to similarities internally, so alpha 1 favors the closest dense
+result. Reported `dense_score` remains the original distance.
+
+## Document IDs and lifecycle
+
+Dense IDs start at 1; standalone sparse IDs start at 0. WASM `insertSparse()` pairs
+documents in dense insertion order, skipping deleted/already paired IDs. For
+partial coverage or arbitrary order, call
+`db.insertSparseForVector(denseId, indices, values, sparseDim)` instead. A dense
+document can have one sparse vector. Hybrid results use dense IDs; standalone
+`searchSparse()` keeps sparse IDs.
+
+Deletion excludes the paired sparse document from hybrid retrieval before top-k.
+Compaction remaps surviving pairings and metadata to the new dense IDs. Sparse-first
+insertion reserves future dense IDs; compaction rejects pending reservations until
+those dense vectors are inserted. Sparse vectors and their pairings are runtime
+state and remain excluded from v0.9 snapshots; regenerate them after loading.
+
+Native callers use `search_with_mapping()` to translate sparse IDs into live dense
+IDs (`None` excludes a document). Update that mapping after native compaction.
+The original `search()` method assumes the numeric IDs are already aligned.
 
 ---
 
@@ -101,7 +122,8 @@ let sparse_query = SparseVector::new(
 
 // Search with RRF fusion: retrieve 20 from each, return top 10
 let config = HybridSearchConfig::rrf(20, 20, 10);
-let results = searcher.search(&dense_query, &sparse_query, &config)
+// For insertion-order-aligned stores before deletion/compaction:
+let results = searcher.search_with_mapping(&dense_query, &sparse_query, &config, |id| Some(id + 1))
     .expect("search succeeds");
 
 for result in &results {

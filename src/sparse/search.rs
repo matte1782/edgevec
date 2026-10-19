@@ -196,6 +196,17 @@ impl<'a> SparseSearcher<'a> {
     /// ```
     #[must_use]
     pub fn search(&self, query: &SparseVector, k: usize) -> Vec<SparseSearchResult> {
+        self.search_filtered(query, k, |_| true)
+    }
+
+    /// Search only eligible IDs, filtering before the top-k heap is filled.
+    #[must_use]
+    pub fn search_filtered(
+        &self,
+        query: &SparseVector,
+        k: usize,
+        eligible: impl Fn(SparseId) -> bool,
+    ) -> Vec<SparseSearchResult> {
         if k == 0 {
             return Vec::new();
         }
@@ -206,6 +217,9 @@ impl<'a> SparseSearcher<'a> {
 
         // Iterate over all non-deleted vectors
         for (id, vector) in self.storage {
+            if !eligible(id) {
+                continue;
+            }
             let score = sparse_dot_product(query, &vector);
 
             // Skip vectors with no overlap (score = 0)

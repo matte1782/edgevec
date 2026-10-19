@@ -8,9 +8,8 @@
   "types": "./wasm/dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./wasm/dist/index.d.ts",
-      "import": "./wasm/dist/index.js",
-      "require": "./wasm/index.cjs"
+      "import": { "types": "./wasm/dist/index.d.ts", "default": "./wasm/dist/index.js" },
+      "require": { "types": "./wasm/index.d.cts", "default": "./wasm/index.cjs" }
     },
     "./wasm": {
       "types": "./pkg/edgevec.d.ts",
@@ -23,7 +22,16 @@
     "!wasm/dist/__tests__",
     "!wasm/README.md",
     "wasm/index.cjs",
-    "pkg",
+    "wasm/index.d.cts",
+    "pkg/*.js",
+    "pkg/*.d.ts",
+    "pkg/edgevec_bg.wasm",
+    "pkg/package.json",
+    "pkg/snippets",
+    "pkg/react/*.js",
+    "pkg/react/*.d.ts",
+    "pkg/vue/*.js",
+    "pkg/vue/*.d.ts",
     "README.md",
     "LICENSE"
   ],
@@ -50,11 +58,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/matteocrippa/edgevec.git"
+    "url": "https://github.com/matte1782/edgevec.git"
   },
-  "homepage": "https://github.com/matteocrippa/edgevec#readme",
+  "homepage": "https://github.com/matte1782/edgevec#readme",
   "bugs": {
-    "url": "https://github.com/matteocrippa/edgevec/issues"
+    "url": "https://github.com/matte1782/edgevec/issues"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -63,20 +71,30 @@
   "scripts": {
     "build": "wasm-pack build --target web --out-dir pkg --release && npm run build:ts",
     "build:debug": "wasm-pack build --target web --out-dir pkg --dev && npm run build:ts",
-    "build:ts": "tsc --project wasm/tsconfig.json",
+    "build:ts": "node scripts/build-typescript.mjs",
     "build:node": "wasm-pack build --target nodejs --out-dir pkg-node --release",
-    "build:profiling": "wasm-pack build --target web --out-dir pkg --profiling",
+    "build:profiling": "wasm-pack build --target web --out-dir pkg --profiling && npm run build:ts",
     "test": "cargo test && npm run test:wasm",
     "test:wasm": "cd wasm && npm test",
     "test:coverage": "cd wasm && npm run test:coverage",
-    "typecheck": "tsc --noEmit --project wasm/tsconfig.json",
+    "typecheck": "tsc --noEmit --project pkg/tsconfig.json && tsc --noEmit --project wasm/tsconfig.json",
     "pack:dry": "npm pack --dry-run",
     "prepublishOnly": "npm run build && npm run test",
-    "test:storage": "node --test --test-timeout=10000 tests/js/storage.test.mjs"
+    "test:storage": "node --test --test-timeout=10000 tests/js/storage.test.mjs",
+    "test:runtime": "node --test tests/js/closeout.e2e.mjs",
+    "test:package": "node scripts/test-package.mjs"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.19.26",
+    "@types/react": "^19.3.0",
+    "dts-bundle-generator": "^9.5.1",
+    "esbuild": "^0.28.2",
     "fake-indexeddb": "^6.2.6",
-    "typescript": "^5.9.3"
+    "jest": "^29.7.0",
+    "react": "^19.3.1",
+    "ts-jest": "^29.4.15",
+    "typescript": "^5.9.3",
+    "vue": "^3.5.44"
   }
 }

@@ -1819,56 +1819,38 @@ impl HnswIndex {
         let original_deleted = self.deleted_count;
         let original_total = self.node_count();
 
-        // Fast path: no tombstones — return copy
-        if original_deleted == 0 {
-            // Clone manually since VectorStorage doesn't implement Clone
-            let config = self.config.clone();
-            let mut new_storage = VectorStorage::new(&config, None);
-            let mut new_index = HnswIndex::new(config, &new_storage)?;
-            new_index.compaction_threshold = self.compaction_threshold;
-
-            // Re-insert all vectors (this is a rebuild, but preserves order)
-            for node in &self.nodes {
-                let vec = storage.get_vector(node.vector_id);
-                new_index.insert(&vec, &mut new_storage)?;
-            }
-
-            return Ok((
-                new_index,
-                new_storage,
-                CompactionResult {
-                    tombstones_removed: 0,
-                    new_size: original_total,
-                    duration_ms: 0,
-                },
-            ));
-        }
-
-        // Collect live vectors' data
-        let live_vectors: Vec<Vec<f32>> = self
-            .nodes
-            .iter()
-            .filter(|node| node.deleted == 0)
-            .map(|node| {
-                let vec = storage.get_vector(node.vector_id);
-                vec.into_owned()
-            })
-            .collect();
-
-        let new_size = live_vectors.len();
-
-        // Build new index AND new storage with same config
+        // Rebuild with the original storage representation. Binary vectors
+        // must never pass through get_vector(), which only exposes floats.
         let config = self.config.clone();
         let mut new_storage = VectorStorage::new(&config, None);
+        new_storage.set_storage_type(storage.config.clone());
+        new_storage.quantizer.clone_from(&storage.quantizer);
         let mut new_index = HnswIndex::new(config, &new_storage)?;
-
-        // Copy compaction threshold from original
         new_index.compaction_threshold = self.compaction_threshold;
 
-        // Re-insert all live vectors (IDs will be remapped)
-        for vector in live_vectors {
-            new_index.insert(&vector, &mut new_storage)?;
+        for node in self.nodes.iter().filter(|node| node.deleted == 0) {
+            if matches!(storage.config, crate::storage::StorageType::Binary(_)) {
+                let vector = storage
+                    .get_binary_vector(node.vector_id)
+                    .map_err(|error| GraphError::Storage(error.to_string()))?;
+                new_index.insert_binary(vector, &mut new_storage)?;
+            } else {
+                let vector = storage.get_vector(node.vector_id);
+                new_index.insert(&vector, &mut new_storage)?;
+                // A narrow SQ8 calibration can map multiple encoded values to
+                // one f32. Rebuild graph links using the decoded vector, then
+                // retain the exact original codes instead of requantizing data.
+                if matches!(storage.config, crate::storage::StorageType::QuantizedU8(_)) {
+                    let codes = storage.get_quantized_vector(node.vector_id);
+                    let start = new_storage.quantized_data.len() - codes.len();
+                    new_storage.quantized_data[start..].copy_from_slice(codes);
+                }
+            }
         }
+        if self.has_bq() {
+            new_index.enable_bq(&new_storage)?;
+        }
+        let new_size = original_total - original_deleted;
 
         // Calculate duration based on target
         #[cfg(not(target_arch = "wasm32"))]
@@ -1885,7 +1867,11 @@ impl HnswIndex {
             CompactionResult {
                 tombstones_removed: original_deleted,
                 new_size,
-                duration_ms,
+                duration_ms: if original_deleted == 0 {
+                    0
+                } else {
+                    duration_ms
+                },
             },
         ))
     }

@@ -4,7 +4,7 @@
  * High-level wrapper for EdgeVec WASM module with filtered search support.
  *
  * @module edgevec-wrapper
- * @version 0.9.0
+ * @version 0.5.0
  */
 import { EdgeVec, EdgeVecConfig, JsMetadataValue } from './edgevec.js';
 // =============================================================================
@@ -76,12 +76,21 @@ export class EdgeVecIndex {
      * @param config - Index configuration
      */
     constructor(config) {
-        this.dims = config.dimensions;
+        if (config.quantized)
+            throw new Error('Scalar quantization is not supported by the WASM wrapper');
         const wasmConfig = new EdgeVecConfig(config.dimensions);
+        if (config.m !== undefined) {
+            wasmConfig.m = config.m;
+        }
         if (config.efConstruction !== undefined) {
             wasmConfig.ef_construction = config.efConstruction;
         }
-        this.inner = new EdgeVec(wasmConfig);
+        try {
+            this.inner = new EdgeVec(wasmConfig);
+        }
+        finally {
+            wasmConfig.free();
+        }
     }
     /**
      * Number of vectors in index.
@@ -93,7 +102,7 @@ export class EdgeVecIndex {
      * Vector dimensions.
      */
     get dimensions() {
-        return this.dims;
+        return this.inner.dimensions();
     }
     /**
      * Add a vector with optional metadata.
@@ -107,7 +116,7 @@ export class EdgeVecIndex {
         const id = this.inner.insert(vec);
         if (metadata) {
             for (const [key, value] of Object.entries(metadata)) {
-                this.inner.setMetadata(id, key, this.toJsMetadataValue(value));
+                this.setMetadata(id, key, value);
             }
         }
         return id;
@@ -184,6 +193,8 @@ export class EdgeVecIndex {
         if (!filter) {
             return this.size;
         }
+        if (this.size === 0)
+            return 0;
         // Use pre-filter strategy to count all matches
         const result = await this.searchFiltered(new Float32Array(this.dimensions).fill(0), this.size, { filter, strategy: 'pre' });
         return result.results.length;
@@ -206,7 +217,13 @@ export class EdgeVecIndex {
      * @param value - Metadata value
      */
     setMetadata(id, key, value) {
-        this.inner.setMetadata(id, key, this.toJsMetadataValue(value));
+        const metadata = this.toJsMetadataValue(value);
+        try {
+            this.inner.setMetadata(id, key, metadata);
+        }
+        finally {
+            metadata.free();
+        }
     }
     /**
      * Delete a vector (soft delete).
@@ -232,12 +249,37 @@ export class EdgeVecIndex {
      * @returns Loaded index
      */
     static async load(name) {
-        const inner = await EdgeVec.load(name);
+        return EdgeVecIndex.fromInner(await EdgeVec.load(name));
+    }
+    /** Export a self-contained persistence buffer. */
+    toBytes() {
+        return this.inner.toBytes();
+    }
+    /** Restore a persistence buffer with its saved dimensions and live count. */
+    static fromBytes(bytes) {
+        return EdgeVecIndex.fromInner(EdgeVec.fromBytes(bytes));
+    }
+    static fromInner(inner) {
         const index = Object.create(EdgeVecIndex.prototype);
         index.inner = inner;
-        // Get dimensions from config
-        index.dims = 0; // Will be inferred from first vector
         return index;
+    }
+    initSparseStorage() { this.inner.initSparseStorage(); }
+    hasSparseStorage() { return this.inner.hasSparseStorage(); }
+    sparseCount() { return this.inner.sparseCount(); }
+    /** Insert in dense document order; use insertSparseForVector for partial coverage. */
+    insertSparse(indices, values, dim) {
+        return this.inner.insertSparse(indices, values, dim);
+    }
+    /** Pair a sparse vector with an existing dense document in arbitrary order. */
+    insertSparseForVector(vectorId, indices, values, dim) {
+        return this.inner.insertSparseForVector(vectorId, indices, values, dim);
+    }
+    searchSparse(indices, values, dim, k) {
+        return JSON.parse(this.inner.searchSparse(indices, values, dim, k));
+    }
+    hybridSearch(denseQuery, indices, values, dim, options) {
+        return JSON.parse(this.inner.hybridSearch(denseQuery, indices, values, dim, JSON.stringify(options)));
     }
     // ===========================================================================
     // Private Helpers
@@ -311,5 +353,7 @@ export class EdgeVecIndex {
 // Re-export commonly used types and classes
 export { Filter } from './filter.js';
 export { FilterBuilder, FieldCondition } from './filter-builder.js';
+// Re-export standalone filter functions (v0.8.0)
+export { eq, ne, gt, lt, ge, le, between, contains, startsWith, endsWith, like, inArray, notInArray, any, all, none, isNull, isNotNull, and, or, not, matchAll, matchNone, filter, } from './filter.js';
 export default EdgeVecIndex;
 //# sourceMappingURL=edgevec-wrapper.js.map

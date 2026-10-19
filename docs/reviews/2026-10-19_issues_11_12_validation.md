@@ -50,6 +50,8 @@ The fix is prepared on an isolated branch based on GitHub `main`; four unrelated
 
 The pre-existing high-level TypeScript wrapper build errors and its `load()` dimension bookkeeping are outside this raw WASM persistence fix. The pre-existing Hamming/binary `compact()` panic with tombstones is also unchanged; the fuzz exercise explicitly avoids that unrelated path. No npm package or crates.io version is published by this GitHub source/demo deployment.
 
+These exclusions describe the original persistence PR. The subsequent [wrapper and compaction closeout](2026-10-20_closeout_validation.md) addresses the TypeScript, packaging, and binary-compaction gaps and restores binary compaction to the mutation exercise.
+
 See [the second hostile review](2026-10-19_issues_11_12_persistence_v2.md) for the final review verdict and disposition of the original findings.
 
 ## Hosted CI follow-up

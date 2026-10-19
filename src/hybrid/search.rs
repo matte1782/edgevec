@@ -24,6 +24,9 @@ pub enum HybridError {
     /// Dense search failed.
     #[error("Dense search error: {0}")]
     DenseSearchError(String),
+    /// Sparse dot products overflowed the finite score range.
+    #[error("Sparse search error: {0}")]
+    SparseSearchError(String),
     /// Dimension mismatch between query and index.
     #[error("Dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch {
@@ -244,8 +247,9 @@ impl HybridSearchResult {
 /// **IMPORTANT**: The caller is responsible for ensuring that the same document
 /// has matching numeric IDs in both dense and sparse storage:
 ///
-/// 1. **Insert Order Alignment**: Insert dense and sparse vectors in the same
-///    order, so auto-assigned IDs match (recommended for simple use cases).
+/// Dense IDs start at one and sparse IDs start at zero. Inserting both in
+/// the same order does not align numeric IDs. Use `search_with_mapping()`
+/// to pair them, including any remapping after dense compaction.
 ///
 /// 2. **Explicit ID Management**: Use `insert_with_id()` methods (when available)
 ///    to explicitly set matching IDs for the same document.
@@ -350,6 +354,22 @@ impl<'a> HybridSearcher<'a> {
         sparse_query: &SparseVector,
         config: &HybridSearchConfig,
     ) -> Result<Vec<HybridSearchResult>, HybridError> {
+        self.search_with_mapping(dense_query, sparse_query, config, Some)
+    }
+
+    /// Fuse results after translating sparse IDs to dense document IDs.
+    /// Returning `None` excludes an unpaired/deleted document before top-k.
+    /// The mapping must be stable for the duration of the call.
+    ///
+    /// # Errors
+    /// Returns the same validation and dense-search errors as `search()`.
+    pub fn search_with_mapping(
+        &self,
+        dense_query: &[f32],
+        sparse_query: &SparseVector,
+        config: &HybridSearchConfig,
+        map_sparse_id: impl Fn(u64) -> Option<u64>,
+    ) -> Result<Vec<HybridSearchResult>, HybridError> {
         // Validate config
         config.validate().map_err(HybridError::InvalidConfig)?;
 
@@ -364,21 +384,47 @@ impl<'a> HybridSearcher<'a> {
             Vec::new()
         };
 
+        if dense_results
+            .iter()
+            .any(|(_, distance)| !distance.is_finite())
+        {
+            return Err(HybridError::DenseSearchError(
+                "Dense search produced non-finite distances".into(),
+            ));
+        }
+
         // Execute sparse search
         let sparse_searcher = SparseSearcher::new(self.sparse_storage);
         let sparse_results = if config.sparse_k > 0 {
-            sparse_searcher.search_u64(sparse_query, config.sparse_k)
+            sparse_searcher
+                .search_filtered(sparse_query, config.sparse_k, |id| {
+                    map_sparse_id(id.as_u64()).is_some()
+                })
+                .into_iter()
+                .filter_map(|hit| map_sparse_id(hit.id.as_u64()).map(|id| (id, hit.score)))
+                .collect()
         } else {
             Vec::new()
         };
 
         // Fuse results
+        if sparse_results.iter().any(|(_, score)| !score.is_finite()) {
+            return Err(HybridError::SparseSearchError(
+                "Sparse search produced non-finite scores".into(),
+            ));
+        }
         let fused = match &config.fusion {
             FusionMethod::Rrf { k } => {
                 rrf_fusion(&dense_results, &sparse_results, *k, config.final_k)
             }
             FusionMethod::Linear { alpha } => {
-                linear_fusion(&dense_results, &sparse_results, *alpha, config.final_k)
+                // HNSW returns distances (smaller is better), whereas fusion
+                // accepts similarity scores (larger is better).
+                let similarities: Vec<_> = dense_results
+                    .iter()
+                    .map(|(id, distance)| (*id, -*distance))
+                    .collect();
+                linear_fusion(&similarities, &sparse_results, *alpha, config.final_k)
             }
         };
 

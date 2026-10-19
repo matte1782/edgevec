@@ -119,7 +119,7 @@ python -m http.server 8080
 
 EdgeVec supports **metadata boosting** for entity-enhanced retrieval — improve search relevance by incorporating entity signals (ORG, PERSON, GPE) extracted via NER, without building a knowledge graph.
 
-```rust
+```rust,ignore
 use edgevec::filter::{MetadataBoost, FilteredSearcher, FilterStrategy};
 use edgevec::metadata::MetadataValue;
 
@@ -274,11 +274,15 @@ if (db.needsCompaction()) {
 ### Persistence
 
 ```javascript
-// Save to IndexedDB (browser) or filesystem
+// Save to IndexedDB (browser)
 await db.save("my-vector-db");
 
 // Load existing database
 const db = await EdgeVec.load("my-vector-db");
+
+// Or persist anywhere yourself (files in Tauri/Electron/Node.js, OPFS, uploads)
+const bytes = db.toBytes();            // Uint8Array
+const restored = EdgeVec.fromBytes(bytes);
 ```
 
 ### Scalar Quantization

@@ -1,6 +1,6 @@
 // wasm/EdgeVecConfig.ts
 
-import { EdgeVecClientConfig } from './EdgeVecClient';
+import type { EdgeVecClientConfig } from './EdgeVecClient.js';
 
 /**
  * Fluent builder for EdgeVec configuration.
@@ -9,7 +9,6 @@ import { EdgeVecClientConfig } from './EdgeVecClient';
  * ```typescript
  * const config = new EdgeVecConfigBuilder(128)
  *   .withMetric('cosine')
- *   .withQuantization('sq8')
  *   .build();
  * ```
  */
@@ -34,7 +33,8 @@ export class EdgeVecConfigBuilder {
   }
 
   /**
-   * Enable scalar quantization for 4x memory reduction.
+   * Set the quantization preference. Only 'none' is currently supported by
+   * EdgeVecClient; create() rejects 'sq8' until WASM exposes scalar quantization.
    *
    * @param quantization - 'none' or 'sq8' (8-bit scalar quantization)
    */

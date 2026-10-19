@@ -1,0 +1,236 @@
+{
+  "node": "v22.21.0",
+  "artifacts": {
+    "wasm": {
+      "bytes": 685769,
+      "gzipBytes": 263557,
+      "sha256": "0c095841c0dbabd7953bb4a437b83fa6bd394aac4c98e5e2a97bc01d2c43d813"
+    },
+    "js": {
+      "bytes": 162729,
+      "gzipBytes": 29461,
+      "sha256": "092d99bbeee54cdcddc0ab4cffb06ca876aa56eded72421fe00ccc4528ac9194"
+    }
+  },
+  "runtimeTests": 16,
+  "installedPackageTypecheck": "ESM and CommonJS; Node16 resolution; strict; skipLibCheck false",
+  "installedPackageRuntime": [
+    "Node 22.21.0",
+    "Node 16.20.2"
+  ],
+  "native": {
+    "passed": 3490,
+    "ignored": 32,
+    "failed": 0,
+    "suites": 94
+  },
+  "wasmPersistenceTests": 10,
+  "mutationIterations": 200000,
+  "lint": [
+    "native all-targets -D warnings",
+    "wasm32 lib -D warnings"
+  ],
+  "loadTrials": [
+    {
+      "mode": "plain",
+      "trial": 1,
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": false,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 141.35399999999998,
+      "samplesMs": [
+        80.10340000000002,
+        81.55060000000003,
+        75.495,
+        83.73259999999999,
+        79.34090000000003,
+        78.52729999999997,
+        73.72739999999999
+      ],
+      "medianMs": 79.34090000000003,
+      "maxMs": 83.73259999999999
+    },
+    {
+      "mode": "bq",
+      "trial": 1,
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": true,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 160.0621,
+      "samplesMs": [
+        94.6077,
+        97.9563,
+        92.82359999999994,
+        95.00929999999994,
+        93.3257000000001,
+        92.58979999999997,
+        92.31060000000002
+      ],
+      "medianMs": 93.3257000000001,
+      "maxMs": 97.9563
+    },
+    {
+      "mode": "plain",
+      "trial": 2,
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": false,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 139.16840000000002,
+      "samplesMs": [
+        80.61009999999996,
+        84.50850000000003,
+        80.43110000000001,
+        81.78560000000004,
+        79.16809999999998,
+        82.59319999999991,
+        75.10360000000003
+      ],
+      "medianMs": 80.61009999999996,
+      "maxMs": 84.50850000000003
+    },
+    {
+      "mode": "bq",
+      "trial": 2,
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": true,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 153.78019999999998,
+      "samplesMs": [
+        97.13140000000001,
+        98.73109999999997,
+        96.77830000000006,
+        92.6916,
+        93.10850000000005,
+        93.30319999999995,
+        95.86189999999999
+      ],
+      "medianMs": 95.86189999999999,
+      "maxMs": 98.73109999999997
+    },
+    {
+      "mode": "plain",
+      "trial": 3,
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": false,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 144.402,
+      "samplesMs": [
+        81.3631,
+        78.81110000000001,
+        82.7362,
+        80.16909999999996,
+        83.64279999999997,
+        79.27659999999992,
+        80.43739999999991
+      ],
+      "medianMs": 80.43739999999991,
+      "maxMs": 83.64279999999997
+    },
+    {
+      "mode": "bq",
+      "trial": 3,
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": true,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 155.0546,
+      "samplesMs": [
+        90.0358,
+        90.11500000000001,
+        95.03869999999995,
+        95.8141,
+        88.957,
+        94.07749999999999,
+        96.73130000000003
+      ],
+      "medianMs": 94.07749999999999,
+      "maxMs": 96.73130000000003
+    }
+  ],
+  "contendedLoadTrials": [
+    {
+      "mode": "plain",
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": false,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 629.3891000000001,
+      "samplesMs": [
+        251.20649999999978,
+        2117.533,
+        3284.7263999999996,
+        3567.353000000001,
+        1484.1427999999996,
+        1148.0244000000002,
+        629.5827000000008
+      ],
+      "medianMs": 1484.1427999999996,
+      "maxMs": 3567.353000000001
+    },
+    {
+      "mode": "bq",
+      "node": "v22.21.0",
+      "platform": "win32 10.0.26200 x64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "count": 100000,
+      "dimensions": 128,
+      "metric": "l2",
+      "seed": 42,
+      "bq": true,
+      "bufferBytes": 57265029,
+      "firstLoadMs": 309.76559999999995,
+      "samplesMs": [
+        164.1531,
+        162.63519999999994,
+        174.11569999999995,
+        179.4384,
+        184.44909999999982,
+        182.74609999999984,
+        187.11069999999995
+      ],
+      "medianMs": 179.4384,
+      "maxMs": 187.11069999999995
+    }
+  ],
+  "benchmarkNotes": "Idle trials were measured after native compilation/tests completed. Initial contended runs are retained separately; do not compare different load conditions as an algorithmic optimization."
+}

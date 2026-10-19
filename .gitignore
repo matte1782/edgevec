@@ -56,9 +56,6 @@ smoke_test_w25/
 scripts/node_modules/
 scripts/package-lock.json
 
-# Root package files (for dev tooling)
-/package-lock.json
-
 # NUL file (Windows artifact)
 NUL
 

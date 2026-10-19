@@ -1,6 +1,7 @@
 // wasm/EdgeVecClient.ts
 
 import init, {
+  initSync,
   EdgeVec as WasmEdgeVec,
   EdgeVecConfig as WasmConfig,
   WasmCompactionResult
@@ -39,13 +40,8 @@ export interface EdgeVecClientConfig {
 export class EdgeVecClient {
   private static initPromise: Promise<void> | null = null;
   private inner: WasmEdgeVec;
-  private config: EdgeVecClientConfig;
-  private vectorCount: number;
-
-  private constructor(inner: WasmEdgeVec, config: EdgeVecClientConfig, vectorCount: number = 0) {
+  private constructor(inner: WasmEdgeVec) {
     this.inner = inner;
-    this.config = config;
-    this.vectorCount = vectorCount;
   }
 
   /**
@@ -56,6 +52,14 @@ export class EdgeVecClient {
    * @throws Error if dimensions <= 0 or metric is invalid
    */
   static async create(config: EdgeVecClientConfig): Promise<EdgeVecClient> {
+    EdgeVecClient.validateConfig(config);
+    await EdgeVecClient.ensureInitialized();
+    const wasmConfig = new WasmConfig(config.dimensions);
+    if (config.metric) wasmConfig.metric = config.metric;
+    try { return new EdgeVecClient(new WasmEdgeVec(wasmConfig)); } finally { wasmConfig.free(); }
+  }
+
+  private static validateConfig(config: EdgeVecClientConfig): void {
     // C4 Fix: Input validation before WASM calls
     if (!config.dimensions || config.dimensions <= 0) {
       throw new Error(`Dimensions must be positive, got ${config.dimensions}`);
@@ -67,60 +71,54 @@ export class EdgeVecClient {
       throw new Error(`Invalid metric: ${config.metric}. Must be 'l2', 'cosine', or 'dot'`);
     }
     // M5 Fix: Explicitly reject quantization parameter
-    if (config.quantization) {
+    if (config.quantization && config.quantization !== 'none') {
       throw new Error('Quantization not supported in current WASM API. Remove the quantization parameter from config.');
     }
 
-    await EdgeVecClient.ensureInitialized();
-
-    const wasmConfig = new WasmConfig(config.dimensions);
-    // Apply optional config
-    if (config.metric) {
-      wasmConfig.metric = config.metric;
-    }
-
-    const inner = new WasmEdgeVec(wasmConfig);
-    return new EdgeVecClient(inner, config);
   }
 
   /**
    * Load an existing database from IndexedDB.
    *
    * @param name - Database name
-   * @param config - Configuration (must match saved database)
+   * @param config - Optional configuration; dimensions must match the saved database
    * @returns Promise resolving to loaded EdgeVecClient
    * @throws Error if name is empty or config is invalid
    *
-   * **Important:** The `length` property will be 0 after load until vectors are inserted.
-   * This is a known limitation - WASM API doesn't expose vector count from loaded databases.
+   * Dimensions and live vector count are restored from the saved database.
    */
-  static async load(name: string, config: EdgeVecClientConfig): Promise<EdgeVecClient> {
+  static async load(name: string, config?: EdgeVecClientConfig): Promise<EdgeVecClient> {
     // M1 Fix: Validate inputs
     if (!name || name.trim().length === 0) {
       throw new Error('Database name cannot be empty');
     }
-    if (!config.dimensions || config.dimensions <= 0) {
-      throw new Error(`Dimensions must be positive, got ${config.dimensions}`);
-    }
-    // M10 Fix: Add integer validation (consistent with create())
-    if (!Number.isInteger(config.dimensions)) {
-      throw new Error(`Dimensions must be an integer, got ${config.dimensions}`);
-    }
-    if (config.metric && !['l2', 'cosine', 'dot'].includes(config.metric)) {
-      throw new Error(`Invalid metric: ${config.metric}. Must be 'l2', 'cosine', or 'dot'`);
-    }
+    if (config) EdgeVecClient.validateConfig(config);
 
     await EdgeVecClient.ensureInitialized();
 
     const inner = await WasmEdgeVec.load(name);
-    // C1: Vector count not restored - WASM API limitation
-    // Count remains 0 after load, only tracks inserts made after load
-    return new EdgeVecClient(inner, config, 0);
+    if (config && config.dimensions !== inner.dimensions()) {
+      inner.free();
+      throw new Error('Configuration dimensions do not match the saved database');
+    }
+    return new EdgeVecClient(inner);
   }
 
   private static async ensureInitialized(): Promise<void> {
     if (!EdgeVecClient.initPromise) {
-      EdgeVecClient.initPromise = init().then(() => undefined);
+      EdgeVecClient.initPromise = (async () => {
+        if (typeof process !== 'undefined' && process.versions?.node) {
+          const nodeFs = 'node:fs/promises';
+          const { readFile } = await import(/* webpackIgnore: true */ /* @vite-ignore */ nodeFs);
+          const bytes = await readFile(new URL('../pkg/edgevec_bg.wasm', import.meta.url));
+          initSync({ module: bytes });
+        } else {
+          await init();
+        }
+      })().catch(error => {
+        EdgeVecClient.initPromise = null;
+        throw error;
+      });
     }
     await EdgeVecClient.initPromise;
   }
@@ -135,7 +133,6 @@ export class EdgeVecClient {
   insert(vector: Float32Array): number {
     this.validateDimension(vector);
     const id = this.inner.insert(vector);
-    this.vectorCount++;
     return id;
   }
 
@@ -197,29 +194,23 @@ export class EdgeVecClient {
   }
 
   /**
-   * Get the number of vectors inserted in this session.
-   *
-   * **Important Limitation:** This only tracks vectors inserted via `insert()` after
-   * the client was created or loaded. For databases loaded from IndexedDB, this will
-   * be 0 until new vectors are inserted.
-   *
-   * **Reason:** The WASM API doesn't expose the total vector count from loaded databases.
+   * Get the current live vector count, including restored vectors.
    */
   get length(): number {
-    return this.vectorCount;
+    return this.inner.liveCount();
   }
 
   /**
    * Get the configured dimensions.
    */
   get dimensions(): number {
-    return this.config.dimensions;
+    return this.inner.dimensions();
   }
 
   private validateDimension(vector: Float32Array): void {
-    if (vector.length !== this.config.dimensions) {
+    if (vector.length !== this.dimensions) {
       throw new Error(
-        `Dimension mismatch: expected ${this.config.dimensions}, got ${vector.length}`
+        `Dimension mismatch: expected ${this.dimensions}, got ${vector.length}`
       );
     }
   }
@@ -340,7 +331,7 @@ export class EdgeVecClient {
    *
    * This operation:
    * 1. Creates a new index with only live vectors
-   * 2. Re-inserts vectors preserving IDs
+   * 2. Re-inserts surviving vectors with sequential IDs
    * 3. Replaces the current index
    *
    * **WARNING:** This is a blocking operation. For indices with >10k vectors,
@@ -361,11 +352,13 @@ export class EdgeVecClient {
    */
   compact(): CompactionResult {
     const wasmResult: WasmCompactionResult = this.inner.compact();
-    return {
-      tombstonesRemoved: wasmResult.tombstones_removed,
-      newSize: wasmResult.new_size,
-      durationMs: wasmResult.duration_ms
-    };
+    try {
+      return {
+        tombstonesRemoved: wasmResult.tombstones_removed,
+        newSize: wasmResult.new_size,
+        durationMs: wasmResult.duration_ms
+      };
+    } finally { wasmResult.free(); }
   }
 
   /**

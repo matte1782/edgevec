@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Binary HNSW compaction preserves packed storage; compaction also retains scalar calibration and enabled BQ state. WASM metadata follows surviving vectors when IDs are reassigned.
+- Loaded TypeScript clients and indexes report saved dimensions and live counts. `EdgeVecIndex` exposes persistence buffers and the documented parsed sparse/hybrid methods.
+- Hybrid search pairs sparse and dense document IDs, filters deleted documents before sparse top-k, and updates pairings after compaction. `insertSparseForVector()` supports explicit pairing.
+- Linear hybrid fusion ranks smaller dense distances correctly and normalizes finite signed scores without overflowing the score range.
+- `save_stream()` owns its serialized snapshot, eliminating borrowed state invalidated by source mutation, compaction, or freeing. Chunks now reassemble to `EVWB` (`toBytes()`), with full-snapshot memory usage documented and the 64-byte minimum preserved.
+- Public package exports include the high-level wrapper and raw enums. Both npm packages include required runtime snippets, and `@edgevec/core` has working Node ESM and CommonJS initialization.
+- Clean-checkout TypeScript builds have locked development dependencies. CI checks types, wrapper runtime behavior, browser bundling, and installed tarball consumers.
+
 > **Note:** This project extends Keep a Changelog with `Research`, `Internal`, `Documentation`, and `Performance` headings as project-specific conventions.
 
 ### Added

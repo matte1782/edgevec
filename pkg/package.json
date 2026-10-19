@@ -9,14 +9,18 @@
     "url": "https://github.com/matte1782/edgevec"
   },
   "files": [
+    "*.js",
+    "*.d.ts",
     "edgevec_bg.wasm",
-    "edgevec.js",
-    "edgevec.d.ts",
+    "snippets",
+    "react",
+    "vue",
     "LICENSE-APACHE",
-    "LICENSE-MIT"
+    "LICENSE-MIT",
+    "README.md"
   ],
-  "main": "edgevec.js",
-  "types": "edgevec.d.ts",
+  "main": "index.js",
+  "types": "index.d.ts",
   "sideEffects": [
     "./snippets/*"
   ],
@@ -26,5 +30,36 @@
     "wasm",
     "hnsw",
     "similarity-search"
-  ]
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./wasm": {
+      "types": "./edgevec.d.ts",
+      "import": "./edgevec.js"
+    },
+    "./react": {
+      "types": "./react/index.d.ts",
+      "import": "./react/index.js"
+    },
+    "./vue": {
+      "types": "./vue/index.d.ts",
+      "import": "./vue/index.js"
+    },
+    "./*": "./*"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "vue": ">=3.3"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  }
 }

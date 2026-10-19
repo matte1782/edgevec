@@ -147,14 +147,27 @@ jobs:
 
       - name: IndexedDB shim tests
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run test:storage
+
+      - name: TypeScript checks and unit tests
+        run: |
+          npm run typecheck
+          npm --prefix wasm test -- --runInBand
 
       - name: IndexedDB through WASM bindings
         run: |
           cargo build --locked --target wasm32-unknown-unknown --lib
           wasm-bindgen --target web --out-dir target/persistence-e2e target/wasm32-unknown-unknown/debug/edgevec.wasm
           node tests/js/persistence.e2e.mjs target/persistence-e2e
+
+      - name: Public SDK and packed-package regression tests
+        run: |
+          cp target/persistence-e2e/edgevec{.js,.d.ts,_bg.wasm,_bg.wasm.d.ts} pkg/
+          cp -r target/persistence-e2e/snippets/. pkg/snippets/
+          npm run build:ts
+          npm run test:runtime
+          npm run test:package
 
   # Job 4: Fuzz Harness Verification — All 15 targets
   fuzz-check:

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" />
 /* tslint:disable */
 /* eslint-disable */
 
@@ -152,16 +153,17 @@ export class EdgeVec {
    *
    * # Arguments
    *
-   * * `chunk_size` - Maximum size of each chunk in bytes (default: 10MB).
+   * * `chunk_size` - Maximum chunk size (default: 10MB; minimum: 64 bytes).
    *
    * # Returns
    *
    * A `PersistenceIterator` that yields `Uint8Array` chunks.
    *
-   * # Safety
+   * # Snapshot ownership
    *
-   * The returned iterator holds a reference to this `EdgeVec` instance.
-   * You MUST ensure `EdgeVec` is not garbage collected or freed while using the iterator.
+   * Serializes eagerly into an owned snapshot. Memory includes the complete
+   * snapshot and one emitted chunk. The source may be mutated or freed while
+   * iterating; concatenated chunks are identical to `toBytes()` at creation.
    */
   save_stream(chunk_size?: number | null): PersistenceIterator;
   /**
@@ -440,6 +442,11 @@ export class EdgeVec {
    * const id = db.insertSparse(indices, values, 10000);
    * console.log(`Inserted sparse vector with ID: ${id}`);
    * ```
+   *
+   * For hybrid search, pairs with the next unpaired live dense ID in order.
+   * Sparse-first insertion reserves future dense IDs in the same order.
+   * Use `insertSparseForVector()` for partial coverage or arbitrary order.
+   * Standalone sparse result IDs still start at zero; hybrid results use dense IDs.
    */
   insertSparse(indices: Uint32Array, values: Float32Array, dim: number): number;
   /**
@@ -1330,6 +1337,11 @@ export class EdgeVec {
    */
   searchBinaryFiltered(query: Uint8Array, k: number, options_json: string): string;
   /**
+   * Insert a sparse vector paired with a specific live dense vector.
+   * Use this for arbitrary insertion order or partial sparse coverage.
+   */
+  insertSparseForVector(vector_id: number, indices: Uint32Array, values: Float32Array, dim: number): number;
+  /**
    * Set the compaction threshold.
    *
    * # Arguments
@@ -1917,10 +1929,6 @@ export class PersistenceIterator {
    *
    * * `Some(Uint8Array)` - The next chunk of data.
    * * `None` - If iteration is complete.
-   *
-   * # Panics
-   *
-   * Panics if the parent `EdgeVec` instance has been freed.
    */
   next_chunk(): Uint8Array | undefined;
 }
@@ -2327,6 +2335,7 @@ export interface InitOutput {
   readonly edgevec_insertBatchWithProgress: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_insertBinary: (a: number, b: number, c: number) => void;
   readonly edgevec_insertSparse: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly edgevec_insertSparseForVector: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly edgevec_insertWithBq: (a: number, b: number, c: number) => void;
   readonly edgevec_insertWithMetadata: (a: number, b: number, c: number, d: number) => void;
   readonly edgevec_isDeleted: (a: number, b: number, c: number) => void;
@@ -2412,8 +2421,8 @@ export interface InitOutput {
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
   readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
-  readonly __wasm_bindgen_func_elem_2308: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_2292: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_2309: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_2293: (a: number, b: number) => void;
   readonly __wasm_bindgen_func_elem_2877: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;

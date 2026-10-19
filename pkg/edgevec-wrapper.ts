@@ -9,6 +9,8 @@
 
 import { EdgeVec, EdgeVecConfig, JsMetadataValue } from './edgevec.js';
 import { Filter, FilterExpression, MetadataValue } from './filter.js';
+import type { SparseSearchResult, HybridSearchResult, HybridSearchOptions } from './edgevec-types.js';
+export type { SparseSearchResult, HybridSearchResult, HybridSearchOptions } from './edgevec-types.js';
 
 // =============================================================================
 // Types
@@ -103,7 +105,7 @@ export interface IndexConfig {
   m?: number;
   /** HNSW ef_construction parameter */
   efConstruction?: number;
-  /** Enable quantization for smaller memory footprint */
+  /** Reserved; true is rejected until scalar quantization is exposed in WASM. */
   quantized?: boolean;
 }
 
@@ -205,7 +207,6 @@ export class FilterException extends Error {
  */
 export class EdgeVecIndex {
   private inner: EdgeVec;
-  private readonly dims: number;
 
   /**
    * Create a new EdgeVec index.
@@ -213,12 +214,15 @@ export class EdgeVecIndex {
    * @param config - Index configuration
    */
   constructor(config: IndexConfig) {
-    this.dims = config.dimensions;
+    if (config.quantized) throw new Error('Scalar quantization is not supported by the WASM wrapper');
     const wasmConfig = new EdgeVecConfig(config.dimensions);
+    if (config.m !== undefined) {
+      wasmConfig.m = config.m;
+    }
     if (config.efConstruction !== undefined) {
       wasmConfig.ef_construction = config.efConstruction;
     }
-    this.inner = new EdgeVec(wasmConfig);
+    try { this.inner = new EdgeVec(wasmConfig); } finally { wasmConfig.free(); }
   }
 
   /**
@@ -232,7 +236,7 @@ export class EdgeVecIndex {
    * Vector dimensions.
    */
   get dimensions(): number {
-    return this.dims;
+    return this.inner.dimensions();
   }
 
   /**
@@ -249,7 +253,7 @@ export class EdgeVecIndex {
 
     if (metadata) {
       for (const [key, value] of Object.entries(metadata)) {
-        this.inner.setMetadata(id, key, this.toJsMetadataValue(value));
+        this.setMetadata(id, key, value);
       }
     }
 
@@ -344,6 +348,7 @@ export class EdgeVecIndex {
     if (!filter) {
       return this.size;
     }
+    if (this.size === 0) return 0;
 
     // Use pre-filter strategy to count all matches
     const result = await this.searchFiltered(
@@ -374,7 +379,8 @@ export class EdgeVecIndex {
    * @param value - Metadata value
    */
   setMetadata(id: number, key: string, value: MetadataValue): void {
-    this.inner.setMetadata(id, key, this.toJsMetadataValue(value));
+    const metadata = this.toJsMetadataValue(value);
+    try { this.inner.setMetadata(id, key, metadata); } finally { metadata.free(); }
   }
 
   /**
@@ -403,12 +409,41 @@ export class EdgeVecIndex {
    * @returns Loaded index
    */
   static async load(name: string): Promise<EdgeVecIndex> {
-    const inner = await EdgeVec.load(name);
+    return EdgeVecIndex.fromInner(await EdgeVec.load(name));
+  }
+
+  /** Export a self-contained persistence buffer. */
+  toBytes(): Uint8Array {
+    return this.inner.toBytes();
+  }
+
+  /** Restore a persistence buffer with its saved dimensions and live count. */
+  static fromBytes(bytes: Uint8Array): EdgeVecIndex {
+    return EdgeVecIndex.fromInner(EdgeVec.fromBytes(bytes));
+  }
+
+  private static fromInner(inner: EdgeVec): EdgeVecIndex {
     const index = Object.create(EdgeVecIndex.prototype) as EdgeVecIndex;
-    (index as unknown as { inner: EdgeVec }).inner = inner;
-    // Get dimensions from config
-    (index as unknown as { dims: number }).dims = 0; // Will be inferred from first vector
+    index.inner = inner;
     return index;
+  }
+
+  initSparseStorage(): void { this.inner.initSparseStorage(); }
+  hasSparseStorage(): boolean { return this.inner.hasSparseStorage(); }
+  sparseCount(): number { return this.inner.sparseCount(); }
+  /** Insert in dense document order; use insertSparseForVector for partial coverage. */
+  insertSparse(indices: Uint32Array, values: Float32Array, dim: number): number {
+    return this.inner.insertSparse(indices, values, dim);
+  }
+  /** Pair a sparse vector with an existing dense document in arbitrary order. */
+  insertSparseForVector(vectorId: number, indices: Uint32Array, values: Float32Array, dim: number): number {
+    return this.inner.insertSparseForVector(vectorId, indices, values, dim);
+  }
+  searchSparse(indices: Uint32Array, values: Float32Array, dim: number, k: number): SparseSearchResult[] {
+    return JSON.parse(this.inner.searchSparse(indices, values, dim, k));
+  }
+  hybridSearch(denseQuery: Float32Array, indices: Uint32Array, values: Float32Array, dim: number, options: HybridSearchOptions): HybridSearchResult[] {
+    return JSON.parse(this.inner.hybridSearch(denseQuery, indices, values, dim, JSON.stringify(options)));
   }
 
   // ===========================================================================
