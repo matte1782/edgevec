@@ -48,13 +48,13 @@ async function runTests() {
 
   // Build BrowserStack capabilities
   const capabilities = {
+    browserName: options.browser,
     'bstack:options': {
       userName: process.env.BROWSERSTACK_USERNAME,
       accessKey: process.env.BROWSERSTACK_ACCESS_KEY,
-      os: options.platform === 'ios' ? 'ios' : 'android',
+      realMobile: true,
       osVersion: options['os-version'],
       deviceName: options.device,
-      browserName: options.browser,
       local: true,
       localIdentifier: process.env.GITHUB_RUN_ID || 'local-dev',
       sessionName: `EdgeVec Mobile Test - ${options.platform} ${options.browser} ${options['os-version']}`,

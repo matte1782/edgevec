@@ -1,13 +1,13 @@
 {
-  "recordedAtUtc": "2026-10-19T21:58:18.0028816Z",
+  "recordedAtUtc": "2026-10-19T22:11:59.8369355Z",
   "protocol": "Three fresh Node processes per mode after compiler/test jobs completed; first fromBytes call includes JS-to-WASM copying, checksum, decode, validation and BQ rebuild. Module initialization and file I/O are excluded. Each process then measures seven warm loads. All observed samples are retained.",
   "buildCommand": "wasm-pack build --target web --release --out-dir target/persistence-release-verified --no-pack",
   "dataset": "100000 x 128 float32 vectors, L2, LCG seed42; default HNSW m12/m0=24/efConstruction100/efSearch50; generated with real insert calls; 57265029-byte buffers.",
   "release": {
-    "wasmSha256": "0204f3e125c5befad2750462936a714916156d611f529f78052e3fd5582e17fa",
+    "wasmSha256": "2ac49da9589f315bc9df6c2a6d064883a38c48c9b67bc491c1f3481c6cdddfb3",
     "jsBytes": 161716,
-    "combinedGzipBytes": 292086,
-    "wasmGzipBytes": 262881,
+    "combinedGzipBytes": 292089,
+    "wasmGzipBytes": 262884,
     "jsGzipBytes": 29205,
     "jsSha256": "489eda35bb27e8fb977ddab45532887548bfa06b2481023cdeabed6a308a98a6",
     "combinedBytes": 845417,
@@ -25,18 +25,18 @@
         "seed": 42,
         "bq": false,
         "bufferBytes": 57265029,
-        "firstLoadMs": 350.573,
+        "firstLoadMs": 296.9212,
         "samplesMs": [
-          232.82989999999995,
-          223.03510000000006,
-          186.85719999999992,
-          171.02020000000016,
-          184.20699999999988,
-          179.4194,
-          163.0739000000001
+          150.4576,
+          156.21499999999992,
+          169.10069999999996,
+          171.42909999999995,
+          147.21260000000007,
+          144.93329999999992,
+          152.26239999999984
         ],
-        "medianMs": 184.20699999999988,
-        "maxMs": 232.82989999999995
+        "medianMs": 152.26239999999984,
+        "maxMs": 171.42909999999995
       },
       {
         "node": "v22.21.0",
@@ -48,18 +48,18 @@
         "seed": 42,
         "bq": false,
         "bufferBytes": 57265029,
-        "firstLoadMs": 337.3234,
+        "firstLoadMs": 272.4803,
         "samplesMs": [
-          174.57100000000003,
-          184.84969999999998,
-          171.60159999999996,
-          155.55349999999999,
-          165.90959999999995,
-          156.9438,
-          146.28489999999988
+          137.73329999999999,
+          137.24940000000004,
+          142.29179999999997,
+          182.2858,
+          136.34889999999996,
+          117.81830000000014,
+          122.2826
         ],
-        "medianMs": 165.90959999999995,
-        "maxMs": 184.84969999999998
+        "medianMs": 137.24940000000004,
+        "maxMs": 182.2858
       },
       {
         "node": "v22.21.0",
@@ -71,18 +71,18 @@
         "seed": 42,
         "bq": false,
         "bufferBytes": 57265029,
-        "firstLoadMs": 290.659,
+        "firstLoadMs": 297.3663,
         "samplesMs": [
-          140.82980000000003,
-          140.3069999999999,
-          135.50069999999994,
-          145.54269999999997,
-          141.63049999999998,
-          140.75160000000005,
-          148.73130000000015
+          131.64160000000004,
+          139.05200000000002,
+          132.41610000000003,
+          132.10629999999992,
+          136.07150000000001,
+          125.904,
+          128.76229999999987
         ],
-        "medianMs": 140.82980000000003,
-        "maxMs": 148.73130000000015
+        "medianMs": 132.10629999999992,
+        "maxMs": 139.05200000000002
       }
     ],
     "bq": [
@@ -96,18 +96,18 @@
         "seed": 42,
         "bq": true,
         "bufferBytes": 57265029,
-        "firstLoadMs": 374.6779,
+        "firstLoadMs": 358.1033,
         "samplesMs": [
-          207.9484,
-          246.94870000000003,
-          200.95659999999998,
-          214.95510000000013,
-          225.56490000000008,
-          231.68370000000004,
-          204.73379999999997
+          186.21890000000002,
+          182.58589999999992,
+          177.22309999999993,
+          167.06549999999993,
+          167.75890000000004,
+          165.03650000000016,
+          159.89829999999984
         ],
-        "medianMs": 214.95510000000013,
-        "maxMs": 246.94870000000003
+        "medianMs": 167.75890000000004,
+        "maxMs": 186.21890000000002
       },
       {
         "node": "v22.21.0",
@@ -119,18 +119,18 @@
         "seed": 42,
         "bq": true,
         "bufferBytes": 57265029,
-        "firstLoadMs": 322.35970000000003,
+        "firstLoadMs": 240.99579999999997,
         "samplesMs": [
-          178.6494,
-          178.10399999999993,
-          180.1793,
-          197.60280000000012,
-          174.05399999999986,
-          179.5215999999998,
-          190.62789999999995
+          139.33780000000002,
+          134.25629999999995,
+          138.2323,
+          140.67999999999995,
+          133.98929999999996,
+          144.26440000000002,
+          135.58580000000006
         ],
-        "medianMs": 179.5215999999998,
-        "maxMs": 197.60280000000012
+        "medianMs": 138.2323,
+        "maxMs": 144.26440000000002
       },
       {
         "node": "v22.21.0",
@@ -142,18 +142,18 @@
         "seed": 42,
         "bq": true,
         "bufferBytes": 57265029,
-        "firstLoadMs": 280.8162,
+        "firstLoadMs": 288.5229,
         "samplesMs": [
-          163.00029999999998,
-          160.221,
-          156.34860000000003,
-          168.80189999999993,
-          182.01299999999992,
-          173.95600000000013,
-          177.2838999999999
+          157.4336,
+          143.6907,
+          139.60720000000003,
+          139.3994,
+          142.81039999999996,
+          134.6123,
+          137.5326
         ],
-        "medianMs": 168.80189999999993,
-        "maxMs": 182.01299999999992
+        "medianMs": 139.60720000000003,
+        "maxMs": 157.4336
       }
     ]
   },
@@ -323,6 +323,162 @@
         "maxMs": 1563.7236000000003
       }
     ],
-    "note": "These diagnostic runs motivated the quantizer optimization and the final idle protocol. They are preserved for transparency and are not substituted for the final idle measurements."
+    "note": "These diagnostic runs motivated the quantizer optimization and the final idle protocol. They are preserved for transparency and are not substituted for the final idle measurements.",
+    "priorReviewedBuild": {
+      "release": {
+        "wasmSha256": "2ac49da9589f315bc9df6c2a6d064883a38c48c9b67bc491c1f3481c6cdddfb3",
+        "jsBytes": 161716,
+        "combinedGzipBytes": 292089,
+        "wasmGzipBytes": 262884,
+        "jsGzipBytes": 29205,
+        "jsSha256": "489eda35bb27e8fb977ddab45532887548bfa06b2481023cdeabed6a308a98a6",
+        "combinedBytes": 845417,
+        "wasmBytes": 683701
+      },
+      "idle": {
+        "plain": [
+          {
+            "node": "v22.21.0",
+            "platform": "win32 10.0.26200 x64",
+            "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+            "count": 100000,
+            "dimensions": 128,
+            "metric": "l2",
+            "seed": 42,
+            "bq": false,
+            "bufferBytes": 57265029,
+            "firstLoadMs": 296.9212,
+            "samplesMs": [
+              150.4576,
+              156.21499999999992,
+              169.10069999999996,
+              171.42909999999995,
+              147.21260000000007,
+              144.93329999999992,
+              152.26239999999984
+            ],
+            "medianMs": 152.26239999999984,
+            "maxMs": 171.42909999999995
+          },
+          {
+            "node": "v22.21.0",
+            "platform": "win32 10.0.26200 x64",
+            "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+            "count": 100000,
+            "dimensions": 128,
+            "metric": "l2",
+            "seed": 42,
+            "bq": false,
+            "bufferBytes": 57265029,
+            "firstLoadMs": 272.4803,
+            "samplesMs": [
+              137.73329999999999,
+              137.24940000000004,
+              142.29179999999997,
+              182.2858,
+              136.34889999999996,
+              117.81830000000014,
+              122.2826
+            ],
+            "medianMs": 137.24940000000004,
+            "maxMs": 182.2858
+          },
+          {
+            "node": "v22.21.0",
+            "platform": "win32 10.0.26200 x64",
+            "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+            "count": 100000,
+            "dimensions": 128,
+            "metric": "l2",
+            "seed": 42,
+            "bq": false,
+            "bufferBytes": 57265029,
+            "firstLoadMs": 297.3663,
+            "samplesMs": [
+              131.64160000000004,
+              139.05200000000002,
+              132.41610000000003,
+              132.10629999999992,
+              136.07150000000001,
+              125.904,
+              128.76229999999987
+            ],
+            "medianMs": 132.10629999999992,
+            "maxMs": 139.05200000000002
+          }
+        ],
+        "bq": [
+          {
+            "node": "v22.21.0",
+            "platform": "win32 10.0.26200 x64",
+            "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+            "count": 100000,
+            "dimensions": 128,
+            "metric": "l2",
+            "seed": 42,
+            "bq": true,
+            "bufferBytes": 57265029,
+            "firstLoadMs": 358.1033,
+            "samplesMs": [
+              186.21890000000002,
+              182.58589999999992,
+              177.22309999999993,
+              167.06549999999993,
+              167.75890000000004,
+              165.03650000000016,
+              159.89829999999984
+            ],
+            "medianMs": 167.75890000000004,
+            "maxMs": 186.21890000000002
+          },
+          {
+            "node": "v22.21.0",
+            "platform": "win32 10.0.26200 x64",
+            "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+            "count": 100000,
+            "dimensions": 128,
+            "metric": "l2",
+            "seed": 42,
+            "bq": true,
+            "bufferBytes": 57265029,
+            "firstLoadMs": 240.99579999999997,
+            "samplesMs": [
+              139.33780000000002,
+              134.25629999999995,
+              138.2323,
+              140.67999999999995,
+              133.98929999999996,
+              144.26440000000002,
+              135.58580000000006
+            ],
+            "medianMs": 138.2323,
+            "maxMs": 144.26440000000002
+          },
+          {
+            "node": "v22.21.0",
+            "platform": "win32 10.0.26200 x64",
+            "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+            "count": 100000,
+            "dimensions": 128,
+            "metric": "l2",
+            "seed": 42,
+            "bq": true,
+            "bufferBytes": 57265029,
+            "firstLoadMs": 288.5229,
+            "samplesMs": [
+              157.4336,
+              143.6907,
+              139.60720000000003,
+              139.3994,
+              142.81039999999996,
+              134.6123,
+              137.5326
+            ],
+            "medianMs": 139.60720000000003,
+            "maxMs": 157.4336
+          }
+        ]
+      }
+    }
   }
 }

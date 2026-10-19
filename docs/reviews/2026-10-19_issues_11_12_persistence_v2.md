@@ -45,16 +45,16 @@ The optimized v1 storage decoder preserves postcard field/variant order and chec
 
 The shared binary quantizer constructs one output byte per eight components (`src/quantization/variable.rs:158`). Its existing dimension guard remains, and a regression checks all 256 bit patterns with signed zeros and non-finite comparison values (`:361`). Bit order and comparison semantics are unchanged.
 
-[Raw benchmark evidence](../benchmarks/2026-10-19_persistence_load.json) records the final build hashes, commands, hardware, all six idle trials, and the earlier diagnostic trials. The final protocol uses three fresh Node processes per mode after compiler/test jobs finish: 100,000 × 128-dimensional F32 vectors, L2, default HNSW parameters, deterministic seed 42, and 57,265,029-byte buffers. First-call timing includes JS-to-WASM copying, checksum, decoding, structural validation and BQ rebuilding; it excludes module initialization and file I/O. Hardware: Intel Core Ultra 9 285H, Windows x64, Node 22.21.0.
+[Raw benchmark evidence](../benchmarks/2026-10-19_persistence_load.json) records the latest rebuilt SIMD runtime, commands, hardware, all six new idle trials, and the archived previously reviewed build/trials. The table below refers to WASM SHA-256 `2ac49da9589f315bc9df6c2a6d064883a38c48c9b67bc491c1f3481c6cdddfb3`. The protocol uses three fresh Node processes per mode after compiler/test jobs finish: 100,000 × 128-dimensional F32 vectors, L2, default HNSW parameters, deterministic seed 42, and 57,265,029-byte buffers. First-call timing includes JS-to-WASM copying, checksum, decoding, structural validation and BQ rebuilding; it excludes module initialization and file I/O. Hardware: Intel Core Ultra 9 285H, Windows x64, Node 22.21.0.
 
 | Mode | Fresh first calls (ms) | First-call mean ± sample SD (ms) | Largest warm sample (ms) |
 | --- | --- | --- | --- |
-| Plain HNSW | 350.57, 337.32, 290.66 | 326.19 ± 31.47 | 232.83 |
-| HNSW with BQ rebuild | 374.68, 322.36, 280.82 | 325.95 ± 47.03 | 246.95 |
+| Plain HNSW | 296.92, 272.48, 297.37 | 288.92 ± 14.24 | 182.29 |
+| HNSW with BQ rebuild | 358.10, 241.00, 288.52 | 295.87 ± 58.90 | 186.22 |
 
 All six controlled first calls satisfy the architecture's **<500 ms cold index-load** target for this dataset. Earlier pre-optimization and contended trials exceeded it and remain in the raw data; warm medians were not substituted for first-call evidence. These small Node samples establish this measured case, not browser/Safari performance, other dimensions, or P99 latency.
 
-The final raw WASM is **683,701 bytes** (262,881 gzip); JS is **161,716 bytes** (29,205 gzip). Combined raw size is **845,417 bytes**, combined gzip **292,086 bytes**. The WASM artifact is below 700,000 bytes and the combined compressed runtime is below the architecture's 500 KB compressed target. The combined uncompressed runtime exceeds 700,000 bytes; these size measures are distinct.
+The latest rebuilt raw WASM is **683,701 bytes** (262,884 gzip); JS is **161,716 bytes** (29,205 gzip). Combined raw size is **845,417 bytes**, combined gzip **292,089 bytes**. The WASM artifact is below 700,000 bytes and the combined compressed runtime is below the architecture's 500 KB compressed target. The combined uncompressed runtime exceeds 700,000 bytes; these size measures are distinct. Both copied package and demo runtimes pass their five glue tests again.
 
 ## Final validation
 
@@ -110,3 +110,13 @@ Both hosted Miri jobs must pass with the newly resolved dependency version and t
 The patches are ready for CI. Formatting passes, the mobile-page Node smoke passes 12/12, and the code/value equivalence and workflow command coverage were inspected. The implementing agent reported the earlier hosted Linux suite, WASM compilation/persistence, fuzz-build and x86 checks passing; the follow-up revision still needs its own hosted results.
 
 Before merge, verify the new revision's native lint, ARM build/tests/lint, both Miri jobs and configured BrowserStack matrix, together with the already-required main checks. A missing-secrets skip must be reported as a skip, not as executed mobile-browser coverage. The reviewer changed only this review appendix and performed no implementation or Git-state mutation.
+
+### Additional ARM and BrowserStack corrections
+
+**GO for another CI iteration; the same hosted merge gate remains.** Revision `9815857` was reported green for lint, WASM and fuzz checks. At this review point, both Miri jobs with bitvec 1.0.1 are still running; elapsed time is not a passing result.
+
+The ARM workflow now overrides the obsolete internal LLVM switches from local Cargo configuration with `RUSTFLAGS="-C target-cpu=generic -C opt-level=3"`. This uses stable compiler options and an ARM baseline while leaving its build, test, SIMD and lint commands intact. The x86 regression step retains its own x86-specific override. This addresses the observed compiler preflight failure without suppressing a lint or test.
+
+The BrowserStack runner now places `browserName` at the W3C capability root, retains `deviceName`, `osVersion` and `realMobile` under `bstack:options`, and removes the nested browser name and desktop-style OS selection (`tests/browserstack/run-tests.js:50`). This organization matches the vendor's mobile examples. [BrowserStack device-selection documentation](https://www.browserstack.com/docs/automate/selenium/select-browsers-and-devices#browserstack-specific-capabilities-mobile).
+
+The reviewer independently ran `node --check tests/browserstack/run-tests.js` successfully. The hosted setup and scalar build had passed before the earlier client-side capability failure; that does not establish a real-device session or a passing mobile suite. Both Miri outcomes, actual ARM execution and the configured mobile-browser matrix remain unproven until their hosted jobs finish successfully. The latest runtime measurements and rebuilt-artifact glue results are recorded in the updated performance section above; the previous measurements remain archived in the raw data.

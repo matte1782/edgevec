@@ -31,16 +31,16 @@ Three separate fresh Node processes per mode were run after compiler and test jo
 
 | Mode | Fresh-process load times (ms) | Warm medians per process (ms) |
 | --- | --- | --- |
-| Plain | 350.57 / 337.32 / 290.66 | 184.21 / 165.91 / 140.83 |
-| BQ reconstruction | 374.68 / 322.36 / 280.82 | 214.96 / 179.52 / 168.80 |
+| Plain | 296.92 / 272.48 / 297.37 | 152.26 / 137.25 / 132.11 |
+| BQ reconstruction | 358.10 / 241.00 / 288.52 | 167.76 / 138.23 / 139.61 |
 
 All six final cold loads meet the architecture's <500 ms target on this machine. Before optimization, BQ first calls were 517.57–604.81 ms. Packing each quantized byte once removed that measured bottleneck without changing bit order or the wire format. Trials taken during concurrent compilation included a 678.51 ms outlier; these diagnostic trials and all final raw samples are preserved in [the measurement data](../benchmarks/2026-10-19_persistence_load.json). These are local measurements, not a guarantee for other hardware.
 
 | Release asset | Raw bytes | gzip bytes |
 | --- | ---: | ---: |
-| `edgevec_bg.wasm` | 683,701 | 262,881 |
+| `edgevec_bg.wasm` | 683,701 | 262,884 |
 | `edgevec.js` | 161,716 | 29,205 |
-| Combined WASM + generated JS | 845,417 | 292,086 |
+| Combined WASM + generated JS | 845,417 | 292,089 |
 
 The WASM artifact is below the current 700 KB WASM size budget. The combined compressed runtime is below the architecture's 500 KB compressed bundle target. Source snippets add a small separate JavaScript transfer; their lifecycle code is also included in both published runtime directories.
 

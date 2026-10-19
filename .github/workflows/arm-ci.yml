@@ -10,6 +10,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Override obsolete internal LLVM flags in the local Cargo configuration.
+  RUSTFLAGS: "-C target-cpu=generic -C opt-level=3"
   PROPTEST_CASES: "16"
   NUM_VECTORS: "500"
 
