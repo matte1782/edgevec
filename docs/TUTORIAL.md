@@ -417,7 +417,10 @@ main().catch(console.error);
 
 ## Persistence (Save/Load)
 
-EdgeVec can save your index to disk (Node.js) or IndexedDB (browser) for persistence across sessions.
+In browsers, `save()` and `load()` persist to IndexedDB. For Node.js files,
+write `index.toBytes()` with `node:fs/promises` and restore with
+`EdgeVec.fromBytes(await readFile(path))`. The IndexedDB methods reject when
+IndexedDB is unavailable.
 
 ### Saving Your Index
 
@@ -438,9 +441,7 @@ async function main() {
 
     console.log('Vectors before save:', index.liveCount());
 
-    // Save to storage
-    // Browser: saves to IndexedDB
-    // Node.js: saves to file system
+    // Browser: save to IndexedDB
     await index.save("my-vector-db");
 
     console.log('Index saved successfully!');
@@ -525,7 +526,19 @@ main().catch(console.error);
 | Environment | Storage Backend | Location |
 |:------------|:----------------|:---------|
 | Browser | IndexedDB | Browser's IndexedDB (per-origin) |
-| Node.js | File System | Current working directory |
+| Node.js | `toBytes()` / `fromBytes()` with `node:fs/promises` | File path chosen by your application |
+
+### Node.js File Persistence
+
+After initializing the WASM module and creating an index:
+
+```javascript
+import { readFile, writeFile } from 'node:fs/promises';
+
+await writeFile('tutorial-vectors.evwb', index.toBytes());
+const restored = EdgeVec.fromBytes(await readFile('tutorial-vectors.evwb'));
+console.log('Loaded vectors:', restored.liveCount());
+```
 
 ---
 

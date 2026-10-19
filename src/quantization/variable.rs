@@ -155,12 +155,17 @@ impl BinaryVector {
         let bytes = dimension / 8;
         let mut data = vec![0u8; bytes];
 
-        for (i, &value) in vector.iter().enumerate() {
-            if value > 0.0 {
-                let byte_idx = i / 8;
-                let bit_idx = i % 8;
-                data[byte_idx] |= 1 << bit_idx;
-            }
+        // Build each packed byte once instead of repeatedly updating it for
+        // individual components. This also avoids a branch for every sign bit.
+        for (byte, values) in data.iter_mut().zip(vector.chunks_exact(8)) {
+            *byte = u8::from(values[0] > 0.0)
+                | (u8::from(values[1] > 0.0) << 1)
+                | (u8::from(values[2] > 0.0) << 2)
+                | (u8::from(values[3] > 0.0) << 3)
+                | (u8::from(values[4] > 0.0) << 4)
+                | (u8::from(values[5] > 0.0) << 5)
+                | (u8::from(values[6] > 0.0) << 6)
+                | (u8::from(values[7] > 0.0) << 7);
         }
 
         Ok(Self { data, dimension })
@@ -350,6 +355,29 @@ mod tests {
         assert_eq!(bv.bytes(), 96);
         // 0b01010101 = 0x55
         assert!(bv.data().iter().all(|&b| b == 0x55));
+    }
+
+    #[test]
+    fn test_quantize_all_sign_patterns_and_zero() {
+        // All 256 possible packed bytes, including both signed zeros and
+        // non-finite values whose comparison semantics must stay unchanged.
+        let nonpositive = [-1.0, 0.0, -0.0, f32::NEG_INFINITY, f32::NAN];
+        for &off in &nonpositive {
+            let vector: Vec<f32> = (0u16..256)
+                .flat_map(|pattern| {
+                    (0..8).map(move |bit| {
+                        if pattern & (1 << bit) == 0 {
+                            off
+                        } else {
+                            f32::INFINITY
+                        }
+                    })
+                })
+                .collect();
+            let packed = BinaryVector::quantize(&vector).unwrap();
+            let expected: Vec<u8> = (0u8..=255).collect();
+            assert_eq!(packed.data(), expected);
+        }
     }
 
     #[test]

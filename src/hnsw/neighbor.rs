@@ -20,6 +20,9 @@ use std::vec::Vec;
 /// This structure manages a contiguous byte buffer for storing compressed neighbor lists.
 /// It implements a "best-fit" memory recycling strategy using a free list to reuse
 /// deallocated segments.
+///
+/// The serde layout is part of the WASM buffer format. Wire changes require a
+/// `persistence::buffer::BUFFER_VERSION` bump, migration, and golden fixture tests.
 #[derive(Debug, Clone, Serialize, Deserialize)] // Clone might be expensive for buffer, but needed for HnswIndex derive
 pub struct NeighborPool {
     /// Contiguous compressed data buffer.
@@ -32,7 +35,7 @@ pub struct NeighborPool {
     /// `GRANULARITY` is 16 bytes.
     /// Max bucketed size is 512 bytes (Index 31).
     /// Allocations larger than 512 bytes are not recycled (rare case).
-    buckets: Vec<Vec<u32>>,
+    pub(crate) buckets: Vec<Vec<u32>>,
 }
 
 /// Zero-copy iterator over neighbors in a compressed list.

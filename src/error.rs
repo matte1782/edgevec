@@ -151,7 +151,9 @@ impl From<EdgeVecError> for JsValue {
                 PersistenceError::Io(e) => ("ERR_IO", e.to_string()),
                 PersistenceError::ChecksumMismatch { .. }
                 | PersistenceError::Corrupted(_)
-                | PersistenceError::InvalidMagic { .. } => ("ERR_CORRUPTION", pe.to_string()),
+                | PersistenceError::InvalidMagic { .. }
+                | PersistenceError::BufferTooSmall { .. }
+                | PersistenceError::TruncatedData => ("ERR_CORRUPTION", pe.to_string()),
                 _ => ("ERR_PERSISTENCE", pe.to_string()),
             },
 

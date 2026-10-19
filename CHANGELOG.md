@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Note:** This project extends Keep a Changelog with `Research`, `Internal`, `Documentation`, and `Performance` headings as project-specific conventions.
 
 ### Added
+- **Buffer-based persistence** ([#11](https://github.com/matte1782/edgevec/issues/11)) — `EdgeVec.prototype.toBytes(): Uint8Array` and `EdgeVec.fromBytes(bytes)` for storing indexes outside IndexedDB (Tauri/Electron/Node.js files, OPFS, network). Format: `EVWB` magic + version + flags + length + CRC32 over the header and payload. Loading validates graph/storage structure, finite vectors (rejecting NaN/Inf), and metadata insertion limits. Unknown flags or reserved fields from newer writers return `ERR_PERSISTENCE`; invalid data returns `ERR_CORRUPTION`.
+- `EdgeVec.prototype.dimensions()` — dimensions of a loaded index.
+- CI job `wasm-persistence`: runs the WASM roundtrip tests under Node and the IndexedDB shim tests against `fake-indexeddb` (`npm run test:storage`).
 - **Product Quantization (PQ) engine** — `edgevec::quantization::product` module (W46 Days 1-3)
   - `PqCodebook` — k-means++ codebook training with deterministic per-subspace seeding (seed=42+m)
   - `PqCode` — compact M-byte vector representation (8 bytes for 768D with M=8)
@@ -49,18 +52,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blog post:** "Entity-Enhanced RAG in 300KB" (`docs/blog/entity-enhanced-rag.md`) (W48 Day 5)
 - 16 MetadataBoost unit tests + 6 integration tests (W48 Days 1-2)
 
-### Fixed
-- **HNSW cosine/dot product ordering bug** — `DotProduct::distance()` now returns `1.0 - dot_product` (cosine distance) instead of raw dot product. HNSW's "lower distance = closer" invariant was violated, causing searches to return *least* similar vectors first for cosine and dot product metrics. FlatIndex is NOT affected (separate code path with `is_similarity()` sort reversal). **User-visible change:** WASM `search()` and `searchBoosted()` `score` field now returns distance (lower = better) instead of raw similarity for cosine/dot metrics. Range: [0, 2] for normalized vectors.
-- **Entity-RAG demo queries** — replaced 10 sample queries with topic-aligned queries matching the SQuAD dataset (Beyoncé, Chopin, Solar Energy, NYC, Buddhism, etc.). Previous queries ("capital of France", "moon landing") had no matching content, producing near-random results.
-
 ### Changed
+- **Rust API on wasm32:** removed the serde `Serialize` / `Deserialize` implementations from `edgevec::wasm::EdgeVec`. Use `to_bytes()` / `from_bytes()` for persistence; the internal `IndexVariant` also no longer derives serde traits.
 - **PQ seeding:** Switched from shared sequential RNG (`seed=42`) to per-subspace deterministic seeding (`seed=42+m`). Enables parallel training via rayon. **Breaking:** codebooks trained before this change will differ (PQ is unreleased, no external consumers affected).
 - **ROADMAP.md** updated to v7.3: W47 PQ Phase 4 complete (CONDITIONAL GO)
 - **PQ training default:** Early-stop convergence (threshold 1e-4) enabled by default
 - `pkg/langchain/README.md`: documented both filter forms (DSL strings + FilterExpression), removed "Coming Next" section
 - `pkg/langchain/package.json` and `index.ts`: version bumped to 0.2.0
 
+### Fixed
+- **WASM `EdgeVec.load()` could never read data written by `save()`** ([#12](https://github.com/matte1782/edgevec/issues/12)) — failed with `ERR_CORRUPTION: ... This is a feature that PostCard will never implement` for every index. Two causes, both fixed:
+  - The internal index enum was internally tagged (`#[serde(tag = "variant_type")]`), which postcard cannot decode.
+  - `MetadataValue` was adjacently tagged, which postcard also cannot decode. It now uses a compact binary representation for non-human-readable formats; JSON output is unchanged, and the binary bytes are identical to what the old impl wrote.
+  - Data saved by **0.6.0–0.9.0** is recoverable: `load()` / `fromBytes()` decode both legacy layouts, including metadata stored inside the 0.6–0.8 HNSW index. Releases before 0.6.0 are not supported.
+- **IndexedDB `load()` hung forever on a missing database** (#12) — exceptions inside callbacks never reached the promise, and `read()` could leave an empty v1 database without the `files` store. The backend now rejects missing entries with `NotFoundError`, closes its connections, and repairs broken databases. It bumps v1 to v2 **only when the store is missing**; healthy databases keep their version. Older clients that explicitly open v1 cannot open a repaired v2 database (`VersionError`). Unavailable IndexedDB and upgrades blocked by other tabs produce clear rejections, including subsequent calls while the upgrade remains pending.
+- `save()` passed IndexedDB a view into WASM memory, which could be detached if memory grew before the write; it now passes a JS-owned copy.
+- Binary quantization state is persisted in the new format; `hasBQ()` is restored after `load()` (BQ codes are rebuilt from F32 vectors). Legacy saves did not preserve this state.
+- Hardened `VectorStorage` tombstone-bit deserialization against malformed `bitvec` lengths/heads that could panic or expose uninitialized memory before validation; the wire layout remains compatible.
+- WASM construction now rejects zero dimensions with `ERR_VALIDATION`, matching the buffer loader's validity checks.
+- **HNSW cosine/dot product ordering bug** — `DotProduct::distance()` now returns `1.0 - dot_product` (cosine distance) instead of raw dot product. HNSW's "lower distance = closer" invariant was violated, causing searches to return *least* similar vectors first for cosine and dot product metrics. FlatIndex is NOT affected (separate code path with `is_similarity()` sort reversal). **User-visible change:** WASM `search()` and `searchBoosted()` `score` field now returns distance (lower = better) instead of raw similarity for cosine/dot metrics. Range: [0, 2] for normalized vectors.
+- **Entity-RAG demo queries** — replaced 10 sample queries with topic-aligned queries matching the SQuAD dataset (Beyoncé, Chopin, Solar Energy, NYC, Buddhism, etc.). Previous queries ("capital of France", "moon landing") had no matching content, producing near-random results.
+
 ### Performance
+- WASM buffer loading decodes contiguous F32 vector data in bulk while preserving the v1 wire format and all validation checks.
 - **PQ GO/NO-GO Decision** (`docs/benchmarks/PQ_GO_NOGO_DECISION.md`) — **CONDITIONAL GO** (W46-W47)
   - G1 PASS: PQ memory 16.5% of BQ at 100K (threshold: <70%)
   - G2 PASS: ADC 145 ns/candidate WASM P99 (threshold: <150ns) — Chrome 145, 100K scale
@@ -511,7 +525,8 @@ All v0.7.0 performance targets maintained:
 
 #### From v0.5.x
 
-v0.6.0 is backward compatible with v0.5.x snapshots:
+Historical migration example (the planned `loadSnapshot` API below was never
+shipped). Current WASM `fromBytes()` supports saves from 0.6.0–0.9.0, not v0.5.x:
 
 ```javascript
 // v0.5.x snapshots load automatically

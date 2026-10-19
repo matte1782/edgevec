@@ -4,7 +4,7 @@ This directory contains Node.js examples demonstrating EdgeVec vector database u
 
 ## Prerequisites
 
-- Node.js >= 16.0.0
+- Node.js >= 20.6.0 (the quickstart resolves the WASM file with `import.meta.resolve`)
 - Built EdgeVec package (run `npm run build` from project root)
 
 ## Setup
@@ -21,10 +21,10 @@ npm install
 ### 1. Quick Start (`quickstart.js`)
 
 Basic demonstration of EdgeVec API:
-- Creating a client
+- Initializing the WASM package and creating an index
 - Inserting vectors (synchronous)
 - Searching for nearest neighbors (synchronous)
-- Saving and loading databases
+- Saving bytes to a Node.js file and restoring with `EdgeVec.fromBytes()`
 
 **Run:**
 ```bash
@@ -32,7 +32,7 @@ npm run quickstart
 ```
 
 **Expected Output:**
-- Client initialization time
+- Index dimensions and metric
 - 3 vectors inserted with IDs
 - Search results with distances
 - Save/load verification
@@ -83,14 +83,10 @@ const id = client.insert(vector);
 const results = client.search(query, 10); // Top 10 results
 // Returns: [{ id: number, distance: number }, ...]
 
-// Save (async)
-await client.save('my-database');
-
-// Load (async)
-const loaded = await EdgeVecClient.load('my-database', {
-    dimensions: 128,
-    metric: 'cosine'
-});
+// The wrapper's save()/load() require browser IndexedDB.
+// For Node.js files, use the WASM EdgeVec API shown in quickstart.js:
+// await writeFile('my-database.evwb', index.toBytes());
+// const loaded = EdgeVec.fromBytes(await readFile('my-database.evwb'));
 ```
 
 ## Troubleshooting

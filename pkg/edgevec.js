@@ -311,12 +311,12 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_2147(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_2147(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_2308(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_2308(arg0, arg1, addHeapObject(arg2));
 }
 
-function __wasm_bindgen_func_elem_2698(arg0, arg1, arg2, arg3) {
-    wasm.__wasm_bindgen_func_elem_2698(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
+function __wasm_bindgen_func_elem_2877(arg0, arg1, arg2, arg3) {
+    wasm.__wasm_bindgen_func_elem_2877(arg0, arg1, addHeapObject(arg2), addHeapObject(arg3));
 }
 
 const BatchInsertConfigFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -464,19 +464,12 @@ if (Symbol.dispose) BatchInsertResult.prototype[Symbol.dispose] = BatchInsertRes
 /**
  * The main EdgeVec database handle.
  *
- * This struct is serializable for persistence via `postcard`.
- * The `liveness` field is skipped as it is runtime state.
+ * Persisted with `toBytes()` / `fromBytes()` / `save()` / `load()` using the
+ * format in `persistence::buffer`.
  *
  * Supports both Flat and HNSW index types via the `indexType` configuration.
  * Use `IndexType.Flat` for insert-heavy workloads with exact search,
  * or `IndexType.Hnsw` (default) for large-scale approximate search.
- *
- * # Safety Note
- *
- * This type derives `Deserialize` despite containing methods with `unsafe`.
- * The unsafe code (`save_stream`) is unrelated to deserialization and is safe
- * because it only extends lifetimes for iterator borrowing, controlled by the
- * `liveness` guard.
  */
 export class EdgeVec {
     static __wrap(ptr) {
@@ -509,7 +502,9 @@ export class EdgeVec {
      *
      * # Errors
      *
-     * Returns an error if loading fails, deserialization fails, or data is corrupted.
+     * Rejects with an `Error` named `NotFoundError` if nothing was saved under
+     * `name`, and with the same errors as [`EdgeVec::from_bytes`] if the
+     * stored data is corrupted.
      * @param {string} name
      * @returns {Promise<EdgeVec>}
      */
@@ -522,17 +517,21 @@ export class EdgeVec {
     /**
      * Saves the database to IndexedDB.
      *
+     * Stores the same bytes as [`EdgeVec::to_bytes`] under `name` in the
+     * `EdgeVecDB` database. Saving to an existing name overwrites it.
+     *
      * # Arguments
      *
      * * `name` - The name of the database file in IndexedDB.
      *
      * # Returns
      *
-     * A Promise that resolves when saving is complete.
+     * A Promise that resolves when the IndexedDB transaction has committed.
      *
      * # Errors
      *
-     * Returns an error if serialization fails or if the backend write fails.
+     * Returns an error if serialization fails, IndexedDB is unavailable, or
+     * the write transaction fails.
      * @param {string} name
      * @returns {Promise<void>}
      */
@@ -563,6 +562,57 @@ export class EdgeVec {
     canInsert() {
         const ret = wasm.edgevec_canInsert(this.__wbg_ptr);
         return ret !== 0;
+    }
+    /**
+     * Get the vector dimensions this index was created with.
+     *
+     * For Flat (binary) indexes this is the number of bits per vector.
+     * Useful after `load()` / `fromBytes()`, when the original config is
+     * no longer at hand.
+     * @returns {number}
+     */
+    dimensions() {
+        const ret = wasm.edgevec_dimensions(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Restores a database from bytes produced by [`EdgeVec::to_bytes`] or
+     * `save()`, including buffers written by EdgeVec 0.6.0–0.9.0.
+     * Releases before 0.6.0 used a different layout and are not supported.
+     *
+     * Decoding allocates memory for the index. Nested collections and metadata
+     * can use roughly ten times the input size; the checksum is not authentication.
+     *
+     * # Arguments
+     *
+     * * `bytes` - A `Uint8Array` holding the serialized database.
+     *
+     * # Errors
+     *
+     * Returns an error object with `code: "ERR_CORRUPTION"` if the buffer is
+     * truncated, fails its checksum, or is structurally invalid, and
+     * `code: "ERR_PERSISTENCE"` if it was written by a newer, unsupported
+     * format version or unknown flags/reserved fields. Non-finite vectors and
+     * metadata that exceeds the insertion limits are rejected as corruption.
+     * @param {Uint8Array} bytes
+     * @returns {EdgeVec}
+     */
+    static fromBytes(bytes) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray8ToWasm0(bytes, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.edgevec_fromBytes(retptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return EdgeVec.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
     }
     /**
      * Check if a vector is deleted (tombstoned).
@@ -1323,6 +1373,12 @@ export class EdgeVec {
      * - Boosts JSON is malformed or contains invalid weights
      * - Filter expression is invalid
      * - Options JSON is malformed
+     *
+     * # Returns
+     *
+     * JSON string with `{ results: [{ id, score, metadata? }], total }`.
+     * The `score` field contains boosted **distance** (lower = closer).
+     * For cosine/dot metrics on normalized vectors, unboosted range is `[0, 2]`.
      *
      * # Example (JavaScript)
      *
@@ -2679,6 +2735,10 @@ export class EdgeVec {
      * # Returns
      *
      * An array of objects: `[{ id: u32, score: f32 }, ...]`.
+     * The `score` field contains **distance** (lower = closer) for cosine and
+     * dot product metrics. For normalized vectors, range is `[0, 2]` where
+     * `0` = identical and `2` = opposite. Results are sorted by ascending
+     * distance (most similar first).
      *
      * # Errors
      *
@@ -2747,6 +2807,53 @@ export class EdgeVec {
                 throw takeObject(r1);
             }
             return WasmCompactionResult.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * Serializes the database into a self-contained byte buffer.
+     *
+     * Use this to persist the index anywhere other than IndexedDB, e.g. a
+     * file via Tauri/Electron/Node APIs, OPFS, or a network upload. Restore
+     * with [`EdgeVec::from_bytes`]. `save()` writes the same bytes.
+     *
+     * Persisted: vectors, graph, soft-delete state, metadata, and whether
+     * binary quantization is enabled (BQ codes are rebuilt on load).
+     * Not persisted: sparse vectors (see `sparse_storage`) and memory
+     * pressure configuration.
+     *
+     * # Returns
+     *
+     * A `Uint8Array` (a copy; safe to keep after further mutations).
+     *
+     * # Errors
+     *
+     * Returns an error if serialization fails or the buffer would exceed 4 GiB.
+     *
+     * # Example (JavaScript)
+     *
+     * ```javascript
+     * const bytes = db.toBytes();
+     * await writeFile('index.evwb', bytes);          // e.g. @tauri-apps/plugin-fs
+     * const restored = EdgeVec.fromBytes(await readFile('index.evwb'));
+     * ```
+     * @returns {Uint8Array}
+     */
+    toBytes() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_toBytes(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            if (r3) {
+                throw takeObject(r2);
+            }
+            var v1 = getArrayU8FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export4(r0, r1 * 1, 1);
+            return v1;
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
@@ -4370,7 +4477,7 @@ function __wbg_get_imports() {
                 const a = state0.a;
                 state0.a = 0;
                 try {
-                    return __wasm_bindgen_func_elem_2698(a, state0.b, arg0, arg1);
+                    return __wasm_bindgen_func_elem_2877(a, state0.b, arg0, arg1);
                 } finally {
                     state0.a = a;
                 }
@@ -4507,15 +4614,10 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_warn_6e567d0d926ff881 = function(arg0) {
         console.warn(getObject(arg0));
     };
-    imports.wbg.__wbg_write_91f31b73380b0c53 = function() { return handleError(function (arg0, arg1, arg2, arg3) {
-        const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getArrayU8FromWasm0(arg2, arg3));
+    imports.wbg.__wbg_write_e37628d40fe4801e = function() { return handleError(function (arg0, arg1, arg2) {
+        const ret = IndexedDbBackend.write(getStringFromWasm0(arg0, arg1), getObject(arg2));
         return addHeapObject(ret);
     }, arguments) };
-    imports.wbg.__wbindgen_cast_0578849e8f68f9d8 = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 138, function: Function { arguments: [Externref], shim_idx: 139, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_2131, __wasm_bindgen_func_elem_2147);
-        return addHeapObject(ret);
-    };
     imports.wbg.__wbindgen_cast_2241b6af4c4b2941 = function(arg0, arg1) {
         // Cast intrinsic for `Ref(String) -> Externref`.
         const ret = getStringFromWasm0(arg0, arg1);
@@ -4524,6 +4626,11 @@ function __wbg_get_imports() {
     imports.wbg.__wbindgen_cast_4625c577ab2ec9ee = function(arg0) {
         // Cast intrinsic for `U64 -> Externref`.
         const ret = BigInt.asUintN(64, arg0);
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbindgen_cast_792cb4e15050f6f1 = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 144, function: Function { arguments: [Externref], shim_idx: 145, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_2292, __wasm_bindgen_func_elem_2308);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_cast_cb9088102bce6b30 = function(arg0, arg1) {

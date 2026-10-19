@@ -231,6 +231,12 @@ pub struct HnswNode {
 
 /// The HNSW Graph structure managing layers and nodes.
 ///
+/// # Persistence schema
+///
+/// Its serde layout is part of the WASM buffer format. Any wire-layout change
+/// requires a `persistence::buffer::BUFFER_VERSION` bump, a migration, and golden
+/// fixture tests. `#[serde(default)]` does not migrate postcard sequences.
+///
 /// # Memory
 ///
 /// Uses a flattened representation for cache efficiency.

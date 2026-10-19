@@ -202,8 +202,9 @@ if (!db.canInsert()) {
 | Method | Description |
 |:-------|:------------|
 | `save(name)` | Save to IndexedDB |
-| `createSnapshot()` | Create binary snapshot |
-| `loadSnapshot(data)` | Load from snapshot |
+| `EdgeVec.load(name)` | Load from IndexedDB |
+| `toBytes()` | Serialize to a `Uint8Array` (files, Tauri, Node.js) |
+| `EdgeVec.fromBytes(bytes)` | Restore from `toBytes()` / `save()` output |
 
 ### Utility Methods
 

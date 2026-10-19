@@ -480,7 +480,9 @@ needsCompaction(): boolean
 
 ### save(name)
 
-Save to IndexedDB (browser) or filesystem (Node.js).
+Save to IndexedDB (browser only). Stores the same bytes as `toBytes()` under
+`name` in the `EdgeVecDB` database; an existing entry is overwritten.
+Outside the browser (Node.js, Tauri, Electron) use `toBytes()` instead.
 
 ```typescript
 save(name: string): Promise<void>
@@ -490,11 +492,15 @@ save(name: string): Promise<void>
 
 ### load(name)
 
-Load from storage.
+Load from IndexedDB.
 
 ```typescript
 static load(name: string): Promise<EdgeVec>
 ```
+
+Rejects with an `Error` whose `name` is `"NotFoundError"` if nothing was saved
+under `name`, and with `{ code: "ERR_CORRUPTION", message }` if the stored data
+is damaged.
 
 **Example:**
 
@@ -503,33 +509,83 @@ static load(name: string): Promise<EdgeVec>
 await index.save('my-vector-db');
 
 // Load on page reload
+let index;
 try {
-    const index = await EdgeVec.load('my-vector-db');
+    index = await EdgeVec.load('my-vector-db');
     console.log('Loaded', index.liveCount(), 'vectors');
 } catch (e) {
-    // Database doesn't exist
-    const index = new EdgeVec(config);
+    if (e?.name !== 'NotFoundError') throw e;
+    index = new EdgeVec(config); // first run
 }
 ```
 
 ---
 
-### createSnapshot()
+### toBytes()
 
-Create a binary snapshot for manual persistence.
+Serialize the whole index into a self-contained buffer, for persisting
+anywhere other than IndexedDB: a file (Tauri, Electron, Node.js), OPFS, or an
+upload.
 
 ```typescript
-createSnapshot(): Uint8Array
+toBytes(): Uint8Array
+```
+
+The buffer contains vectors, the HNSW graph, soft-delete state, metadata, and
+whether binary quantization is enabled (BQ codes are rebuilt on load). Sparse
+vectors and memory-pressure settings are not included. The buffer starts with
+an `EVWB` magic, a format version, and a CRC32 checksum.
+
+---
+
+### fromBytes(bytes)
+
+Restore an index from bytes produced by `toBytes()` or `save()`, including
+data saved by EdgeVec 0.6.0–0.9.0. Releases before 0.6.0 are not supported.
+
+```typescript
+static fromBytes(bytes: Uint8Array): EdgeVec
+```
+
+Throws `{ code: "ERR_CORRUPTION", message }` for truncated, corrupted, or
+non-EdgeVec data, and `{ code: "ERR_PERSISTENCE", message }` for a buffer
+written by a newer, unsupported format version or with unknown flags/reserved
+fields. Loading validates vector finiteness, graph structure, and metadata
+against the same limits used on insertion. The CRC32 covers the header and payload.
+
+Decoding allocates memory for the index; nested collections and metadata can
+use roughly ten times the input size. The checksum detects corruption and does
+not authenticate the source of a buffer.
+
+**Example (Tauri):**
+
+```typescript
+import { writeFile, readFile, BaseDirectory } from '@tauri-apps/plugin-fs';
+
+await writeFile('index.evwb', index.toBytes(), { baseDir: BaseDirectory.AppData });
+
+const bytes = await readFile('index.evwb', { baseDir: BaseDirectory.AppData });
+const restored = EdgeVec.fromBytes(bytes);
+```
+
+**Example (Node.js):**
+
+```typescript
+import { writeFile, readFile } from 'node:fs/promises';
+
+await writeFile('index.evwb', index.toBytes());
+const restored = EdgeVec.fromBytes(await readFile('index.evwb'));
 ```
 
 ---
 
-### loadSnapshot(data)
+### dimensions()
 
-Load from a binary snapshot.
+The dimensions the index was created with (bits per vector for Flat indexes).
+Useful after `load()` / `fromBytes()`.
 
 ```typescript
-loadSnapshot(data: Uint8Array): void
+dimensions(): number
 ```
 
 ---

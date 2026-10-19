@@ -18,6 +18,7 @@
 #   test:       15 minutes (cargo test --verbose)
 #   lint:       5 minutes  (cargo fmt + clippy)
 #   wasm-check: 5 minutes  (cargo check --target wasm32-unknown-unknown)
+#   wasm-persistence: 15 minutes (wasm_persistence under Node + IndexedDB shim tests)
 #   fuzz-check: 5 minutes  (cargo +nightly check)
 #   miri-core:   20 minutes (cargo +nightly miri test, core features)
 #   miri-sparse: 20 minutes (cargo +nightly miri test, sparse feature)
@@ -99,6 +100,62 @@ jobs:
       - name: Check WASM Build
         run: cargo check --target wasm32-unknown-unknown
 
+  # Job 3b: WASM persistence regression tests (issues #11, #12)
+  # save()/load() shipped broken because nothing executed them; this runs the
+  # toBytes/fromBytes roundtrip under Node and the IndexedDB shim against
+  # fake-indexeddb.
+  wasm-persistence:
+    name: WASM Persistence Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Do not inherit the native x86 target-cpu override; fixtures use SIMD128.
+      RUSTFLAGS: "-C target-feature=+simd128"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust with WASM target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve wasm-bindgen version from Cargo.lock
+        id: wbg
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          v=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Install wasm-bindgen-test-runner
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@${{ steps.wbg.outputs.version }}
+
+      - name: Buffer roundtrip tests (wasm32 under Node)
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
+        run: cargo test --locked --target wasm32-unknown-unknown --test wasm_persistence
+
+      - name: IndexedDB shim tests
+        run: |
+          npm install --no-audit --no-fund
+          npm run test:storage
+
+      - name: IndexedDB through WASM bindings
+        run: |
+          cargo build --locked --target wasm32-unknown-unknown --lib
+          wasm-bindgen --target web --out-dir target/persistence-e2e target/wasm32-unknown-unknown/debug/edgevec.wasm
+          node tests/js/persistence.e2e.mjs target/persistence-e2e
+
   # Job 4: Fuzz Harness Verification — All 15 targets
   fuzz-check:
     name: Fuzz Harness Build (All Targets)
@@ -123,6 +180,8 @@ jobs:
   #   - hybrid:: — pure-safe search/fusion logic, very slow under Miri
   #   - quantization::product:: — pure-safe k-means/PQ, extremely slow under Miri
   #   - hnsw:: — graph search is safe-only, slow under Miri instrumentation
+  #   - persistence::buffer::tests — safe-code fixture/mutation loops drive HNSW;
+  #     bitvec decoder and metadata serde tests still run under Miri
   #   - proptests — property tests don't exercise unsafe, 1-3min/case under Miri
   #   - wasm — not available in Miri
   #   - test_bq_vs_f32_recall_comparison — slow integration test
@@ -153,6 +212,7 @@ jobs:
             --skip hybrid:: \
             --skip quantization::product:: \
             --skip hnsw:: \
+            --skip persistence::buffer::tests \
             --skip proptests
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"
@@ -186,6 +246,7 @@ jobs:
             --skip hybrid:: \
             --skip quantization::product:: \
             --skip hnsw:: \
+            --skip persistence::buffer::tests \
             --skip proptests
         env:
           MIRIFLAGS: "-Zmiri-disable-isolation -Zmiri-symbolic-alignment-check -Zmiri-permissive-provenance"

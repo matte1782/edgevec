@@ -27,8 +27,13 @@
 //! {"type": "boolean", "value": true}
 //! {"type": "string_array", "value": ["a", "b", "c"]}
 //! ```
+//!
+//! Non-self-describing binary formats (e.g. `postcard`) cannot decode
+//! adjacently-tagged enums, so those formats use a compact externally-tagged
+//! representation instead (variant index + payload). The format is selected via
+//! `Serializer::is_human_readable()`. See issue #12.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 /// Supported metadata value types.
@@ -48,7 +53,8 @@ use std::fmt;
 ///
 /// # Serialization
 ///
-/// Uses adjacently-tagged representation for unambiguous type preservation:
+/// Human-readable formats (JSON) use an adjacently-tagged representation for
+/// unambiguous type preservation:
 ///
 /// ```rust
 /// use edgevec::metadata::MetadataValue;
@@ -57,6 +63,10 @@ use std::fmt;
 /// let json = serde_json::to_string(&value).unwrap();
 /// assert_eq!(json, r#"{"type":"integer","value":42}"#);
 /// ```
+///
+/// Binary formats (postcard) use a compact externally-tagged representation
+/// (variant index followed by the payload), which is byte-identical to what the
+/// previous derived adjacently-tagged impl emitted under postcard.
 ///
 /// # Example
 ///
@@ -80,8 +90,7 @@ use std::fmt;
 /// assert_eq!(title.as_string(), Some("Document Title"));
 /// assert_eq!(page_count.as_integer(), Some(42));
 /// ```
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MetadataValue {
     /// UTF-8 string value (max 65,536 bytes).
     ///
@@ -108,6 +117,103 @@ pub enum MetadataValue {
     ///
     /// Use for tags, categories, labels, and multi-value fields.
     StringArray(Vec<String>),
+}
+
+// =============================================================================
+// Serde wire representations
+// =============================================================================
+//
+// Variant ORDER is part of the binary format: the compact representation
+// encodes the variant index. Never reorder or insert variants in the middle.
+
+/// Human-readable wire form (serialize side, borrows to avoid clones).
+#[derive(Serialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+enum TaggedRef<'a> {
+    String(&'a str),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+    StringArray(&'a [String]),
+}
+
+/// Human-readable wire form (deserialize side).
+#[derive(Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+enum Tagged {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+    StringArray(Vec<String>),
+}
+
+/// Compact binary wire form (serialize side).
+#[derive(Serialize)]
+#[serde(rename = "MetadataValue")]
+enum CompactRef<'a> {
+    String(&'a str),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+    StringArray(&'a [String]),
+}
+
+/// Compact binary wire form (deserialize side).
+#[derive(Deserialize)]
+#[serde(rename = "MetadataValue")]
+enum Compact {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Boolean(bool),
+    StringArray(Vec<String>),
+}
+
+impl Serialize for MetadataValue {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            match self {
+                MetadataValue::String(s) => TaggedRef::String(s),
+                MetadataValue::Integer(i) => TaggedRef::Integer(*i),
+                MetadataValue::Float(f) => TaggedRef::Float(*f),
+                MetadataValue::Boolean(b) => TaggedRef::Boolean(*b),
+                MetadataValue::StringArray(a) => TaggedRef::StringArray(a),
+            }
+            .serialize(serializer)
+        } else {
+            match self {
+                MetadataValue::String(s) => CompactRef::String(s),
+                MetadataValue::Integer(i) => CompactRef::Integer(*i),
+                MetadataValue::Float(f) => CompactRef::Float(*f),
+                MetadataValue::Boolean(b) => CompactRef::Boolean(*b),
+                MetadataValue::StringArray(a) => CompactRef::StringArray(a),
+            }
+            .serialize(serializer)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for MetadataValue {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        if deserializer.is_human_readable() {
+            Ok(match Tagged::deserialize(deserializer)? {
+                Tagged::String(s) => MetadataValue::String(s),
+                Tagged::Integer(i) => MetadataValue::Integer(i),
+                Tagged::Float(f) => MetadataValue::Float(f),
+                Tagged::Boolean(b) => MetadataValue::Boolean(b),
+                Tagged::StringArray(a) => MetadataValue::StringArray(a),
+            })
+        } else {
+            Ok(match Compact::deserialize(deserializer)? {
+                Compact::String(s) => MetadataValue::String(s),
+                Compact::Integer(i) => MetadataValue::Integer(i),
+                Compact::Float(f) => MetadataValue::Float(f),
+                Compact::Boolean(b) => MetadataValue::Boolean(b),
+                Compact::StringArray(a) => MetadataValue::StringArray(a),
+            })
+        }
+    }
 }
 
 impl MetadataValue {
@@ -446,6 +552,78 @@ mod tests {
             MetadataValue::StringArray(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
         let json = serde_json::to_string(&value).unwrap();
         assert_eq!(json, r#"{"type":"string_array","value":["a","b","c"]}"#);
+    }
+
+    // =========================================================================
+    // Binary (postcard) Format Tests — issue #12
+    // =========================================================================
+
+    fn all_variants() -> Vec<MetadataValue> {
+        vec![
+            MetadataValue::String("hello 世界".to_string()),
+            MetadataValue::Integer(i64::MIN),
+            MetadataValue::Float(-9.87654),
+            MetadataValue::Boolean(true),
+            MetadataValue::StringArray(vec!["a".to_string(), String::new()]),
+            MetadataValue::StringArray(vec![]),
+        ]
+    }
+
+    #[test]
+    fn test_postcard_roundtrip_all_variants() {
+        for value in all_variants() {
+            let bytes = postcard::to_stdvec(&value).unwrap();
+            let parsed: MetadataValue = postcard::from_bytes(&bytes).unwrap();
+            assert_eq!(value, parsed);
+        }
+    }
+
+    #[test]
+    fn test_postcard_roundtrip_inside_map() {
+        // Mirrors MetadataStore's layout: the failure in #12 surfaced here.
+        let mut map = std::collections::HashMap::new();
+        map.insert("k".to_string(), MetadataValue::Integer(3));
+        let bytes = postcard::to_stdvec(&map).unwrap();
+        let parsed: std::collections::HashMap<String, MetadataValue> =
+            postcard::from_bytes(&bytes).unwrap();
+        assert_eq!(map, parsed);
+    }
+
+    /// The previous `#[derive]` with `#[serde(tag, content)]` emitted
+    /// `[variant index][payload]` under postcard. Data written by it must
+    /// remain readable with the new compact representation.
+    #[test]
+    fn test_postcard_reads_legacy_adjacently_tagged_bytes() {
+        #[derive(Serialize)]
+        #[serde(tag = "type", content = "value", rename_all = "snake_case")]
+        enum Legacy {
+            String(String),
+            Integer(i64),
+            Float(f64),
+            Boolean(bool),
+            StringArray(Vec<String>),
+        }
+
+        for value in all_variants() {
+            let legacy = match value.clone() {
+                MetadataValue::String(s) => Legacy::String(s),
+                MetadataValue::Integer(i) => Legacy::Integer(i),
+                MetadataValue::Float(f) => Legacy::Float(f),
+                MetadataValue::Boolean(b) => Legacy::Boolean(b),
+                MetadataValue::StringArray(a) => Legacy::StringArray(a),
+            };
+            let legacy_bytes = postcard::to_stdvec(&legacy).unwrap();
+            assert_eq!(legacy_bytes, postcard::to_stdvec(&value).unwrap());
+            let parsed: MetadataValue = postcard::from_bytes(&legacy_bytes).unwrap();
+            assert_eq!(value, parsed);
+        }
+    }
+
+    #[test]
+    fn test_postcard_rejects_unknown_variant() {
+        // Variant index 5 does not exist.
+        let err = postcard::from_bytes::<MetadataValue>(&[5, 0]);
+        assert!(err.is_err());
     }
 
     // =========================================================================

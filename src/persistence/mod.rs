@@ -2,6 +2,8 @@
 //!
 //! Handles file formats, serialization, recovery, and logging.
 
+/// WASM buffer format (`toBytes` / `fromBytes`, IndexedDB save/load).
+pub(crate) mod buffer;
 /// Storage chunking logic.
 pub mod chunking;
 /// WAL entry definitions.
@@ -31,6 +33,15 @@ pub use storage::{MemoryBackend, StorageBackend};
 pub use writer::write_empty_index;
 
 use thiserror::Error;
+
+/// Fuzzing entry point for the WASM buffer decoder (`fuzz/fuzz_targets/wasm_buffer`).
+///
+/// Decodes `data` as a `toBytes()` buffer and, if it is accepted, drives the
+/// restored index through search/insert/delete. Must never panic.
+#[doc(hidden)]
+pub fn fuzz_wasm_buffer(data: &[u8]) {
+    buffer::exercise(data);
+}
 
 /// Errors that can occur during persistence operations.
 #[derive(Debug, Error)]

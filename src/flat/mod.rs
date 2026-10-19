@@ -80,6 +80,8 @@ const SERIALIZATION_HEADER_SIZE: usize = 8;
 /// 0-based direct indexing. The 1-based convention allows `VectorId(0)` to
 /// serve as a sentinel value in graph structures (e.g., HNSW neighbor lists).
 #[derive(Debug, Serialize, Deserialize)]
+// Wire changes require a persistence::buffer::BUFFER_VERSION bump, migration,
+// and golden fixture tests.
 pub struct BinaryFlatIndex {
     /// Contiguous storage for all vectors.
     vectors: Vec<u8>,
@@ -287,6 +289,17 @@ impl BinaryFlatIndex {
     #[inline]
     pub fn bytes_per_vector(&self) -> usize {
         self.bytes_per_vector
+    }
+
+    /// Check that the internal fields agree with each other.
+    ///
+    /// Always true for indexes built through the public API; used to reject
+    /// malformed deserialized data before it can cause out-of-bounds slicing.
+    #[must_use]
+    pub(crate) fn is_consistent(&self) -> bool {
+        self.dimensions % 8 == 0
+            && self.bytes_per_vector == self.dimensions / 8
+            && self.count.checked_mul(self.bytes_per_vector) == Some(self.vectors.len())
     }
 
     /// Get approximate memory usage in bytes.

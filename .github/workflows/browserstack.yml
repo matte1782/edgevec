@@ -37,14 +37,15 @@ jobs:
 
       - name: Setup Rust
         if: steps.check-secrets.outputs.skip != 'true'
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Node.js
         if: steps.check-secrets.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
+          cache-dependency-path: tests/browserstack/package-lock.json
 
       - name: Install wasm-pack
         if: steps.check-secrets.outputs.skip != 'true'
@@ -57,14 +58,18 @@ jobs:
 
       - name: Build WASM
         if: steps.check-secrets.outputs.skip != 'true'
+        env:
+          # This matrix includes Safari 15/16 on iOS: use the scalar runtime.
+          RUSTFLAGS: "-C target-feature=-simd128"
         run: wasm-pack build --target web --release
 
       - name: Prepare test assets
         if: steps.check-secrets.outputs.skip != 'true'
         run: |
-          mkdir -p tests/mobile/pkg
+          mkdir -p tests/mobile
           cp pkg/edgevec.js tests/mobile/
           cp pkg/edgevec_bg.wasm tests/mobile/
+          cp -R pkg/snippets tests/mobile/
 
       - name: Start local server
         if: steps.check-secrets.outputs.skip != 'true'
