@@ -1177,7 +1177,7 @@ impl FlatIndex {
 pub const FLAT_INDEX_VERSION: u32 = 1;
 
 /// Magic number for FlatIndex snapshots: "EVFI" (EdgeVec Flat Index).
-pub const FLAT_INDEX_MAGIC: [u8; 4] = [b'E', b'V', b'F', b'I'];
+pub const FLAT_INDEX_MAGIC: [u8; 4] = *b"EVFI";
 
 /// FlatIndex snapshot header.
 ///
@@ -2861,7 +2861,7 @@ mod tests {
 
         // Wrong magic
         let bad_magic = FlatIndexHeader {
-            magic: [b'X', b'X', b'X', b'X'],
+            magic: *b"XXXX",
             ..header.clone()
         };
         assert!(matches!(

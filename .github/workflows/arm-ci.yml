@@ -1,23 +1,5 @@
-# EdgeVec ARM CI Configuration
-# ============================
-# W20.1: ARM64 Cross-Compilation & QEMU Test Execution
-#
-# Purpose:
-#   - Cross-compile for ARM64 (aarch64-unknown-linux-gnu)
-#   - Execute tests under QEMU user-mode emulation
-#   - Verify NEON SIMD detection works correctly
-#
-# Local Simulation:
-#   cargo install cross --git https://github.com/cross-rs/cross
-#   cross build --target aarch64-unknown-linux-gnu --release
-#   cross test --target aarch64-unknown-linux-gnu --release
-#
-# Performance Notes:
-#   - First run downloads ~2GB Docker image (can take 10+ minutes)
-#   - Docker layer caching reduces subsequent runs to ~2 minutes
-#   - QEMU emulation is ~10x slower than native execution
-#   - Proptest cases reduced to 16 to stay within time budget
-
+# EdgeVec ARM CI: execute the full library suite on native ARM64 hardware.
+# GitHub's standard ARM runners avoid cross/QEMU metadata and Docker failures.
 name: ARM CI
 
 on:
@@ -28,19 +10,14 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Reduce proptest cases in CI (QEMU is slower than native)
   PROPTEST_CASES: "16"
-  # Reduce vector count for integration tests under emulation
   NUM_VECTORS: "500"
-  # Cross version for caching
-  CROSS_VERSION: "0.2.5"
 
 jobs:
-  # Job 1: ARM64 Build + Test (Combined to avoid duplicate builds)
   arm64-test:
-    name: ARM64 Build & Test (QEMU)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45  # Increased: Docker pull (15min) + compile (15min) + QEMU tests (15min)
+    name: ARM64 Build & Test
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -49,64 +26,26 @@ jobs:
         with:
           targets: aarch64-unknown-linux-gnu
 
-      # Cache cargo registry and cross binary
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/cross
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-cross-${{ env.CROSS_VERSION }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-cross-${{ env.CROSS_VERSION }}-
-            ${{ runner.os }}-cargo-cross-
+      - uses: Swatinem/rust-cache@v2
 
-      # Cache Docker layers for cross image
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.docker-cache
-          key: ${{ runner.os }}-docker-aarch64-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-docker-aarch64-
-
-      - name: Install cross (if not cached)
-        run: |
-          if ! command -v cross &> /dev/null; then
-            cargo install cross --git https://github.com/cross-rs/cross
-          fi
-          cross --version
-
-      # Pre-pull the Docker image to track time separately
-      - name: Pull cross Docker image
-        run: |
-          docker pull ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main || true
+      - name: Verify native ARM64 runner
+        run: test "$(uname -m)" = aarch64
 
       - name: Build ARM64 (Release)
-        run: cross build --target aarch64-unknown-linux-gnu --release
+        run: cargo build --target aarch64-unknown-linux-gnu --release
 
       - name: Run ARM64 Tests
-        run: |
-          cross test --target aarch64-unknown-linux-gnu --release --lib -- --test-threads=1
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER: qemu-aarch64
+        run: cargo test --target aarch64-unknown-linux-gnu --release --lib -- --test-threads=1
 
       - name: Verify NEON Detection
-        run: |
-          cross test --target aarch64-unknown-linux-gnu --release simd -- --nocapture --test-threads=1
+        run: cargo test --target aarch64-unknown-linux-gnu --release simd -- --nocapture --test-threads=1
         env:
-          RUST_BACKTRACE: 1
+          RUST_BACKTRACE: "1"
 
-  # Job 2: ARM64 Clippy Check (separate, faster)
   arm64-lint:
     name: ARM64 Clippy
-    runs-on: ubuntu-latest
-    timeout-minutes: 30  # Increased for Docker pull
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -116,33 +55,11 @@ jobs:
           targets: aarch64-unknown-linux-gnu
           components: clippy
 
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/cross
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-cross-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-cross-clippy-
-
-      - name: Install cross (if not cached)
-        run: |
-          if ! command -v cross &> /dev/null; then
-            cargo install cross --git https://github.com/cross-rs/cross
-          fi
-
-      - name: Pull cross Docker image
-        run: |
-          docker pull ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main || true
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run Clippy for ARM64
-        run: |
-          cross clippy --target aarch64-unknown-linux-gnu -- -D clippy::correctness -W clippy::suspicious
+        run: cargo clippy --target aarch64-unknown-linux-gnu -- -D clippy::correctness -W clippy::suspicious
 
-  # Job 3: Verify x86 Not Broken (Regression Guard) - Fast, no Docker needed
   x86-regression:
     name: x86 Regression Check
     runs-on: ubuntu-latest
@@ -153,17 +70,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-x86-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-x86-
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run x86 Tests (Quick Check)
         run: cargo test --lib -- --test-threads=2

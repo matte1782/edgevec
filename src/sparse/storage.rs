@@ -50,7 +50,7 @@ use crate::sparse::{SparseError, SparseVector};
 /// Magic number for EdgeVec Sparse Vector format: "ESPV" in ASCII.
 ///
 /// Used to identify valid sparse storage files.
-pub const SPARSE_MAGIC: [u8; 4] = [b'E', b'S', b'P', b'V'];
+pub const SPARSE_MAGIC: [u8; 4] = *b"ESPV";
 
 /// Current format version. Increment on breaking changes.
 ///

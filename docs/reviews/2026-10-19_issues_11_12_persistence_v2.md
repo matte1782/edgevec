@@ -80,3 +80,33 @@ The pre-existing TypeScript-wrapper type errors and the pre-existing binary-inde
 **GO for the reviewed persistence change.** The original blocking functional findings and the additional concurrent-repair finding are resolved, regression coverage exercises the public behavior and real historical bytes, and the final measured load case meets its budget. This approval does not certify hosted CI or unmeasured browser performance. No gate file was created; the requested review document is the deliverable.
 
 **Handoff:** HOSTILE_REVIEWER complete. Status: READY_FOR_NEXT_PHASE. Next: verify the publication's hosted CI results.
+
+## Appendix — Hosted CI follow-ups reviewed 2026-10-20
+
+**Disposition: GO for the next CI iteration; merge remains gated on green hosted checks.** This appendix reviews the follow-up patches, not an assertion that all hosted jobs have passed. The original persistence approval remains scoped to the implementation and evidence above.
+
+| Follow-up | Review assessment |
+| --- | --- |
+| Current Clippy byte-array diagnostics | `*b"EVFI"`, `*b"XXXX"` and `*b"ESPV"` have the same `[u8; 4]` values as the replaced character arrays (`src/index/flat.rs:1180`, `:2864`; `src/sparse/storage.rs:53`). No snapshot bytes, layout or behavior change. |
+| BrowserStack dependency setup | `tests/browserstack/package-lock.json` now supplies the lock required by `npm ci` and the explicit cache path; Node 22 supports the locked Selenium dependency. The lock must be included in the published changes. |
+| BrowserStack runtime assets | The generated JS/WASM and their imported snippets are copied together. This resolves the missing-snippet asset path rather than omitting that import. The workflow's scalar WASM build is limited to its legacy Safari/mobile matrix; regular WASM CI retains its SIMD build. |
+| Mobile API assertions | Cases use the ID actually returned by insertion rather than the invalid zero-ID assumption (`tests/mobile/index.html:1077`). The reviewed smoke log records **12/12 actual mobile-page API cases passing under Node**. This verifies their API logic; mobile-browser execution still needs the hosted matrix. |
+| ARM infrastructure | Native `ubuntu-24.04-arm` replaces cross/Docker setup while preserving the release build, complete library test command, SIMD-filtered test command, ARM lint and x86 regression job. An explicit `uname -m` check verifies execution architecture. No test assertions are removed. |
+
+GitHub lists `ubuntu-24.04-arm` as an ARM64 hosted-runner label. The workflow therefore uses a documented execution environment rather than substituting an x86 compile-only check. Its runtime and lint results must still be verified. [GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories).
+
+### bitvec constraint and Miri
+
+`Cargo.toml:84` changes the dependency requirement from `"1.0"` to `"~1.0"`, retaining its serde feature. This is a reasonable constraint for the project's fixed MSRV: upstream explicitly recommends a limiting minor-version requirement for pinned Rust toolchains and permits MSRV increases in minor releases. [bitvec usage policy](https://github.com/ferrilab/bitvec#usage).
+
+The distinction matters: `~1.0` permits `>=1.0.0, <1.1.0`; it is **not an exact 1.0.1 pin**. The local lockfile inspected during this review resolves **1.0.1**, matching the version used for the earlier local validation. Future 1.0 patch releases remain permitted. [Cargo version-requirement semantics](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#tilde-requirements).
+
+This dependency policy is approved for testing; it does **not yet establish a Miri fix**. The linked upstream retag issue was opened in 2022 and reports a similar failure, so it cannot establish that the problem first appeared in 1.1.1 or that 1.0.1 is unaffected. Native test success also does not establish Miri success. This is an inference from the issue's age and the difference between the checks, not an upstream claim about the current CI run. [Upstream issue 193](https://github.com/ferrilab/bitvec/issues/193).
+
+Both hosted Miri jobs must pass with the newly resolved dependency version and their existing model flags and test coverage. Disabling checks, adding failure tolerances or removing further coverage is outside this approval. If either still fails, that remains an unresolved merge blocker requiring further investigation.
+
+### Evidence and publication gate
+
+The patches are ready for CI. Formatting passes, the mobile-page Node smoke passes 12/12, and the code/value equivalence and workflow command coverage were inspected. The implementing agent reported the earlier hosted Linux suite, WASM compilation/persistence, fuzz-build and x86 checks passing; the follow-up revision still needs its own hosted results.
+
+Before merge, verify the new revision's native lint, ARM build/tests/lint, both Miri jobs and configured BrowserStack matrix, together with the already-required main checks. A missing-secrets skip must be reported as a skip, not as executed mobile-browser coverage. The reviewer changed only this review appendix and performed no implementation or Git-state mutation.

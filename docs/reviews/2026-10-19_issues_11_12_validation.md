@@ -51,3 +51,13 @@ The fix is prepared on an isolated branch based on GitHub `main`; four unrelated
 The pre-existing high-level TypeScript wrapper build errors and its `load()` dimension bookkeeping are outside this raw WASM persistence fix. The pre-existing Hamming/binary `compact()` panic with tombstones is also unchanged; the fuzz exercise explicitly avoids that unrelated path. No npm package or crates.io version is published by this GitHub source/demo deployment.
 
 See [the second hostile review](2026-10-19_issues_11_12_persistence_v2.md) for the final review verdict and disposition of the original findings.
+
+## Hosted CI follow-up
+
+The first hosted Linux suite, WASM persistence job, all-target fuzz build, x86 regression check, and performance benchmark workflow passed. Other jobs exposed maintenance issues that were not visible with the local toolchain.
+
+The CI follow-up normalizes three existing byte-array constants to equivalent byte strings for newer Clippy. It constrains bitvec to its 1.0 minor line, following the dependency's documented guidance for a fixed MSRV; this retains the locally validated dependency series. Both existing Miri jobs keep their borrow/provenance checks and test coverage, and a successful hosted result is required before merge.
+
+ARM release builds, complete library tests, SIMD tests, and lint run on GitHub's native Ubuntu ARM64 runners. This replaces the failed cross/Docker setup while preserving command coverage. The x86 regression job remains separate.
+
+The optional mobile workflow has a committed dependency lockfile, uses Node 22 as required by the resolved Selenium dependency, caches that lockfile, and copies the generated storage snippets alongside the WASM glue. Its legacy Safari 15/16 matrix builds the scalar runtime. The mobile page uses the ID actually returned by insertion for search/metadata assertions. All 12 page API cases passed against the release runtime in Node; real-device results are a separate BrowserStack check.

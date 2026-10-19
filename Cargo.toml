@@ -79,7 +79,9 @@ crate-type = ["lib", "cdylib"]
 # =============================================================================
 
 [dependencies]
-bitvec = { version = "1.0", features = ["serde"] }
+# Keep the validated 1.0 series within the project's fixed Rust 1.70 MSRV.
+# bitvec permits MSRV increases in minor releases.
+bitvec = { version = "~1.0", features = ["serde"] }
 # Error handling (required by Day 1 spec)
 thiserror = "1.0"
 

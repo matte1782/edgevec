@@ -1074,7 +1074,7 @@
                 run: async (ctx) => {
                     const vector = new Float32Array(128).fill(0.5);
                     ctx.vectorId = ctx.index.insert(vector);
-                    return ctx.vectorId === 0;
+                    return Number.isInteger(ctx.vectorId) && ctx.vectorId > 0;
                 }
             },
             {
@@ -1082,46 +1082,46 @@
                 run: async (ctx) => {
                     const query = new Float32Array(128).fill(0.5);
                     const results = ctx.index.search(query, 1);
-                    return results.length === 1 && results[0].id === 0;
+                    return results.length === 1 && results[0].id === ctx.vectorId;
                 }
             },
             {
                 name: 'Metadata: String',
                 run: async (ctx) => {
-                    ctx.index.setMetadata(0, 'title', JsMetadataValue.fromString('EdgeVec Test'));
-                    const val = ctx.index.getMetadata(0, 'title');
+                    ctx.index.setMetadata(ctx.vectorId, 'title', JsMetadataValue.fromString('EdgeVec Test'));
+                    const val = ctx.index.getMetadata(ctx.vectorId, 'title');
                     return val?.asString() === 'EdgeVec Test';
                 }
             },
             {
                 name: 'Metadata: Integer',
                 run: async (ctx) => {
-                    ctx.index.setMetadata(0, 'count', JsMetadataValue.fromInteger(42));
-                    const val = ctx.index.getMetadata(0, 'count');
+                    ctx.index.setMetadata(ctx.vectorId, 'count', JsMetadataValue.fromInteger(42));
+                    const val = ctx.index.getMetadata(ctx.vectorId, 'count');
                     return val?.asInteger() === 42;
                 }
             },
             {
                 name: 'Metadata: Float',
                 run: async (ctx) => {
-                    ctx.index.setMetadata(0, 'score', JsMetadataValue.fromFloat(0.95));
-                    const val = ctx.index.getMetadata(0, 'score');
+                    ctx.index.setMetadata(ctx.vectorId, 'score', JsMetadataValue.fromFloat(0.95));
+                    const val = ctx.index.getMetadata(ctx.vectorId, 'score');
                     return Math.abs(val?.asFloat() - 0.95) < 0.001;
                 }
             },
             {
                 name: 'Metadata: Boolean',
                 run: async (ctx) => {
-                    ctx.index.setMetadata(0, 'verified', JsMetadataValue.fromBoolean(true));
-                    const val = ctx.index.getMetadata(0, 'verified');
+                    ctx.index.setMetadata(ctx.vectorId, 'verified', JsMetadataValue.fromBoolean(true));
+                    const val = ctx.index.getMetadata(ctx.vectorId, 'verified');
                     return val?.asBoolean() === true;
                 }
             },
             {
                 name: 'Metadata: Array',
                 run: async (ctx) => {
-                    ctx.index.setMetadata(0, 'tags', JsMetadataValue.fromStringArray(['wasm', 'vector', 'mobile']));
-                    const val = ctx.index.getMetadata(0, 'tags');
+                    ctx.index.setMetadata(ctx.vectorId, 'tags', JsMetadataValue.fromStringArray(['wasm', 'vector', 'mobile']));
+                    const val = ctx.index.getMetadata(ctx.vectorId, 'tags');
                     const arr = val?.asStringArray();
                     return arr && arr.length === 3 && arr[0] === 'wasm';
                 }
@@ -1129,15 +1129,15 @@
             {
                 name: 'Get All Metadata',
                 run: async (ctx) => {
-                    const all = ctx.index.getAllMetadata(0);
+                    const all = ctx.index.getAllMetadata(ctx.vectorId);
                     return all && all.title === 'EdgeVec Test' && all.count === 42;
                 }
             },
             {
                 name: 'Delete Metadata',
                 run: async (ctx) => {
-                    const deleted = ctx.index.deleteMetadata(0, 'title');
-                    const gone = !ctx.index.hasMetadata(0, 'title');
+                    const deleted = ctx.index.deleteMetadata(ctx.vectorId, 'title');
+                    const gone = !ctx.index.hasMetadata(ctx.vectorId, 'title');
                     return deleted && gone;
                 }
             },
