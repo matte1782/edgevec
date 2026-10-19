@@ -199,11 +199,11 @@ This ensures consistency and allows algorithm improvements.
 
 ```javascript
 // Save
-const snapshot = db.createSnapshot();  // F32 only
+const bytes = db.toBytes();  // F32 vectors + "BQ enabled" flag
 
 // Load - BQ regenerated automatically
-db.loadSnapshot(snapshot);
-console.log(db.hasBQ());  // true (if dimensions divisible by 8)
+const restored = EdgeVec.fromBytes(bytes);
+console.log(restored.hasBQ());  // true if BQ was enabled when saved
 ```
 
 ---

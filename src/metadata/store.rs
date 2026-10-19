@@ -72,6 +72,8 @@ use super::validation::{validate_key, validate_value, MAX_KEYS_PER_VECTOR};
 ///
 /// The store implements `Serialize` and `Deserialize` for persistence support.
 /// It can be serialized to JSON, MessagePack, or any other serde-compatible format.
+/// Its wire layout is part of the WASM buffer format: changes require a
+/// `persistence::buffer::BUFFER_VERSION` bump, migration, and golden fixture tests.
 ///
 /// # Example
 ///

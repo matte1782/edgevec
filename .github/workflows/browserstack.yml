@@ -37,7 +37,7 @@ jobs:
 
       - name: Setup Rust
         if: steps.check-secrets.outputs.skip != 'true'
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Node.js
         if: steps.check-secrets.outputs.skip != 'true'

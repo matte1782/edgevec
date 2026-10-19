@@ -50,11 +50,16 @@ export class EdgeVec {
    *
    * # Errors
    *
-   * Returns an error if loading fails, deserialization fails, or data is corrupted.
+   * Rejects with an `Error` named `NotFoundError` if nothing was saved under
+   * `name`, and with the same errors as [`EdgeVec::from_bytes`] if the
+   * stored data is corrupted.
    */
   static load(name: string): Promise<EdgeVec>;
   /**
    * Saves the database to IndexedDB.
+   *
+   * Stores the same bytes as [`EdgeVec::to_bytes`] under `name` in the
+   * `EdgeVecDB` database. Saving to an existing name overwrites it.
    *
    * # Arguments
    *
@@ -62,11 +67,12 @@ export class EdgeVec {
    *
    * # Returns
    *
-   * A Promise that resolves when saving is complete.
+   * A Promise that resolves when the IndexedDB transaction has committed.
    *
    * # Errors
    *
-   * Returns an error if serialization fails or if the backend write fails.
+   * Returns an error if serialization fails, IndexedDB is unavailable, or
+   * the write transaction fails.
    */
   save(name: string): Promise<void>;
   /**
@@ -87,6 +93,35 @@ export class EdgeVec {
    * ```
    */
   canInsert(): boolean;
+  /**
+   * Get the vector dimensions this index was created with.
+   *
+   * For Flat (binary) indexes this is the number of bits per vector.
+   * Useful after `load()` / `fromBytes()`, when the original config is
+   * no longer at hand.
+   */
+  dimensions(): number;
+  /**
+   * Restores a database from bytes produced by [`EdgeVec::to_bytes`] or
+   * `save()`, including buffers written by EdgeVec 0.6.0–0.9.0.
+   * Releases before 0.6.0 used a different layout and are not supported.
+   *
+   * Decoding allocates memory for the index. Nested collections and metadata
+   * can use roughly ten times the input size; the checksum is not authentication.
+   *
+   * # Arguments
+   *
+   * * `bytes` - A `Uint8Array` holding the serialized database.
+   *
+   * # Errors
+   *
+   * Returns an error object with `code: "ERR_CORRUPTION"` if the buffer is
+   * truncated, fails its checksum, or is structurally invalid, and
+   * `code: "ERR_PERSISTENCE"` if it was written by a newer, unsupported
+   * format version or unknown flags/reserved fields. Non-finite vectors and
+   * metadata that exceeds the insertion limits are rejected as corruption.
+   */
+  static fromBytes(bytes: Uint8Array): EdgeVec;
   /**
    * Check if a vector is deleted (tombstoned).
    *
@@ -583,6 +618,12 @@ export class EdgeVec {
    * - Boosts JSON is malformed or contains invalid weights
    * - Filter expression is invalid
    * - Options JSON is malformed
+   *
+   * # Returns
+   *
+   * JSON string with `{ results: [{ id, score, metadata? }], total }`.
+   * The `score` field contains boosted **distance** (lower = closer).
+   * For cosine/dot metrics on normalized vectors, unboosted range is `[0, 2]`.
    *
    * # Example (JavaScript)
    *
@@ -1456,6 +1497,10 @@ export class EdgeVec {
    * # Returns
    *
    * An array of objects: `[{ id: u32, score: f32 }, ...]`.
+   * The `score` field contains **distance** (lower = closer) for cosine and
+   * dot product metrics. For normalized vectors, range is `[0, 2]` where
+   * `0` = identical and `2` = opposite. Results are sorted by ascending
+   * distance (most similar first).
    *
    * # Errors
    *
@@ -1496,6 +1541,35 @@ export class EdgeVec {
    * ```
    */
   compact(): WasmCompactionResult;
+  /**
+   * Serializes the database into a self-contained byte buffer.
+   *
+   * Use this to persist the index anywhere other than IndexedDB, e.g. a
+   * file via Tauri/Electron/Node APIs, OPFS, or a network upload. Restore
+   * with [`EdgeVec::from_bytes`]. `save()` writes the same bytes.
+   *
+   * Persisted: vectors, graph, soft-delete state, metadata, and whether
+   * binary quantization is enabled (BQ codes are rebuilt on load).
+   * Not persisted: sparse vectors (see `sparse_storage`) and memory
+   * pressure configuration.
+   *
+   * # Returns
+   *
+   * A `Uint8Array` (a copy; safe to keep after further mutations).
+   *
+   * # Errors
+   *
+   * Returns an error if serialization fails or the buffer would exceed 4 GiB.
+   *
+   * # Example (JavaScript)
+   *
+   * ```javascript
+   * const bytes = db.toBytes();
+   * await writeFile('index.evwb', bytes);          // e.g. @tauri-apps/plugin-fs
+   * const restored = EdgeVec.fromBytes(await readFile('index.evwb'));
+   * ```
+   */
+  toBytes(): Uint8Array;
   /**
    * Enables binary quantization on this index.
    *
@@ -2234,7 +2308,9 @@ export interface InitOutput {
   readonly edgevec_deleteAllMetadata: (a: number, b: number) => number;
   readonly edgevec_deleteMetadata: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly edgevec_deletedCount: (a: number, b: number) => void;
+  readonly edgevec_dimensions: (a: number) => number;
   readonly edgevec_enableBQ: (a: number, b: number) => void;
+  readonly edgevec_fromBytes: (a: number, b: number, c: number) => void;
   readonly edgevec_getAllMetadata: (a: number, b: number) => number;
   readonly edgevec_getMemoryConfig: (a: number, b: number) => void;
   readonly edgevec_getMemoryPressure: (a: number, b: number) => void;
@@ -2282,6 +2358,7 @@ export interface InitOutput {
   readonly edgevec_softDeleteBatch: (a: number, b: number, c: number) => void;
   readonly edgevec_softDeleteBatchCompat: (a: number, b: number, c: number) => void;
   readonly edgevec_sparseCount: (a: number) => number;
+  readonly edgevec_toBytes: (a: number, b: number) => void;
   readonly edgevec_tombstoneRatio: (a: number, b: number) => void;
   readonly edgevec_totalMetadataCount: (a: number) => number;
   readonly edgevecconfig_indexType: (a: number) => number;
@@ -2335,9 +2412,9 @@ export interface InitOutput {
   readonly wasmbatchdeleteresult_total: (a: number) => number;
   readonly wasmbatchdeleteresult_uniqueCount: (a: number) => number;
   readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
-  readonly __wasm_bindgen_func_elem_2147: (a: number, b: number, c: number) => void;
-  readonly __wasm_bindgen_func_elem_2131: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_2698: (a: number, b: number, c: number, d: number) => void;
+  readonly __wasm_bindgen_func_elem_2308: (a: number, b: number, c: number) => void;
+  readonly __wasm_bindgen_func_elem_2292: (a: number, b: number) => void;
+  readonly __wasm_bindgen_func_elem_2877: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export3: (a: number) => void;

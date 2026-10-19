@@ -17,6 +17,9 @@
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 /// WASM SIMD implementations.
 pub mod wasm {
+    // WASM exposes unsigned accumulator bits through signed lane extracts.
+    #![allow(clippy::cast_sign_loss)]
+
     use std::arch::wasm32::*;
 
     /// L2 Squared distance using WASM SIMD128.
@@ -102,6 +105,7 @@ pub mod wasm {
     ///
     /// Requires `simd128` target feature.
     #[inline]
+    #[allow(clippy::many_single_char_names)] // Conventional SIMD vector/loop names.
     pub unsafe fn l2_squared_u8(a: &[u8], b: &[u8]) -> u32 {
         assert_eq!(a.len(), b.len());
         let n = a.len();
@@ -180,7 +184,7 @@ pub mod wasm {
 
         // Scalar tail
         while i < n {
-            let diff = (*a.get_unchecked(i) as i32) - (*b.get_unchecked(i) as i32);
+            let diff = i32::from(*a.get_unchecked(i)) - i32::from(*b.get_unchecked(i));
             sum += (diff * diff) as u32;
             i += 1;
         }
@@ -253,6 +257,7 @@ pub mod wasm {
     ///
     /// Requires `simd128` target feature.
     #[inline]
+    #[allow(clippy::many_single_char_names)] // Conventional SIMD vector/loop names.
     pub unsafe fn dot_product_u8(a: &[u8], b: &[u8]) -> u32 {
         assert_eq!(a.len(), b.len());
         let n = a.len();
@@ -322,7 +327,7 @@ pub mod wasm {
         }
 
         while i < n {
-            sum += (*a.get_unchecked(i) as u32) * (*b.get_unchecked(i) as u32);
+            sum += u32::from(*a.get_unchecked(i)) * u32::from(*b.get_unchecked(i));
             i += 1;
         }
         sum

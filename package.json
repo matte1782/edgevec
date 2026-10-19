@@ -71,10 +71,12 @@
     "test:coverage": "cd wasm && npm run test:coverage",
     "typecheck": "tsc --noEmit --project wasm/tsconfig.json",
     "pack:dry": "npm pack --dry-run",
-    "prepublishOnly": "npm run build && npm run test"
+    "prepublishOnly": "npm run build && npm run test",
+    "test:storage": "node --test --test-timeout=10000 tests/js/storage.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.26",
+    "fake-indexeddb": "^6.2.6",
     "typescript": "^5.9.3"
   }
 }

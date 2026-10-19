@@ -21,6 +21,7 @@ use thiserror::Error;
 
 /// Binary vector storage for quantized vectors.
 pub mod binary;
+pub(crate) mod bitvec_serde;
 
 /// Errors that can occur during storage operations.
 #[derive(Debug, Error)]
@@ -61,6 +62,10 @@ pub enum StorageType {
 }
 
 /// Contiguous vector storage with WAL persistence.
+///
+/// Its serde layout is part of the WASM buffer format. Any wire-layout change
+/// requires a `persistence::buffer::BUFFER_VERSION` bump, a migration, and golden
+/// fixture tests. `#[serde(default)]` does not migrate postcard sequences.
 #[derive(Serialize, Deserialize)]
 pub struct VectorStorage {
     /// Full precision vector data (layout: [`v0_d0`, ..., `v1_d0`, ...]).
@@ -88,6 +93,10 @@ pub struct VectorStorage {
     pub(crate) quantizer: Option<ScalarQuantizer>,
 
     /// Tombstones for deleted vectors (1 bit per vector).
+    ///
+    /// Deserialized with a validating decoder: `bitvec`'s own impl can panic
+    /// on malformed input.
+    #[serde(deserialize_with = "bitvec_serde::deserialize")]
     pub(crate) deleted: BitVec,
     /// Number of dimensions per vector.
     pub(crate) dimensions: u32,

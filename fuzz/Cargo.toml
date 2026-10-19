@@ -119,3 +119,9 @@ name = "flat_index"
 path = "fuzz_targets/flat_index/target.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "wasm_buffer"
+path = "fuzz_targets/wasm_buffer/target.rs"
+test = false
+doc = false

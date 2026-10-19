@@ -472,8 +472,12 @@ async function main() {
     const config = new EdgeVecConfig(128);
     const index = new EdgeVec(config);
 
-    // Node.js uses file system for persistence
-    // IndexedDB not available in Node
+    // In Node.js, the application writes and reads the buffer itself.
+    const { writeFile, readFile } = await import('node:fs/promises');
+    await writeFile('my-vectors.evwb', index.toBytes());
+    const restored = EdgeVec.fromBytes(await readFile('my-vectors.evwb'));
+    console.log('Loaded', restored.liveCount(), 'vectors');
+    // save()/load() require IndexedDB and reject if it is unavailable.
 }
 ```
 

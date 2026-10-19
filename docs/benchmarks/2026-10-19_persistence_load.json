@@ -1,0 +1,328 @@
+{
+  "recordedAtUtc": "2026-10-19T21:58:18.0028816Z",
+  "protocol": "Three fresh Node processes per mode after compiler/test jobs completed; first fromBytes call includes JS-to-WASM copying, checksum, decode, validation and BQ rebuild. Module initialization and file I/O are excluded. Each process then measures seven warm loads. All observed samples are retained.",
+  "buildCommand": "wasm-pack build --target web --release --out-dir target/persistence-release-verified --no-pack",
+  "dataset": "100000 x 128 float32 vectors, L2, LCG seed42; default HNSW m12/m0=24/efConstruction100/efSearch50; generated with real insert calls; 57265029-byte buffers.",
+  "release": {
+    "wasmSha256": "0204f3e125c5befad2750462936a714916156d611f529f78052e3fd5582e17fa",
+    "jsBytes": 161716,
+    "combinedGzipBytes": 292086,
+    "wasmGzipBytes": 262881,
+    "jsGzipBytes": 29205,
+    "jsSha256": "489eda35bb27e8fb977ddab45532887548bfa06b2481023cdeabed6a308a98a6",
+    "combinedBytes": 845417,
+    "wasmBytes": 683701
+  },
+  "finalIdle": {
+    "plain": [
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": false,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 350.573,
+        "samplesMs": [
+          232.82989999999995,
+          223.03510000000006,
+          186.85719999999992,
+          171.02020000000016,
+          184.20699999999988,
+          179.4194,
+          163.0739000000001
+        ],
+        "medianMs": 184.20699999999988,
+        "maxMs": 232.82989999999995
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": false,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 337.3234,
+        "samplesMs": [
+          174.57100000000003,
+          184.84969999999998,
+          171.60159999999996,
+          155.55349999999999,
+          165.90959999999995,
+          156.9438,
+          146.28489999999988
+        ],
+        "medianMs": 165.90959999999995,
+        "maxMs": 184.84969999999998
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": false,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 290.659,
+        "samplesMs": [
+          140.82980000000003,
+          140.3069999999999,
+          135.50069999999994,
+          145.54269999999997,
+          141.63049999999998,
+          140.75160000000005,
+          148.73130000000015
+        ],
+        "medianMs": 140.82980000000003,
+        "maxMs": 148.73130000000015
+      }
+    ],
+    "bq": [
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 374.6779,
+        "samplesMs": [
+          207.9484,
+          246.94870000000003,
+          200.95659999999998,
+          214.95510000000013,
+          225.56490000000008,
+          231.68370000000004,
+          204.73379999999997
+        ],
+        "medianMs": 214.95510000000013,
+        "maxMs": 246.94870000000003
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 322.35970000000003,
+        "samplesMs": [
+          178.6494,
+          178.10399999999993,
+          180.1793,
+          197.60280000000012,
+          174.05399999999986,
+          179.5215999999998,
+          190.62789999999995
+        ],
+        "medianMs": 179.5215999999998,
+        "maxMs": 197.60280000000012
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 280.8162,
+        "samplesMs": [
+          163.00029999999998,
+          160.221,
+          156.34860000000003,
+          168.80189999999993,
+          182.01299999999992,
+          173.95600000000013,
+          177.2838999999999
+        ],
+        "medianMs": 168.80189999999993,
+        "maxMs": 182.01299999999992
+      }
+    ]
+  },
+  "diagnosticTrials": {
+    "afterOptimizationDuringConcurrentCompilation": [
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 446.29449999999997,
+        "samplesMs": [
+          315.0475,
+          232.60249999999996,
+          282.4284,
+          317.83659999999986,
+          317.01890000000003,
+          314.3804,
+          488.2696000000001
+        ],
+        "medianMs": 315.0475,
+        "maxMs": 488.2696000000001
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 678.5078,
+        "samplesMs": [
+          331.8476999999999,
+          292.2672,
+          266.46360000000004,
+          320.66729999999984,
+          335.0421000000001,
+          311.7366000000002,
+          378.37379999999985
+        ],
+        "medianMs": 320.66729999999984,
+        "maxMs": 378.37379999999985
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 352.5262,
+        "samplesMs": [
+          195.85609999999997,
+          229.07550000000003,
+          227.27250000000004,
+          262.1368,
+          222.09449999999993,
+          272.3626999999999,
+          257.6331
+        ],
+        "medianMs": 229.07550000000003,
+        "maxMs": 272.3626999999999
+      }
+    ],
+    "beforeQuantizerOptimization": [
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 517.5676,
+        "samplesMs": [
+          407.12839999999994,
+          358.2115000000001,
+          403.21309999999994,
+          393.92549999999983,
+          395.0164,
+          361.30319999999983,
+          454.7306000000003
+        ],
+        "medianMs": 395.0164,
+        "maxMs": 454.7306000000003
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 559.333,
+        "samplesMs": [
+          471.30819999999994,
+          443.89160000000015,
+          493.39329999999995,
+          456.15800000000036,
+          458.16150000000016,
+          632.4000000000001,
+          891.4740000000002
+        ],
+        "medianMs": 471.30819999999994,
+        "maxMs": 891.4740000000002
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 604.808,
+        "samplesMs": [
+          515.1670999999999,
+          544.9693,
+          402.5986999999998,
+          428.8556999999996,
+          430.48990000000003,
+          482.0041000000001,
+          522.1186000000002
+        ],
+        "medianMs": 482.0041000000001,
+        "maxMs": 544.9693
+      },
+      {
+        "node": "v22.21.0",
+        "platform": "win32 10.0.26200 x64",
+        "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+        "count": 100000,
+        "dimensions": 128,
+        "metric": "l2",
+        "seed": 42,
+        "bq": true,
+        "bufferBytes": 57265029,
+        "firstLoadMs": 552.7017999999999,
+        "samplesMs": [
+          428.6164,
+          398.53639999999996,
+          426.3469,
+          520.6707000000001,
+          799.5753,
+          1460.4831000000004,
+          1563.7236000000003
+        ],
+        "medianMs": 520.6707000000001,
+        "maxMs": 1563.7236000000003
+      }
+    ],
+    "note": "These diagnostic runs motivated the quantizer optimization and the final idle protocol. They are preserved for transparency and are not substituted for the final idle measurements."
+  }
+}

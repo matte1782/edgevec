@@ -7,6 +7,7 @@ use crate::hnsw::{GraphError, HnswConfig, HnswIndex};
 use crate::hybrid::{FusionMethod, HybridSearchConfig, HybridSearcher};
 use crate::metadata::validation::{validate_key, validate_value, MAX_KEYS_PER_VECTOR};
 use crate::metadata::MetadataStore;
+use crate::persistence::buffer::{self, PersistedIndex, PersistedIndexRef};
 use crate::persistence::{chunking::ChunkIter, ChunkedWriter, PersistenceError};
 use crate::quantization::product::{PqCode, PqCodebook};
 #[cfg(feature = "sparse")]
@@ -63,8 +64,12 @@ extern "C" {
     pub type IndexedDbBackend;
 
     /// Write data to the named database file.
+    ///
+    /// Takes a JS-owned `Uint8Array` rather than `&[u8]`: a `&[u8]` would be
+    /// passed as a view into WASM memory, which is detached if memory grows
+    /// before IndexedDB clones it.
     #[wasm_bindgen(static_method_of = IndexedDbBackend, catch)]
-    pub async fn write(name: &str, data: &[u8]) -> Result<(), JsValue>;
+    pub async fn write(name: &str, data: &Uint8Array) -> Result<(), JsValue>;
 
     /// Read data from the named database file.
     #[wasm_bindgen(static_method_of = IndexedDbBackend, catch)]
@@ -464,18 +469,18 @@ impl EdgeVecConfig {
 ///
 /// This enum allows EdgeVec to wrap either a BinaryFlatIndex or an HnswIndex,
 /// enabling a single API for both index types.
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "variant_type")]
+///
+/// Persisted through `persistence::buffer` (`PersistedIndex` mirrors this
+/// enum on the wire), not through serde derives on this type.
+/// Wire changes require a `BUFFER_VERSION` bump, migration, and golden fixtures.
 pub(crate) enum IndexVariant {
     /// HNSW graph index with separate storage.
     /// Box is used to reduce enum size (HnswIndex is 736 bytes vs BinaryFlatIndex 48 bytes).
-    #[serde(rename = "hnsw")]
     Hnsw {
         index: Box<HnswIndex>,
         storage: VectorStorage,
     },
     /// Flat (brute-force) index with internal storage.
-    #[serde(rename = "flat")]
     Flat { index: BinaryFlatIndex },
 }
 
@@ -616,30 +621,21 @@ impl IndexVariant {
 
 /// The main EdgeVec database handle.
 ///
-/// This struct is serializable for persistence via `postcard`.
-/// The `liveness` field is skipped as it is runtime state.
+/// Persisted with `toBytes()` / `fromBytes()` / `save()` / `load()` using the
+/// format in `persistence::buffer`.
 ///
 /// Supports both Flat and HNSW index types via the `indexType` configuration.
 /// Use `IndexType.Flat` for insert-heavy workloads with exact search,
 /// or `IndexType.Hnsw` (default) for large-scale approximate search.
-///
-/// # Safety Note
-///
-/// This type derives `Deserialize` despite containing methods with `unsafe`.
-/// The unsafe code (`save_stream`) is unrelated to deserialization and is safe
-/// because it only extends lifetimes for iterator borrowing, controlled by the
-/// `liveness` guard.
-#[derive(Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)]
 #[wasm_bindgen]
 pub struct EdgeVec {
+    // Persisted only via persistence::buffer. Changing its wire schema requires
+    // a BUFFER_VERSION bump, migration, and golden fixture tests.
     /// The underlying index (either Flat or HNSW).
     inner: IndexVariant,
     /// Metadata store for attaching key-value pairs to vectors.
-    #[serde(default)]
     metadata: MetadataStore,
-    /// Memory pressure configuration (skipped during serialization).
-    #[serde(skip, default)]
+    /// Memory pressure configuration (not persisted).
     memory_config: MemoryConfig,
     /// Sparse vector storage for hybrid search (Week 39).
     ///
@@ -657,22 +653,40 @@ pub struct EdgeVec {
     ///
     /// Future versions may add optional sparse persistence via separate file.
     #[cfg(feature = "sparse")]
-    #[serde(skip, default)]
     sparse_storage: Option<SparseStorage>,
-    /// Safety guard for iterators (skipped during serialization).
-    #[serde(skip, default = "default_liveness")]
+    /// Safety guard for iterators (runtime state, not persisted).
     liveness: Arc<AtomicBool>,
-}
-
-/// Default initializer for `liveness` field during deserialization.
-fn default_liveness() -> Arc<AtomicBool> {
-    Arc::new(AtomicBool::new(true))
 }
 
 impl Drop for EdgeVec {
     fn drop(&mut self) {
         // Signal to any active iterators that we are dead
         self.liveness.store(false, Ordering::Release);
+    }
+}
+
+impl EdgeVec {
+    /// Decodes and validates a buffer (current or legacy format).
+    fn decode(bytes: &[u8]) -> Result<EdgeVec, PersistenceError> {
+        let restored = buffer::decode(bytes)?;
+        if restored.source != buffer::SourceFormat::V1 {
+            log::info!(
+                "EdgeVec: loaded a {:?} buffer; it is rewritten in the current format on next save",
+                restored.source
+            );
+        }
+        let inner = match restored.index {
+            PersistedIndex::Hnsw { index, storage } => IndexVariant::Hnsw { index, storage },
+            PersistedIndex::Flat { index } => IndexVariant::Flat { index },
+        };
+        Ok(EdgeVec {
+            inner,
+            metadata: restored.metadata,
+            memory_config: MemoryConfig::default(),
+            #[cfg(feature = "sparse")]
+            sparse_storage: None,
+            liveness: Arc::new(AtomicBool::new(true)),
+        })
     }
 }
 
@@ -689,6 +703,10 @@ impl EdgeVec {
         INIT.call_once(|| {
             init_logging();
         });
+
+        if config.dimensions == 0 {
+            return Err(EdgeVecError::Validation("Dimensions must be positive".into()).into());
+        }
 
         // Dispatch based on index type
         let inner = match config.index_type() {
@@ -1700,7 +1718,72 @@ impl EdgeVec {
         })
     }
 
+    /// Serializes the database into a self-contained byte buffer.
+    ///
+    /// Use this to persist the index anywhere other than IndexedDB, e.g. a
+    /// file via Tauri/Electron/Node APIs, OPFS, or a network upload. Restore
+    /// with [`EdgeVec::from_bytes`]. `save()` writes the same bytes.
+    ///
+    /// Persisted: vectors, graph, soft-delete state, metadata, and whether
+    /// binary quantization is enabled (BQ codes are rebuilt on load).
+    /// Not persisted: sparse vectors (see `sparse_storage`) and memory
+    /// pressure configuration.
+    ///
+    /// # Returns
+    ///
+    /// A `Uint8Array` (a copy; safe to keep after further mutations).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails or the buffer would exceed 4 GiB.
+    ///
+    /// # Example (JavaScript)
+    ///
+    /// ```javascript
+    /// const bytes = db.toBytes();
+    /// await writeFile('index.evwb', bytes);          // e.g. @tauri-apps/plugin-fs
+    /// const restored = EdgeVec.fromBytes(await readFile('index.evwb'));
+    /// ```
+    #[wasm_bindgen(js_name = "toBytes")]
+    pub fn to_bytes(&self) -> Result<Vec<u8>, JsValue> {
+        let index = match &self.inner {
+            IndexVariant::Hnsw { index, storage } => PersistedIndexRef::Hnsw { index, storage },
+            IndexVariant::Flat { index } => PersistedIndexRef::Flat { index },
+        };
+        buffer::encode(index, &self.metadata, self.has_bq())
+            .map_err(|e| EdgeVecError::Persistence(e).into())
+    }
+
+    /// Restores a database from bytes produced by [`EdgeVec::to_bytes`] or
+    /// `save()`, including buffers written by EdgeVec 0.6.0–0.9.0.
+    /// Releases before 0.6.0 used a different layout and are not supported.
+    ///
+    /// Decoding allocates memory for the index. Nested collections and metadata
+    /// can use roughly ten times the input size; the checksum is not authentication.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - A `Uint8Array` holding the serialized database.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error object with `code: "ERR_CORRUPTION"` if the buffer is
+    /// truncated, fails its checksum, or is structurally invalid, and
+    /// `code: "ERR_PERSISTENCE"` if it was written by a newer, unsupported
+    /// format version or unknown flags/reserved fields. Non-finite vectors and
+    /// metadata that exceeds the insertion limits are rejected as corruption.
+    #[wasm_bindgen(js_name = "fromBytes")]
+    pub fn from_bytes(bytes: &[u8]) -> Result<EdgeVec, JsValue> {
+        INIT.call_once(|| {
+            init_logging();
+        });
+        Self::decode(bytes).map_err(|e| EdgeVecError::Persistence(e).into())
+    }
+
     /// Saves the database to IndexedDB.
+    ///
+    /// Stores the same bytes as [`EdgeVec::to_bytes`] under `name` in the
+    /// `EdgeVecDB` database. Saving to an existing name overwrites it.
     ///
     /// # Arguments
     ///
@@ -1708,19 +1791,16 @@ impl EdgeVec {
     ///
     /// # Returns
     ///
-    /// A Promise that resolves when saving is complete.
+    /// A Promise that resolves when the IndexedDB transaction has committed.
     ///
     /// # Errors
     ///
-    /// Returns an error if serialization fails or if the backend write fails.
+    /// Returns an error if serialization fails, IndexedDB is unavailable, or
+    /// the write transaction fails.
     #[wasm_bindgen]
     pub async fn save(&self, name: String) -> Result<(), JsValue> {
-        let bytes = postcard::to_stdvec(self).map_err(|e| {
-            EdgeVecError::Persistence(PersistenceError::Corrupted(format!(
-                "Serialization failed: {e}"
-            )))
-        })?;
-        IndexedDbBackend::write(&name, &bytes).await
+        let bytes = self.to_bytes()?;
+        IndexedDbBackend::write(&name, &Uint8Array::from(bytes.as_slice())).await
     }
 
     /// Loads the database from IndexedDB.
@@ -1735,27 +1815,13 @@ impl EdgeVec {
     ///
     /// # Errors
     ///
-    /// Returns an error if loading fails, deserialization fails, or data is corrupted.
+    /// Rejects with an `Error` named `NotFoundError` if nothing was saved under
+    /// `name`, and with the same errors as [`EdgeVec::from_bytes`] if the
+    /// stored data is corrupted.
     #[wasm_bindgen]
     pub async fn load(name: String) -> Result<EdgeVec, JsValue> {
-        // [m1] Ensure logging is initialized on load as well
-        INIT.call_once(|| {
-            init_logging();
-        });
-
         let val = IndexedDbBackend::read(&name).await?;
-        let bytes = Uint8Array::new(&val).to_vec();
-
-        let mut edge_vec: EdgeVec = postcard::from_bytes(&bytes).map_err(|e| {
-            EdgeVecError::Persistence(PersistenceError::Corrupted(format!(
-                "Deserialization failed: {e}"
-            )))
-        })?;
-
-        // Restore liveness (skipped during serialization)
-        edge_vec.liveness = Arc::new(AtomicBool::new(true));
-
-        Ok(edge_vec)
+        Self::from_bytes(&Uint8Array::new(&val).to_vec())
     }
 
     // =========================================================================
@@ -3649,6 +3715,17 @@ impl EdgeVec {
     #[wasm_bindgen(js_name = "serializedSize")]
     pub fn serialized_size(&self) -> usize {
         self.inner.serialized_size()
+    }
+
+    /// Get the vector dimensions this index was created with.
+    ///
+    /// For Flat (binary) indexes this is the number of bits per vector.
+    /// Useful after `load()` / `fromBytes()`, when the original config is
+    /// no longer at hand.
+    #[wasm_bindgen(js_name = "dimensions")]
+    #[must_use]
+    pub fn dimensions(&self) -> u32 {
+        self.inner.dimensions()
     }
 
     // =========================================================================

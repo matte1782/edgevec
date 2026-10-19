@@ -12,6 +12,6 @@
     "@edgevec/core": "file:../.."
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.6.0"
   }
 }

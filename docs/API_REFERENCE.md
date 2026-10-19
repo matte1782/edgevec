@@ -244,15 +244,24 @@ const ids = index.insertBatchFlat(flat, count);
 
 ##### `save(name: string): Promise<void>`
 
-Save index to IndexedDB (browser) or file system (Node.js).
+Save the index to IndexedDB in a browser. In Node.js, use `toBytes()` and
+`node:fs/promises` to write a file:
 
 ```javascript
 await index.save("my-vector-db");
 ```
 
+```javascript
+import { writeFile, readFile } from 'node:fs/promises';
+
+await writeFile('my-vector-db.evwb', index.toBytes());
+const restored = EdgeVec.fromBytes(await readFile('my-vector-db.evwb'));
+```
+
 ##### `EdgeVec.load(name: string): Promise<EdgeVec>`
 
-Static method to load a saved index.
+Static method to load an index from IndexedDB. Both `save()` and `load()`
+reject if IndexedDB is unavailable; file persistence uses `fromBytes()` above.
 
 ```javascript
 const index = await EdgeVec.load("my-vector-db");

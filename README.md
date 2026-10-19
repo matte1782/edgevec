@@ -274,11 +274,15 @@ if (db.needsCompaction()) {
 ### Persistence
 
 ```javascript
-// Save to IndexedDB (browser) or filesystem
+// Save to IndexedDB (browser)
 await db.save("my-vector-db");
 
 // Load existing database
 const db = await EdgeVec.load("my-vector-db");
+
+// Or persist anywhere yourself (files in Tauri/Electron/Node.js, OPFS, uploads)
+const bytes = db.toBytes();            // Uint8Array
+const restored = EdgeVec.fromBytes(bytes);
 ```
 
 ### Scalar Quantization
