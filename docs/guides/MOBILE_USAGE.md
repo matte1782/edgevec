@@ -28,7 +28,7 @@ platform-specific considerations for iOS Safari and Android Chrome.
 1. **Lazy Loading**: Load EdgeVec only when needed
 2. **Web Workers**: Use for background indexing
 3. **Batch Operations**: Insert vectors in batches
-4. **Quantization**: Use SQ8 for 4x memory reduction
+4. **Memory Budgeting**: Limit retained vectors and compact tombstones; SQ8 configuration is available in native Rust, not the WASM API
 
 ## Example: Safe Mobile Initialization
 
@@ -57,7 +57,7 @@ async function initEdgeVec() {
 
 ### "Out of memory" errors
 - Reduce the number of vectors stored in the index
-- Use quantization (SQ8) for 4x memory reduction
+- Compact deleted vectors to reclaim storage; enabling BQ retains the original float vectors
 - Implement pagination for large datasets
 
 ### Slow initial load

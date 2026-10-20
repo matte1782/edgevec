@@ -3,6 +3,7 @@
 
 import { EdgeVec, EdgeVecConfig, initSync } from '@edgevec/core/wasm';
 import { readFile, writeFile } from 'node:fs/promises';
+import assert from 'node:assert/strict';
 
 async function main() {
     console.log('EdgeVec Node.js Quick Start\n');
@@ -11,9 +12,9 @@ async function main() {
     const entry = import.meta.resolve('@edgevec/core/wasm');
     initSync({ module: await readFile(new URL('edgevec_bg.wasm', entry)) });
     const config = new EdgeVecConfig(128);
-    config.metric = 'cosine'; // Options: 'l2', 'cosine', 'dot'
+    config.metric = 'l2'; // Options: 'l2', 'cosine', 'dot'
     const client = new EdgeVec(config);
-    console.log(`✓ Index created (${client.dimensions()}d, cosine metric)\n`);
+    console.log(`✓ Index created (${client.dimensions()}d, l2 metric)\n`);
 
     // 2. Insert vectors (synchronous)
     console.log('Inserting vectors...');
@@ -30,8 +31,9 @@ async function main() {
 
     // 3. Search for nearest neighbors (synchronous)
     console.log('Searching for nearest neighbors...');
-    const query = new Float32Array(128).fill(0.15); // Query closer to vector1
+    const query = new Float32Array(128).fill(0.11); // Query closest to vector1
     const results = client.search(query, 2); // Find top 2
+    assert.equal(results[0].id, id1);
 
     console.log(`✓ Found ${results.length} results:`);
     results.forEach((result, i) => {
@@ -47,13 +49,15 @@ async function main() {
     // 5. Load from storage
     console.log('Loading database...');
     const loadedClient = EdgeVec.fromBytes(await readFile('quickstart-db.evwb'));
+    assert.equal(loadedClient.liveCount(), 3);
     console.log(`✓ Database loaded`);
     console.log(`  Vectors in loaded index: ${loadedClient.liveCount()}\n`);
 
     // 6. Verify loaded database works
     console.log('Verifying loaded database...');
-    const verifyQuery = new Float32Array(128).fill(0.25); // Query closer to vector2
+    const verifyQuery = new Float32Array(128).fill(0.21); // Query closest to vector2
     const verifyResults = loadedClient.search(verifyQuery, 2);
+    assert.equal(verifyResults[0].id, id2);
     console.log(`✓ Search on loaded database returned ${verifyResults.length} results:`);
     verifyResults.forEach((result, i) => {
         console.log(`  ${i + 1}. ID: ${result.id}, Distance: ${result.score.toFixed(6)}`);

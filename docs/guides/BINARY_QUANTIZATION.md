@@ -7,7 +7,9 @@
 
 ## Overview
 
-Binary Quantization (BQ) is a compression technique that reduces each dimension of a vector to a single bit. This achieves **32x memory reduction** (from 32-bit floats to 1-bit values) while maintaining search quality through rescoring.
+Binary Quantization (BQ) encodes each dimension as a single bit, making binary
+codes **32x smaller** than the original F32 payload. Enabling BQ on a float index
+retains the F32 vectors for rescoring; the code cache is additional storage.
 
 ---
 
@@ -15,15 +17,14 @@ Binary Quantization (BQ) is a compression technique that reduces each dimension 
 
 ### Binarization Process
 
-1. **Threshold:** Each dimension is compared to the mean of that dimension across all vectors
-2. **Encoding:** Values above threshold become `1`, below become `0`
-3. **Packing:** 8 bits are packed into a single byte (128D vector → 16 bytes)
+1. **Threshold:** Each dimension is compared to zero; there is no training step
+2. **Encoding:** Positive values become `1`; zero and negative values become `0`
+3. **Packing:** 8 dimensions are packed into a byte, dimension 0 in the least significant bit (128D vector → 16 bytes)
 
 ```
 F32 Vector:    [0.2, -0.5, 0.8, 0.1, -0.3, 0.9, -0.1, 0.4]
-Mean:          [0.0, -0.2, 0.5, 0.0, -0.1, 0.6, 0.0, 0.2]
 Binary:        [  1,    0,   1,   1,    0,   1,    0,   1]
-Packed Byte:   0b10110101 = 0xB5
+Packed Byte:   0b10101101 = 0xAD  (dimension 0 is bit 0)
 ```
 
 ### Distance Calculation
@@ -43,6 +44,10 @@ Lower Hamming distance = more similar vectors.
 
 ## Memory Savings
 
+These sizes compare vector encodings, excluding graph, metadata, and allocation
+overhead. A BQ-enabled float index keeps **both** encodings: F32 payloads plus the
+binary code cache, about 103% of the original float payload size.
+
 | Dimensions | F32 Size | BQ Size | Reduction |
 |:-----------|:---------|:--------|:----------|
 | 128D | 512 bytes | 16 bytes | 32x |
@@ -52,11 +57,11 @@ Lower Hamming distance = more similar vectors.
 
 ### At Scale (768D vectors)
 
-| Vector Count | F32 Memory | BQ Memory | Savings |
+| Vector Count | F32 Payload | Binary Codes | Encoding Reduction |
 |:-------------|:-----------|:----------|:--------|
-| 10K | 30 MB | 0.9 MB | 33x |
-| 100K | 300 MB | 9 MB | 33x |
-| 1M | 3 GB | 92 MB | 33x |
+| 10K | 29.30 MiB | 0.92 MiB | 32x |
+| 100K | 292.97 MiB | 9.16 MiB | 32x |
+| 1M | 2929.69 MiB | 91.55 MiB | 32x |
 
 ---
 
@@ -65,12 +70,15 @@ Lower Hamming distance = more similar vectors.
 ### JavaScript/TypeScript
 
 ```typescript
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 await init();
 
-// BQ is auto-enabled for dimensions divisible by 8
-const db = new EdgeVec({ dimensions: 768 });
+// Explicitly enable BQ on a compatible HNSW float index
+const config = new EdgeVecConfig(768);
+const db = new EdgeVec(config);
+config.free();
+db.enableBQ();
 
 // Insert vectors (automatically quantized)
 for (const vector of vectors) {
@@ -214,11 +222,17 @@ console.log(restored.hasBQ());  // true if BQ was enabled when saved
 
 ```javascript
 // Error: BQ methods fail
-const db = new EdgeVec({ dimensions: 100 });  // Not divisible by 8
-db.searchBQ(query, 10);  // Throws error
+const config = new EdgeVecConfig(768);
+const db = new EdgeVec(config);
+config.free();
+db.insert(vector);
+db.searchBQ(query, 10);  // Throws: BQ has not been enabled
+db.enableBQ();
+const results = db.searchBQ(query, 10);
 ```
 
-**Fix:** Use dimensions divisible by 8 (128, 384, 768, 1536).
+**Fix:** Call `enableBQ()` explicitly. It requires a HNSW float index with
+dimensions divisible by 8 (128, 384, 768, 1536); incompatible indexes reject it.
 
 ### Low Recall
 

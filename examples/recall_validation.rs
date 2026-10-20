@@ -205,7 +205,7 @@ fn measure_bq_rescore_recall(
             .map(|(i, bq_v)| (i, query_bq.hamming_distance(bq_v)))
             .collect();
         // NaN-safe sort via total_cmp on u32 (no NaN possible, but consistent style)
-        hamming_dists.sort_by(|a, b| a.1.cmp(&b.1));
+        hamming_dists.sort_by_key(|a| a.1);
         let candidates: Vec<usize> = hamming_dists
             .iter()
             .take(hamming_candidates)

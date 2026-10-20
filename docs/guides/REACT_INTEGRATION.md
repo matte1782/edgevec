@@ -38,6 +38,17 @@ pnpm add edgevec react
 
 ## Quick Start
 
+Initialize WASM once in your application bootstrap, before mounting components:
+
+```typescript
+import init from 'edgevec';
+await init();
+// Mount your React application after initialization completes.
+```
+
+The packaged hook returns an `EdgeVecIndex`, whose insert/count APIs are `add()`
+and `size`. Advanced examples that import `EdgeVec` use the separate raw API.
+
 ```tsx
 import { useEdgeVec } from 'edgevec/react';
 
@@ -59,7 +70,7 @@ function App() {
 
 ## useEdgeVec Hook
 
-Initialize an EdgeVec database with automatic WASM loading and lifecycle management.
+Create or load an index after the application has initialized WASM.
 
 ### Basic Usage
 
@@ -77,7 +88,7 @@ function VectorDatabase() {
     if (!isReady || !db) return;
 
     const vector = new Float32Array(384).map(() => Math.random());
-    const id = db.insertWithMetadata(vector, {
+    const id = db.add(vector, {
       category: 'documents',
       timestamp: Date.now(),
     });
@@ -268,7 +279,7 @@ export function SemanticSearch() {
 
     for (const doc of docs) {
       const embedding = await getEmbedding(doc.text);
-      db.insertWithMetadata(new Float32Array(embedding), {
+      db.add(new Float32Array(embedding), {
         text: doc.text,
         category: doc.category,
         relevance: 1.0,
@@ -606,17 +617,17 @@ function SearchWithRetry() {
 
 ### Suspense Integration (Experimental)
 
-For React 18+ Suspense support, create a wrapper:
+For React 19+ Suspense support with the stable `use` API, create a wrapper:
 
 ```tsx
 import { Suspense, use, useState } from 'react';
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 // Create a promise that resolves when WASM is loaded
 let wasmPromise: Promise<void> | null = null;
 function initWasm() {
   if (!wasmPromise) {
-    wasmPromise = init();
+    wasmPromise = init().then(() => undefined);
   }
   return wasmPromise;
 }
@@ -627,7 +638,10 @@ function useEdgeVecSuspense(dimensions: number) {
   use(initWasm());
 
   // Now safe to create EdgeVec
-  const [db] = useState(() => new EdgeVec({ dimensions }));
+  const [db] = useState(() => {
+    const config = new EdgeVecConfig(dimensions);
+    try { return new EdgeVec(config); } finally { config.free(); }
+  });
   return db;
 }
 
@@ -643,7 +657,7 @@ function App() {
 function SearchComponent() {
   const db = useEdgeVecSuspense(384);
   // db is guaranteed to be ready here
-  return <div>Ready! {db.vectorCount()} vectors</div>;
+  return <div>Ready! {db.liveCount()} vectors</div>;
 }
 ```
 
@@ -653,7 +667,7 @@ Share a single EdgeVec instance across your app:
 
 ```tsx
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 interface EdgeVecContextType {
   db: EdgeVec | null;
@@ -669,7 +683,18 @@ const EdgeVecContext = createContext<EdgeVecContextType>({
   error: null,
 });
 
-export function EdgeVecProvider({
+// Remount the provider subtree when its database identity changes. Cleanup then
+// runs only after consumers of the old context have unmounted.
+export function EdgeVecProvider(props: {
+  children: ReactNode;
+  dimensions?: number;
+  persistName?: string;
+}) {
+  const identity = JSON.stringify([props.dimensions ?? 384, props.persistName ?? null]);
+  return <EdgeVecProviderInstance key={identity} {...props} />;
+}
+
+function EdgeVecProviderInstance({
   children,
   dimensions = 384,
   persistName,
@@ -687,22 +712,32 @@ export function EdgeVecProvider({
 
   useEffect(() => {
     let cancelled = false;
+    let ownedDb: EdgeVec | null = null;
 
     async function initialize() {
       try {
         await init();
         if (cancelled) return;
 
-        const db = new EdgeVec({ dimensions });
+        const config = new EdgeVecConfig(dimensions);
+        let db: EdgeVec;
+        try { db = new EdgeVec(config); } finally { config.free(); }
 
         if (persistName) {
           try {
-            await db.load(persistName);
-          } catch {
-            // No existing data, that's fine
+            const loaded = await EdgeVec.load(persistName);
+            db.free();
+            db = loaded;
+          } catch (error) {
+            if (!(error instanceof Error) || error.name !== 'NotFoundError') {
+              db.free();
+              throw error;
+            }
           }
         }
 
+        if (cancelled) { db.free(); return; }
+        ownedDb = db;
         setState({
           db,
           isReady: true,
@@ -725,6 +760,7 @@ export function EdgeVecProvider({
 
     return () => {
       cancelled = true;
+      ownedDb?.free();
     };
   }, [dimensions, persistName]);
 
@@ -788,7 +824,7 @@ For complex state management, integrate with Zustand:
 
 ```tsx
 import { create } from 'zustand';
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 interface VectorState {
   db: EdgeVec | null;
@@ -813,7 +849,9 @@ export const useVectorStore = create<VectorState>((set, get) => ({
 
     try {
       await init();
-      const db = new EdgeVec({ dimensions });
+      const config = new EdgeVecConfig(dimensions);
+      let db: EdgeVec;
+      try { db = new EdgeVec(config); } finally { config.free(); }
       set({ db, isReady: true, isLoading: false });
     } catch (error) {
       set({ error: error as Error, isLoading: false });
@@ -1030,7 +1068,7 @@ module.exports = {
 **Checklist:**
 1. Verify `isReady` is `true`
 2. Verify `queryVector` is not `null`
-3. Verify database has vectors: `db?.vectorCount()`
+3. Verify the hook's `EdgeVecIndex` has vectors: `db?.size`
 4. Check filter syntax is correct
 5. Ensure `enabled` is `true`
 
@@ -1039,10 +1077,9 @@ module.exports = {
 **Symptom:** Browser becomes unresponsive or crashes
 
 **Solutions:**
-1. Use Binary Quantization: `db.searchBQ(query, k)`
-2. Monitor memory: `db.getMemoryPressure()`
-3. Compact regularly: `db.compact()`
-4. Limit dataset size to ~100k vectors in browser
+1. Limit retained vector count and dimensionality to the device's memory budget
+2. For explicit pressure monitoring and compaction, use the raw `EdgeVec` API
+3. Budget for retained F32 vectors when using BQ; enabling it adds binary codes
 
 ### Hooks called in wrong order
 

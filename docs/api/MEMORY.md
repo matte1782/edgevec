@@ -159,17 +159,21 @@ if (recommendation.includes('compact')) {
 
 ## Memory Optimization Strategies
 
-### 1. Enable Binary Quantization
+### 1. Budget for Binary Quantization
 
-The most effective way to reduce memory: 32x reduction.
+Binary codes are 32x smaller than F32 vector payloads. Enabling BQ on a float
+index retains the original F32 vectors for rescoring, so it adds a code cache
+rather than reducing total index memory.
 
 ```typescript
-// BQ is auto-enabled for dimensions divisible by 8
-const index = new EdgeVec({ dimensions: 768 });
+const config = new EdgeVecConfig(768);
+const index = new EdgeVec(config);
+config.free();
+index.enableBQ();
 
-// Memory comparison (100k vectors, 768D):
-// - F32: ~300 MB
-// - BQ:  ~10 MB
+// Vector payloads (100k vectors, 768D; excludes graph and metadata):
+// - F32: ~293 MiB
+// - BQ codes: ~9 MiB, in addition to retained F32 vectors
 ```
 
 ### 2. Periodic Compaction
@@ -333,7 +337,7 @@ console.log(JSON.stringify(dashboard, null, 2));
 
 1. **Monitor regularly** - Check memory pressure before bulk operations
 2. **Compact proactively** - Don't wait for critical pressure
-3. **Use BQ when possible** - 32x memory savings with minimal recall loss
+3. **Budget for BQ** - Binary codes are 32x smaller than F32 payloads; float indexes retain both for rescoring
 4. **Set appropriate thresholds** - Lower on mobile, higher on desktop
 5. **Handle insert blocks gracefully** - Provide user feedback
 

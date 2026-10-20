@@ -1,7 +1,8 @@
 /**
  * useEdgeVec - Vue 3 composable for EdgeVec database initialization
  *
- * Initializes WASM module and creates/loads an EdgeVec index.
+ * Creates/loads an EdgeVec index after the application initializes WASM.
+ * Call the default `init` export from `edgevec` before mounting components.
  * Handles persistence loading from IndexedDB when persistName is provided.
  *
  * @module edgevec/vue

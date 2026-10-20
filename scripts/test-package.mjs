@@ -1,7 +1,7 @@
 // Install the actual tarballs outside the checkout to detect omitted files.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,4 +66,31 @@ assert.equal(cjs.insert(vector), 1);
 console.log('Packed ESM and CommonJS consumers passed');
 `);
 execFileSync(process.execPath, [path.join(consumer, 'smoke.mjs')], { cwd: consumer, stdio: 'inherit' });
+
+// Execute the instructions users copy, using the installed package runtime.
+// Preinitialize from disk so browser snippets can call init() under Node too.
+for (const [name, file] of [
+  ['root', path.join(root, 'README.md')],
+  ['package', path.join(consumer, 'node_modules/edgevec/README.md')],
+  ['api', path.join(root, 'docs/api/README.md')],
+]) {
+  const readme = await readFile(file, 'utf8');
+  const section = readme.slice(readme.indexOf('## Quick Start'));
+  const snippet = section.match(/```typescript\r?\n([\s\S]*?)```/);
+  assert.ok(snippet, `${name} README contains a TypeScript quickstart`);
+  const script = path.join(consumer, `readme-${name}.mjs`);
+  await writeFile(script, `
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { initSync } from 'edgevec';
+initSync({ module: await readFile(new URL('./node_modules/edgevec/edgevec_bg.wasm', import.meta.url)) });
+${snippet[1]}
+assert.equal(results[0].id, id);
+assert.equal(fastResults[0].id, id);
+assert.equal(db.hasBQ(), true);
+db.free();
+console.log('${name} README quickstart passed');
+`);
+  execFileSync(process.execPath, [script], { cwd: consumer, stdio: 'inherit' });
+}
 console.log(`Validated tarballs in ${consumer}`);

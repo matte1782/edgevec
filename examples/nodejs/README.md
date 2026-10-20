@@ -56,7 +56,7 @@ npm run benchmark
 - Insertion throughput (vectors/sec)
 - Search latency percentiles
 - PASS/FAIL verdict for P99 <10ms target
-- Persistence timing
+- File save/load timing and restored-index verification (`benchmark-db.evwb`)
 
 **Note:** This benchmark may take 1-2 minutes to complete depending on your hardware.
 
@@ -103,7 +103,7 @@ npm install
 
 ### Error: WASM initialization failed
 
-**Solution:** Ensure you're using Node.js >= 16.0.0:
+**Solution:** Ensure you're using Node.js >= 20.6.0:
 ```bash
 node --version
 ```

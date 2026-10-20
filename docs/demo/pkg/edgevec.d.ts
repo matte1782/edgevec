@@ -1585,14 +1585,15 @@ export class EdgeVec {
   /**
    * Enables binary quantization on this index.
    *
-   * Binary quantization reduces memory usage by 32x (from 32 bits to 1 bit per dimension)
-   * while maintaining ~85-95% recall. BQ is automatically enabled for dimensions divisible by 8.
+   * Binary codes use 1 bit per dimension, 32x smaller than F32 payloads.
+   * The original F32 vectors remain stored for rescoring. Enable BQ explicitly
+   * on a HNSW float index with dimensions divisible by 8.
    *
    * # Errors
    *
    * Returns an error if:
    * - Dimensions are not divisible by 8 (required for BQ)
-   * - BQ is already enabled
+   * - The index uses packed binary storage or is not HNSW
    *
    * # Example
    *
@@ -1613,7 +1614,7 @@ export class EdgeVec {
    *
    * Binary quantization converts vectors to bit arrays (1 bit per dimension)
    * and uses Hamming distance for comparison. This provides:
-   * - ~32x memory reduction
+   * - Binary codes 32x smaller than F32 payloads (the original vectors remain stored)
    * - ~3-5x faster search
    * - ~70-85% recall (use `searchBQRescored` for higher recall)
    *
@@ -2423,7 +2424,7 @@ export interface InitOutput {
   readonly edgevec_getVectorMetadata: (a: number, b: number) => number;
   readonly __wasm_bindgen_func_elem_2309: (a: number, b: number, c: number) => void;
   readonly __wasm_bindgen_func_elem_2293: (a: number, b: number) => void;
-  readonly __wasm_bindgen_func_elem_2877: (a: number, b: number, c: number, d: number) => void;
+  readonly __wasm_bindgen_func_elem_2876: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export3: (a: number) => void;

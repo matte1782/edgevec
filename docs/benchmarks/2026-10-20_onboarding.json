@@ -1,0 +1,150 @@
+{
+  "baseCommit": "59146c7a0c26fc70819b219b94f428a8b5e9bfc9",
+  "artifacts": {
+    "wasm": {
+      "bytes": 698412,
+      "gzipBytes": 266010,
+      "sha256": "c276ac803ccc164048091c95ec635a68cff04177beea7d366b872ccbbb2df1d6"
+    },
+    "js": {
+      "bytes": 162843,
+      "gzipBytes": 29492,
+      "sha256": "6966189e04a979b7ffd732db4c08ed710116065eea19c0a338ed844256b6af99"
+    }
+  },
+  "snippets": {
+    "snippets/edgevec-59b9f14da3349a9d/src/js/storage.js": "6228b6720eb56b457de3dbdc00953569236e4915c9eba9e8d2855ff9672daf82"
+  },
+  "snippetHashEncoding": "SHA256 of canonical Git LF bytes",
+  "environment": {
+    "node": "v22.21.0",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+    "wasmCompiler": "rustc 1.94.0-nightly",
+    "wasmFlags": "-C target-feature=-simd128"
+  },
+  "validation": {
+    "nativeTargeted": 9,
+    "newNativeBqCases": 2,
+    "wasmPersistence": 10,
+    "sdkRuntime": 17,
+    "jest": 33,
+    "indexedDbShim": 11,
+    "packageGlue": 5,
+    "demoGlue": 5,
+    "readmeQuickstarts": 3,
+    "installedConsumers": [
+      "Node 22.21.0 ESM/CommonJS",
+      "Node 16.20.2 ESM/CommonJS"
+    ],
+    "strictLint": [
+      "cargo +1.96 clippy --all-targets -- -D warnings",
+      "cargo clippy --target wasm32-unknown-unknown --lib -- -D warnings"
+    ]
+  },
+  "nodeBenchmark": {
+    "vectors": 100000,
+    "dimensions": 128,
+    "searches": 1000,
+    "metric": "cosine",
+    "data": "Unseeded random unit vectors; generated separately for this run",
+    "p99SearchMs": 1.143,
+    "fileSaveMs": 245.8,
+    "fileLoadMs": 125.92,
+    "restoredCountAndSearchVerified": true
+  },
+  "loadTrials": [
+    {
+      "trial": 1,
+      "mode": "plain",
+      "count": 100000,
+      "dimensions": 128,
+      "bytes": 57265029,
+      "firstLoadMs": 139.2944,
+      "samplesMs": [
+        139.2944,
+        63.5035,
+        64.29270000000002,
+        63.39510000000001
+      ],
+      "node": "v22.21.0"
+    },
+    {
+      "trial": 2,
+      "mode": "plain",
+      "count": 100000,
+      "dimensions": 128,
+      "bytes": 57265029,
+      "firstLoadMs": 120.9965,
+      "samplesMs": [
+        120.9965,
+        62.794599999999974,
+        63.9914,
+        65.71820000000002
+      ],
+      "node": "v22.21.0"
+    },
+    {
+      "trial": 3,
+      "mode": "plain",
+      "count": 100000,
+      "dimensions": 128,
+      "bytes": 57265029,
+      "firstLoadMs": 124.3527,
+      "samplesMs": [
+        124.3527,
+        68.14630000000002,
+        65.4479,
+        66.66809999999998
+      ],
+      "node": "v22.21.0"
+    },
+    {
+      "trial": 1,
+      "mode": "bq",
+      "count": 100000,
+      "dimensions": 128,
+      "bytes": 57265029,
+      "firstLoadMs": 133.9524,
+      "samplesMs": [
+        133.9524,
+        77.73589999999999,
+        75.33609999999999,
+        77.74790000000002
+      ],
+      "node": "v22.21.0"
+    },
+    {
+      "trial": 2,
+      "mode": "bq",
+      "count": 100000,
+      "dimensions": 128,
+      "bytes": 57265029,
+      "firstLoadMs": 134.0126,
+      "samplesMs": [
+        134.0126,
+        77.97449999999998,
+        76.55869999999999,
+        76.23000000000002
+      ],
+      "node": "v22.21.0"
+    },
+    {
+      "trial": 3,
+      "mode": "bq",
+      "count": 100000,
+      "dimensions": 128,
+      "bytes": 57265029,
+      "firstLoadMs": 133.3219,
+      "samplesMs": [
+        133.3219,
+        77.5121,
+        78.29809999999998,
+        77.99449999999996
+      ],
+      "node": "v22.21.0"
+    }
+  ],
+  "loadMethod": "Each trial is a fresh process; WASM initialization and reading the cached EVWB bytes precede the fromBytes timer; four loads are recorded with the first as the cold sample. No other builds or benchmarks ran concurrently.",
+  "scope": "Packed-binary BQ rejection and runnable onboarding corrections; no package version publication"
+}
