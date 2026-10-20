@@ -32,8 +32,12 @@
 // This maintains backwards compatibility with README examples
 export {
   default,
+  initSync,
   EdgeVec,
   EdgeVecConfig,
+  VectorType,
+  MetricType,
+  JsIndexType,
   JsMetadataValue,
   BatchInsertConfig,
   BatchInsertResult,

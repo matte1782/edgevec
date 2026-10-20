@@ -800,12 +800,7 @@ pub(crate) fn exercise(bytes: &[u8]) {
                 }
             }
             let _ = index.soft_delete(VectorId(1));
-            // `compact` panics on ANY binary-storage index with tombstones
-            // (pre-existing bug in `HnswIndex::compact`, unrelated to
-            // persistence), so it is only exercised for f32 storage.
-            if storage.config == StorageType::Float32 {
-                let _ = index.compact(&storage);
-            }
+            let _ = index.compact(&storage);
         }
         PersistedIndex::Flat { mut index } => {
             if index.dimensions() > MAX_QUERY_DIMENSIONS {

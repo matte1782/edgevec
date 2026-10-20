@@ -6,7 +6,7 @@
  * 2. Builder methods: Filter.eq('category', 'gpu')
  *
  * @module filter
- * @version 0.9.0
+ * @version 0.5.0
  */
 /** Supported metadata value types */
 export type MetadataValue = string | number | boolean | string[];
@@ -229,4 +229,45 @@ export declare const Filter: {
     _escapeString(s: string): string;
 };
 export default Filter;
+/**
+ * Standalone filter functions for functional composition.
+ *
+ * These are convenience wrappers around Filter.* methods for cleaner imports:
+ * ```typescript
+ * import { eq, and, gt } from 'edgevec';
+ * const f = and(eq('category', 'books'), gt('price', 10));
+ * ```
+ */
+export declare const eq: (field: string, value: MetadataValue) => FilterExpression;
+export declare const ne: (field: string, value: MetadataValue) => FilterExpression;
+export declare const gt: (field: string, value: number) => FilterExpression;
+export declare const lt: (field: string, value: number) => FilterExpression;
+export declare const ge: (field: string, value: number) => FilterExpression;
+export declare const le: (field: string, value: number) => FilterExpression;
+export declare const between: (field: string, low: number, high: number) => FilterExpression;
+export declare const contains: (field: string, substring: string) => FilterExpression;
+export declare const startsWith: (field: string, prefix: string) => FilterExpression;
+export declare const endsWith: (field: string, suffix: string) => FilterExpression;
+export declare const like: (field: string, pattern: string) => FilterExpression;
+export declare const inArray: (field: string, values: MetadataValue[]) => FilterExpression;
+export declare const notInArray: (field: string, values: MetadataValue[]) => FilterExpression;
+export declare const any: (field: string, value: MetadataValue) => FilterExpression;
+export declare const all: (field: string, values: MetadataValue[]) => FilterExpression;
+export declare const none: (field: string, values: MetadataValue[]) => FilterExpression;
+export declare const isNull: (field: string) => FilterExpression;
+export declare const isNotNull: (field: string) => FilterExpression;
+export declare const and: (...filters: FilterExpression[]) => FilterExpression;
+export declare const or: (...filters: FilterExpression[]) => FilterExpression;
+export declare const not: (filter: FilterExpression) => FilterExpression;
+export declare const matchAll: FilterExpression;
+export declare const matchNone: FilterExpression;
+/**
+ * Wrapper to convert filter expression to string for search options.
+ * Useful when you want to be explicit about the conversion.
+ *
+ * @example
+ * const f = filter(and(eq('a', 1), gt('b', 2)));
+ * // f is now a FilterExpression that can be used directly in search
+ */
+export declare function filter(expr: FilterExpression): FilterExpression;
 //# sourceMappingURL=filter.d.ts.map

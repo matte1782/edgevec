@@ -27,10 +27,11 @@
  * const results = db.search(new Float32Array(128).fill(0.1), 10);
  * ```
  */
-export { default, EdgeVec, EdgeVecConfig, JsMetadataValue, BatchInsertConfig, BatchInsertResult, } from './edgevec.js';
+export { default, initSync, EdgeVec, EdgeVecConfig, VectorType, MetricType, JsIndexType, JsMetadataValue, BatchInsertConfig, BatchInsertResult, } from './edgevec.js';
 export { Filter, FilterExpression, FilterValidation, FilterValidationError, FilterValidationWarning, MetadataValue, } from './filter.js';
 export { FilterBuilder, FieldCondition } from './filter-builder.js';
+export { eq, ne, gt, lt, ge, le, between, contains, startsWith, endsWith, like, inArray, notInArray, any, all, none, isNull, isNotNull, and, or, not, filter, matchAll, matchNone, } from './filter-functions.js';
 export { EdgeVecIndex, FilterException, FilterStrategy, Metadata, SearchOptions, SearchResult, FilteredSearchResult, IndexConfig, SourcePosition, } from './edgevec-wrapper.js';
-export type { SparseSearchResult, HybridSearchResult, HybridSearchOptions } from './edgevec-wrapper.js';
-export { createSparseVector, parseHybridResults, parseSparseResults, createHybridOptions } from './sparse-helpers.js';
+export type { SparseSearchResult, HybridSearchResult, HybridSearchOptions, } from './edgevec-wrapper.js';
+export { createSparseVector, parseHybridResults, parseSparseResults, createHybridOptions, } from './sparse-helpers.js';
 //# sourceMappingURL=index.d.ts.map

@@ -163,7 +163,7 @@ if (index.needsCompaction()) {
 |:-------|:-------|
 | **Blocking** | Compaction is synchronous; UI may freeze |
 | **Memory** | Temporarily uses 2x memory during rebuild |
-| **ID Preservation** | Vector IDs are preserved after compaction |
+| **Vector IDs** | Surviving vectors receive sequential IDs starting at 1 |
 | **Metadata** | Metadata is preserved after compaction |
 
 **Recommendation:** For large indices (>10k vectors), warn users before compacting or perform during idle time.
@@ -214,7 +214,16 @@ console.log('Loaded', loadedIndex.liveCount(), 'vectors');
 
 ### Streaming Save (Large Databases)
 
-For databases larger than available memory, use streaming:
+`save_stream()` captures an owned serialized snapshot eagerly. It uses memory for
+the complete snapshot plus each emitted JavaScript chunk. The source index can
+be mutated, compacted, or freed while the iterator remains valid. Free the
+iterator when finished to release its snapshot. Chunk sizes below 64 bytes are
+clamped to 64 bytes.
+
+Concatenated chunks now use the checksummed `EVWB` format, identical to
+`toBytes()` at iterator creation, and can be restored with `EdgeVec.fromBytes()`.
+Older releases emitted the legacy `EVEC` stream format, which the loader still
+accepts. Code that inspects stream headers should accept `EVWB` as well.
 
 ```javascript
 // Stream chunks to storage

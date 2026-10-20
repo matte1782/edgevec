@@ -311,8 +311,8 @@ if (!('encodeInto' in cachedTextEncoder)) {
 
 let WASM_VECTOR_LEN = 0;
 
-function __wasm_bindgen_func_elem_2308(arg0, arg1, arg2) {
-    wasm.__wasm_bindgen_func_elem_2308(arg0, arg1, addHeapObject(arg2));
+function __wasm_bindgen_func_elem_2309(arg0, arg1, arg2) {
+    wasm.__wasm_bindgen_func_elem_2309(arg0, arg1, addHeapObject(arg2));
 }
 
 function __wasm_bindgen_func_elem_2877(arg0, arg1, arg2, arg3) {
@@ -675,16 +675,17 @@ export class EdgeVec {
      *
      * # Arguments
      *
-     * * `chunk_size` - Maximum size of each chunk in bytes (default: 10MB).
+     * * `chunk_size` - Maximum chunk size (default: 10MB; minimum: 64 bytes).
      *
      * # Returns
      *
      * A `PersistenceIterator` that yields `Uint8Array` chunks.
      *
-     * # Safety
+     * # Snapshot ownership
      *
-     * The returned iterator holds a reference to this `EdgeVec` instance.
-     * You MUST ensure `EdgeVec` is not garbage collected or freed while using the iterator.
+     * Serializes eagerly into an owned snapshot. Memory includes the complete
+     * snapshot and one emitted chunk. The source may be mutated or freed while
+     * iterating; concatenated chunks are identical to `toBytes()` at creation.
      * @param {number | null} [chunk_size]
      * @returns {PersistenceIterator}
      */
@@ -1099,6 +1100,11 @@ export class EdgeVec {
      * const id = db.insertSparse(indices, values, 10000);
      * console.log(`Inserted sparse vector with ID: ${id}`);
      * ```
+     *
+     * For hybrid search, pairs with the next unpaired live dense ID in order.
+     * Sparse-first insertion reserves future dense IDs in the same order.
+     * Use `insertSparseForVector()` for partial coverage or arbitrary order.
+     * Standalone sparse result IDs still start at zero; hybrid results use dense IDs.
      * @param {Uint32Array} indices
      * @param {Float32Array} values
      * @param {number} dim
@@ -2469,6 +2475,30 @@ export class EdgeVec {
         }
     }
     /**
+     * Insert a sparse vector paired with a specific live dense vector.
+     * Use this for arbitrary insertion order or partial sparse coverage.
+     * @param {number} vector_id
+     * @param {Uint32Array} indices
+     * @param {Float32Array} values
+     * @param {number} dim
+     * @returns {number}
+     */
+    insertSparseForVector(vector_id, indices, values, dim) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.edgevec_insertSparseForVector(retptr, this.__wbg_ptr, vector_id, addHeapObject(indices), addHeapObject(values), dim);
+            var r0 = getDataViewMemory0().getFloat64(retptr + 8 * 0, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            if (r3) {
+                throw takeObject(r2);
+            }
+            return r0;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
      * Set the compaction threshold.
      *
      * # Arguments
@@ -3491,16 +3521,9 @@ export const MetricType = Object.freeze({
 /**
  * Iterator for saving the database in chunks.
  *
- * This avoids large allocations by serializing the database incrementally.
- *
- * # Safety Warning
- *
- * **WARNING:** This iterator holds a reference to the `EdgeVec` instance (via `unsafe` transmutation).
- *
- * - You **MUST NOT** call `free()` on the `EdgeVec` instance while this iterator is in use.
- * - If `EdgeVec` is garbage collected or explicitly freed, usage of this iterator will panic
- *   to prevent Use-After-Free (UAF) vulnerabilities.
- * - Ensure the `EdgeVec` instance remains in scope in JavaScript for the duration of the iteration.
+ * Owns a serialized snapshot, so subsequent source mutations or freeing the
+ * database cannot invalidate iteration. Memory includes the complete snapshot
+ * and one emitted JavaScript chunk. Free the iterator to release the snapshot.
  */
 export class PersistenceIterator {
     static __wrap(ptr) {
@@ -3527,10 +3550,6 @@ export class PersistenceIterator {
      *
      * * `Some(Uint8Array)` - The next chunk of data.
      * * `None` - If iteration is complete.
-     *
-     * # Panics
-     *
-     * Panics if the parent `EdgeVec` instance has been freed.
      * @returns {Uint8Array | undefined}
      */
     next_chunk() {
@@ -4628,9 +4647,9 @@ function __wbg_get_imports() {
         const ret = BigInt.asUintN(64, arg0);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_cast_792cb4e15050f6f1 = function(arg0, arg1) {
-        // Cast intrinsic for `Closure(Closure { dtor_idx: 144, function: Function { arguments: [Externref], shim_idx: 145, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
-        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_2292, __wasm_bindgen_func_elem_2308);
+    imports.wbg.__wbindgen_cast_c42a1cfd85e9d91e = function(arg0, arg1) {
+        // Cast intrinsic for `Closure(Closure { dtor_idx: 148, function: Function { arguments: [Externref], shim_idx: 149, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+        const ret = makeMutClosure(arg0, arg1, wasm.__wasm_bindgen_func_elem_2293, __wasm_bindgen_func_elem_2309);
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_cast_cb9088102bce6b30 = function(arg0, arg1) {
