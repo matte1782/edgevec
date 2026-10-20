@@ -8,7 +8,7 @@
 > **The first WASM-native vector database.**
 > Dense + sparse vectors, hybrid search, binary quantization, metadata filtering — all in the browser.
 
-EdgeVec is an embedded vector database built in Rust with first-class WebAssembly support. It brings server-grade vector database features to the browser: **HNSW + FlatIndex**, **sparse vectors with BM25**, **hybrid search (RRF fusion)**, **32x memory reduction** via binary quantization, metadata filtering, soft delete, persistence, and sub-millisecond search.
+EdgeVec is an embedded vector database built in Rust with first-class WebAssembly support. It brings server-grade vector database features to the browser: **HNSW + FlatIndex**, **sparse vectors with BM25**, **hybrid search (RRF fusion)**, **32x smaller binary codes**, metadata filtering, soft delete, persistence, and sub-millisecond search.
 
 ---
 
@@ -55,12 +55,14 @@ npm install edgevec
 ```
 
 ```typescript
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 await init();
 
 // Create index (768D for embeddings like OpenAI, Cohere)
-const db = new EdgeVec({ dimensions: 768 });
+const config = new EdgeVecConfig(768);
+const db = new EdgeVec(config);
+config.free();
 
 // Insert vectors with metadata (v0.6.0)
 const vector = new Float32Array(768).map(() => Math.random());
@@ -74,8 +76,9 @@ const id = db.insertWithMetadata(vector, {
 const query = new Float32Array(768).map(() => Math.random());
 const results = db.searchWithFilter(query, 'category = "books" AND price < 50', 10);
 
-// Fast BQ search with rescoring — 32x less memory, 95% recall (v0.6.0)
-const fastResults = db.searchBQ(query, 10);
+// Enable BQ explicitly, then rescore binary candidates with retained F32 vectors
+db.enableBQ();
+const fastResults = db.searchBQRescored(query, 10, 5);
 
 // Monitor memory pressure (v0.6.0)
 const pressure = db.getMemoryPressure();
@@ -139,7 +142,10 @@ Read more: [Entity-Enhanced RAG in 300KB](docs/blog/entity-enhanced-rag.md)
 
 ## Performance
 
-EdgeVec v0.9.0 uses **SIMD instructions** for 2x+ faster vector operations on modern browsers.
+EdgeVec supports SIMD builds for modern browsers. The checked-in package and
+GitHub Pages demo intentionally use a scalar compatibility build for older
+Safari versions. The native benchmark figures below are separate from that
+browser artifact.
 
 ### Distance Calculation (Native Benchmark)
 
@@ -166,22 +172,33 @@ EdgeVec v0.9.0 uses **SIMD instructions** for 2x+ faster vector operations on mo
 
 ### Browser Support
 
-| Browser | SIMD | Performance |
-|:--------|:-----|:------------|
-| Chrome 91+ | YES | Full speed |
-| Firefox 89+ | YES | Full speed |
-| Safari 16.4+ | YES | Full speed (macOS) |
-| Edge 91+ | YES | Full speed |
-| iOS Safari | NO | Scalar fallback |
+| Browser | SIMD build support |
+|:--------|:-------------------|
+| Chrome 91+ | Yes |
+| Firefox 89+ | Yes |
+| Safari 16.4+ (macOS, iOS, iPadOS) | Yes |
+| Edge 91+ | Yes |
+| Safari 15–16.3 | Use the scalar build |
 
-> **Note:** iOS Safari doesn't support WASM SIMD. EdgeVec automatically uses scalar
-> fallback, which is ~2x slower but still functional.
+[Safari 16.4 added WebAssembly SIMD](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/).
+SIMD and scalar are separate compile-time builds; there is no automatic runtime
+fallback. The default source build (`npm run build`) enables SIMD. To reproduce
+the checked-in compatibility artifact, use this Bash command:
+
+```bash
+RUSTFLAGS="-C target-feature=-simd128" npm run build
+```
 
 ### Bundle Size
 
-| Package | Size (gzip) | Notes |
-|:--------|:------------|:------|
-| edgevec | **217 KB** | SIMD enabled (541 KB uncompressed) |
+| Checked-in scalar artifact | Bytes | Bytes (gzip) |
+|:---------------------------|------:|-------------:|
+| WASM | 698,412 | 266,010 |
+| JavaScript glue | 162,843 | 29,492 |
+| Combined | 861,255 | 295,502 |
+
+[Current artifact validation](docs/benchmarks/2026-10-20_onboarding.json) records
+the compiler, build flags, hashes, and measured performance.
 
 [Full benchmark report ->](docs/benchmarks/2025-12-24_simd_benchmark.md)
 
@@ -191,11 +208,16 @@ EdgeVec v0.9.0 uses **SIMD instructions** for 2x+ faster vector operations on mo
 
 ### Binary Quantization (v0.6.0)
 
-32x memory reduction with minimal recall loss:
+Binary codes use 1 bit per dimension, 32x smaller than F32 payloads. Enabling BQ
+on a float index retains the original F32 vectors for rescoring.
 
 ```javascript
-// BQ is auto-enabled for dimensions divisible by 8
-const db = new EdgeVec({ dimensions: 768 });
+// BQ requires dimensions divisible by 8 and explicit enablement
+const config = new EdgeVecConfig(768);
+const db = new EdgeVec(config);
+config.free();
+db.enableBQ();
+db.insert(vector);
 
 // Raw BQ search (~85% recall, ~5x faster)
 const bqResults = db.searchBQ(query, 10);
@@ -204,11 +226,14 @@ const bqResults = db.searchBQ(query, 10);
 const rescoredResults = db.searchBQRescored(query, 10, 5);
 ```
 
-| Mode | Memory (100k × 768D) | Speed | Recall@10 |
+| Mode | Vector payloads (100k × 768D) | Speed | Recall@10 |
 |:-----|:---------------------|:------|:----------|
-| F32 (baseline) | ~300 MB | 1x | 100% |
-| BQ raw | **~10 MB** | 5x | ~85% |
-| BQ + rescore(5) | **~10 MB** | 3x | ~95% |
+| F32 (baseline) | ~293 MiB | 1x | 100% |
+| BQ raw on a float index | ~302 MiB (F32 + codes) | 5x | ~85% |
+| BQ + rescore(5) | ~302 MiB (F32 + codes) | 3x | ~95% |
+
+Payload sizes exclude graph, metadata, and capacity overhead. Speed and recall
+depend on the data and hardware. [BQ memory details](docs/guides/BINARY_QUANTIZATION.md#memory-savings).
 
 ### Metadata Filtering (v0.6.0)
 
@@ -287,12 +312,10 @@ const restored = EdgeVec.fromBytes(bytes);
 
 ### Scalar Quantization
 
-```javascript
-const config = new EdgeVecConfig(768);
-config.quantized = true;  // Enable SQ8 quantization
-
-// 3.6x memory reduction: 3.03 GB -> 832 MB at 1M vectors
-```
+SQ8 is available in the native Rust storage API through
+`StorageType::QuantizedU8(QuantizerConfig { min, max })`. The WASM
+`EdgeVecConfig` has no SQ8 option; assigning `config.quantized` does not enable
+quantization. For WASM, use the explicit BQ API shown above.
 
 ### FlatIndex (v0.9.0)
 

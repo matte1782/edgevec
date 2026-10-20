@@ -38,6 +38,17 @@ pnpm add edgevec vue
 
 ## Quick Start
 
+Initialize WASM once in your application bootstrap, before mounting components:
+
+```typescript
+import init from 'edgevec';
+await init();
+// Mount your Vue application after initialization completes.
+```
+
+The composable returns an `EdgeVecIndex`, whose insert/count APIs are `add()` and
+`size`. Advanced examples that import `EdgeVec` use the separate raw API.
+
 ```vue
 <script setup lang="ts">
 import { useEdgeVec } from 'edgevec/vue';
@@ -59,7 +70,7 @@ const { db, isReady, isLoading, error, stats } = useEdgeVec({
 
 ## useEdgeVec Composable
 
-Initialize an EdgeVec database with automatic WASM loading and lifecycle management.
+Create or load an index after the application has initialized WASM.
 
 ### Basic Usage
 
@@ -77,7 +88,7 @@ async function addVector() {
   if (!isReady.value || !db.value) return;
 
   const vector = new Float32Array(384).map(() => Math.random());
-  const id = db.value.insertWithMetadata(vector, {
+  const id = db.value.add(vector, {
     category: 'documents',
     timestamp: Date.now(),
   });
@@ -265,7 +276,7 @@ async function addSampleDocs() {
 
   for (const doc of docs) {
     const embedding = await getEmbedding(doc.text);
-    db.value.insertWithMetadata(new Float32Array(embedding), {
+    db.value.add(new Float32Array(embedding), {
       text: doc.text,
       category: doc.category,
       relevance: 1.0,
@@ -594,7 +605,7 @@ Use EdgeVec across routes with a shared database:
 ```typescript
 // stores/edgevec.ts
 import { ref, computed } from 'vue';
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 // Singleton database instance
 const db = ref<EdgeVec | null>(null);
@@ -607,7 +618,8 @@ export async function initEdgeVec() {
   isLoading.value = true;
   try {
     await init();
-    db.value = new EdgeVec({ dimensions: 384 });
+    const config = new EdgeVecConfig(384);
+    try { db.value = new EdgeVec(config); } finally { config.free(); }
     isReady.value = true;
   } finally {
     isLoading.value = false;
@@ -651,7 +663,7 @@ For more complex state management, integrate with Pinia:
 ```typescript
 // stores/vectors.ts
 import { defineStore } from 'pinia';
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 export const useVectorStore = defineStore('vectors', {
   state: () => ({
@@ -670,7 +682,8 @@ export const useVectorStore = defineStore('vectors', {
 
       try {
         await init();
-        this.db = new EdgeVec({ dimensions });
+        const config = new EdgeVecConfig(dimensions);
+        try { this.db = new EdgeVec(config); } finally { config.free(); }
         this.isReady = true;
       } catch (e) {
         this.error = e as Error;
@@ -841,7 +854,7 @@ export default defineConfig({
 **Checklist:**
 1. Verify `isReady.value` is `true`
 2. Verify `queryVector.value` is not `null`
-3. Verify database has vectors: `db.value?.vectorCount()`
+3. Verify the composable's `EdgeVecIndex` has vectors: `db.value?.size`
 4. Check filter syntax is correct
 5. Ensure `enabled` computed returns `true`
 
@@ -850,10 +863,9 @@ export default defineConfig({
 **Symptom:** Browser becomes unresponsive
 
 **Solutions:**
-1. Use Binary Quantization: `db.value.searchBQ(query, k)`
-2. Monitor memory: `db.value.getMemoryPressure()`
-3. Compact regularly: `db.value.compact()`
-4. Limit dataset size to ~100k vectors in browser
+1. Limit retained vector count and dimensionality to the device's memory budget
+2. For explicit pressure monitoring and compaction, use the raw `EdgeVec` API
+3. Budget for retained F32 vectors when using BQ; enabling it adds binary codes
 
 ---
 

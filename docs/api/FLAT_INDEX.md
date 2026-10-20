@@ -397,7 +397,10 @@ assert_eq!(index.capacity(), 2); // Reclaimed
 
 ## Binary Quantization
 
-FlatIndex supports optional binary quantization (BQ) for approximate search with reduced memory usage.
+Native FlatIndex supports optional binary quantization (BQ) for approximate
+search using compact codes. It retains the original float vectors for rescoring.
+The WASM Flat index uses packed binary storage and does not expose this native
+float-index quantization option.
 
 ### How It Works
 

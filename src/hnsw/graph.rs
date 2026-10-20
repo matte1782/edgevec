@@ -523,8 +523,8 @@ impl HnswIndex {
 
     /// Creates a new index with binary quantization enabled (v0.7.0 - RFC-002 Phase 2).
     ///
-    /// BQ provides 32x memory reduction and 3-5x search speedup at the cost of
-    /// some recall (which can be recovered via rescoring).
+    /// BQ codes are 32x smaller than F32 payloads. The original vectors remain
+    /// stored for rescoring; the code cache adds to total index memory.
     ///
     /// # Arguments
     ///
@@ -550,6 +550,11 @@ impl HnswIndex {
     /// assert!(index.has_bq());
     /// ```
     pub fn with_bq(config: HnswConfig, storage: &VectorStorage) -> Result<Self, GraphError> {
+        if matches!(storage.config, crate::storage::StorageType::Binary(_)) {
+            return Err(GraphError::InvalidConfig(
+                "binary quantization cannot be enabled on packed binary storage".to_string(),
+            ));
+        }
         let dimension = config.dimensions as usize;
 
         // Validate dimension is compatible with BQ (divisible by 8)
@@ -579,7 +584,8 @@ impl HnswIndex {
     ///
     /// # Errors
     ///
-    /// Returns error if dimension is not divisible by 8.
+    /// Returns error if dimension is not divisible by 8 or storage contains
+    /// packed binary vectors rather than float values to quantize.
     ///
     /// # Example
     ///
@@ -599,6 +605,11 @@ impl HnswIndex {
     /// assert!(index.has_bq());
     /// ```
     pub fn enable_bq(&mut self, storage: &VectorStorage) -> Result<(), GraphError> {
+        if matches!(storage.config, crate::storage::StorageType::Binary(_)) {
+            return Err(GraphError::InvalidConfig(
+                "binary quantization cannot be enabled on packed binary storage".to_string(),
+            ));
+        }
         let dimension = self.config.dimensions as usize;
 
         if dimension % 8 != 0 {

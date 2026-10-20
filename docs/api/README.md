@@ -35,12 +35,14 @@ npm install edgevec
 ```
 
 ```typescript
-import init, { EdgeVec } from 'edgevec';
+import init, { EdgeVec, EdgeVecConfig } from 'edgevec';
 
 await init();
 
 // Create index (768D for embeddings like OpenAI, Cohere)
-const db = new EdgeVec({ dimensions: 768 });
+const config = new EdgeVecConfig(768);
+const db = new EdgeVec(config);
+config.free();
 
 // Insert vectors with metadata (v0.6.0)
 const vector = new Float32Array(768).map(() => Math.random());
@@ -52,10 +54,11 @@ const id = db.insertWithMetadata(vector, {
 
 // Search with filter expression (v0.6.0)
 const query = new Float32Array(768).map(() => Math.random());
-const results = db.searchFiltered(query, 'category = "books" AND price < 50', 10);
+const results = db.searchWithFilter(query, 'category = "books" AND price < 50', 10);
 
-// Fast BQ search with rescoring (v0.6.0)
-const fastResults = db.searchBQ(query, 10);
+// Enable BQ explicitly, then rescore using retained F32 vectors
+db.enableBQ();
+const fastResults = db.searchBQRescored(query, 10, 5);
 
 // Monitor memory pressure (v0.6.0)
 const pressure = db.getMemoryPressure();
@@ -94,11 +97,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## v0.6.0 Features Summary
 
-### Binary Quantization (32x Memory Reduction)
+### Binary Quantization (32x Smaller Codes)
 
 ```javascript
-// BQ is auto-enabled for dimensions divisible by 8
-const db = new EdgeVec({ dimensions: 768 });
+// BQ requires dimensions divisible by 8 and explicit enablement
+const config = new EdgeVecConfig(768);
+const db = new EdgeVec(config);
+config.free();
+db.enableBQ();
+db.insert(vector);
 
 // Raw BQ search (~85% recall, ~5x faster)
 const bqResults = db.searchBQ(query, 10);
@@ -107,11 +114,14 @@ const bqResults = db.searchBQ(query, 10);
 const rescoredResults = db.searchBQRescored(query, 10, 5);
 ```
 
-| Mode | Memory (100k x 768D) | Speed | Recall@10 |
+| Mode | Vector payloads (100k x 768D) | Speed | Recall@10 |
 |:-----|:---------------------|:------|:----------|
-| F32 (baseline) | ~300 MB | 1x | 100% |
-| BQ raw | **~10 MB** | 5x | ~85% |
-| BQ + rescore(5) | **~10 MB** | 3x | ~95% |
+| F32 (baseline) | ~293 MiB | 1x | 100% |
+| BQ raw on a float index | ~302 MiB (F32 + codes) | 5x | ~85% |
+| BQ + rescore(5) | ~302 MiB (F32 + codes) | 3x | ~95% |
+
+Float indexes retain their F32 vectors when BQ is enabled. Payload sizes exclude
+graph, metadata, and capacity overhead; speed and recall depend on data/hardware.
 
 ### Metadata Filtering
 
@@ -124,8 +134,8 @@ db.insertWithMetadata(vector, {
 });
 
 // Search with filter
-db.searchFiltered(query, 'category = "electronics" AND price < 500', 10);
-db.searchFiltered(query, 'tags ANY ["featured"]', 10);
+db.searchWithFilter(query, 'category = "electronics" AND price < 500', 10);
+db.searchWithFilter(query, 'tags ANY ["featured"]', 10);
 ```
 
 **Operators:** `=`, `!=`, `>`, `<`, `>=`, `<=`, `AND`, `OR`, `NOT`, `ANY`
@@ -225,7 +235,7 @@ if (!db.canInsert()) {
 | Search (100k vectors) | <10 ms | 329 us |
 | Insert latency | <5 ms | ~2 ms |
 | Bundle size (gzip) | <500 KB | 227 KB |
-| BQ memory reduction | 8-32x | 32x |
+| Binary-code compression relative to F32 payloads | 32x | 32x (float index retains both) |
 | BQ recall@10 | >0.90 | 0.95 |
 
 ---

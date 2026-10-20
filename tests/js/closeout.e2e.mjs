@@ -150,6 +150,29 @@ test('sparse overflow rejects instead of producing invalid JSON scores', () => {
   } finally { db.free(); config.free(); }
 });
 
+test('BQ rejects packed binary indexes without trapping or changing their state', () => {
+  for (const count of [0, 1, 3]) {
+    const config = new EdgeVecConfig(64);
+    config.vector_type = VectorType.Binary;
+    const db = new EdgeVec(config);
+    try {
+      for (let n = 0; n < count; n++) db.insertBinary(new Uint8Array(8).fill(n));
+      assert.throws(() => db.enableBQ(), error =>
+        error?.code === 'ERR_GRAPH' && /packed binary storage/.test(error.message));
+      assert.equal(db.hasBQ(), false);
+      assert.equal(db.liveCount(), count);
+      const id = db.insertBinary(new Uint8Array(8).fill(0xaa));
+      assert.equal(db.searchBinary(new Uint8Array(8).fill(0xaa), 1)[0].id, id);
+      const restored = EdgeVec.fromBytes(db.toBytes());
+      try {
+        assert.equal(restored.liveCount(), count + 1);
+        assert.equal(restored.hasBQ(), false);
+        assert.equal(restored.searchBinary(new Uint8Array(8).fill(0xaa), 1)[0].id, id);
+      } finally { restored.free(); }
+    } finally { db.free(); config.free(); }
+  }
+});
+
 for (const kind of ['bq', 'binary', 'flat']) {
   test(`${kind} stream owns its snapshot through source mutation and free`, () => {
     const config = new EdgeVecConfig(64);

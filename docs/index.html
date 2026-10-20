@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="description" content="EdgeVec - WASM-native vector database with HNSW indexing, binary quantization, and SIMD acceleration. 32x memory reduction, sub-millisecond search.">
+  <meta name="description" content="EdgeVec - WASM-native vector database with HNSW indexing, binary quantization, and SIMD acceleration. 32x smaller binary codes, sub-millisecond search.">
   <meta name="keywords" content="vector database, WASM, WebAssembly, HNSW, binary quantization, SIMD, Rust, similarity search, embeddings">
   <meta name="author" content="Matteo Panzeri">
 
   <!-- Open Graph -->
   <meta property="og:title" content="EdgeVec - WASM-Native Vector Database">
-  <meta property="og:description" content="High-performance vector similarity search in the browser. 32x memory reduction with binary quantization.">
+  <meta property="og:description" content="High-performance vector similarity search in the browser with binary codes 32x smaller than float32 payloads.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://matte1782.github.io/edgevec/">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="EdgeVec - WASM-Native Vector Database">
-  <meta name="twitter:description" content="High-performance vector similarity search in the browser. 32x memory reduction.">
+  <meta name="twitter:description" content="High-performance vector similarity search in the browser. Binary codes 32x smaller than float32 payloads.">
 
   <title>EdgeVec // WASM-Native Vector Database</title>
   <link rel="icon" type="image/svg+xml" href="demo/favicon.svg">
@@ -558,7 +558,7 @@
     <div class="hero__stats">
       <div class="hero__stat">
         <div class="hero__stat-value">32x</div>
-        <div class="hero__stat-label">Memory Reduction</div>
+        <div class="hero__stat-label">Code Compression</div>
       </div>
       <div class="hero__stat">
         <div class="hero__stat-value">&lt;1ms</div>
@@ -590,7 +590,7 @@
           <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </div>
         <h3 class="feature__title">BINARY QUANTIZATION</h3>
-        <p class="feature__desc">32x memory reduction with minimal recall loss. Store millions of vectors in browser memory.</p>
+        <p class="feature__desc">Binary codes are 32x smaller than F32 payloads. Float indexes retain F32 vectors for rescoring.</p>
       </div>
 
       <div class="feature">

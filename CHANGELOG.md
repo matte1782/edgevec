@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- BQ initialization rejects packed binary storage before mutation instead of trapping in WASM. Binary search and buffer persistence remain usable after rejection.
+- Runnable README/API examples construct `EdgeVecConfig` and enable BQ explicitly. BQ guidance distinguishes binary-code compression from retained F32 memory; Node examples verify real file save/load roundtrips.
 - Binary HNSW compaction preserves packed storage; compaction also retains scalar calibration and enabled BQ state. WASM metadata follows surviving vectors when IDs are reassigned.
 - Loaded TypeScript clients and indexes report saved dimensions and live counts. `EdgeVecIndex` exposes persistence buffers and the documented parsed sparse/hybrid methods.
 - Hybrid search pairs sparse and dense document IDs, filters deleted documents before sparse top-k, and updates pairings after compaction. `insertSparseForVector()` supports explicit pairing.

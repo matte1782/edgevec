@@ -41,7 +41,7 @@ This guide compares EdgeVec with pgvector to help you choose the right vector da
 ### Quantization
 
 **EdgeVec** offers binary quantization (1-bit per dimension) which achieves:
-- 32x memory reduction vs float32
+- Binary codes 32x smaller than float32 payloads; BQ-enabled float indexes retain F32 vectors for rescoring
 - 10-50x faster distance computation via Hamming distance
 - 85-95% recall retention (depends on data distribution)
 

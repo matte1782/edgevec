@@ -154,12 +154,12 @@ for (const result of results) {
 
 ---
 
-### searchFiltered(query, filter, k)
+### searchWithFilter(query, filter, k)
 
 Search with metadata filter expression. **(v0.6.0)**
 
 ```typescript
-searchFiltered(
+searchWithFilter(
   query: Float32Array,
   filter: string,
   k: number
@@ -177,16 +177,16 @@ searchFiltered(
 
 ```typescript
 // Simple equality
-const results = index.searchFiltered(query, 'category = "electronics"', 10);
+const results = index.searchWithFilter(query, 'category = "electronics"', 10);
 
 // Comparison
-const results = index.searchFiltered(query, 'price > 100 AND price < 500', 10);
+const results = index.searchWithFilter(query, 'price > 100 AND price < 500', 10);
 
 // Array membership
-const results = index.searchFiltered(query, 'tags ANY ["featured"]', 10);
+const results = index.searchWithFilter(query, 'tags ANY ["featured"]', 10);
 
 // Complex expression
-const results = index.searchFiltered(query,
+const results = index.searchWithFilter(query,
     '(category = "electronics" OR category = "computers") AND inStock = true',
     10
 );
@@ -204,16 +204,17 @@ searchBQ(query: Float32Array, k: number): SearchResult[]
 
 **Requirements:**
 - Dimension must be divisible by 8
-- BQ is auto-enabled for compatible dimensions
+- Call `index.enableBQ()` explicitly before BQ search
 
 **Performance Characteristics:**
 - ~5x faster than F32 search
 - ~85% recall
-- 32x memory reduction
+- Binary codes are 32x smaller than F32 payloads; float vectors remain stored for rescoring
 
 **Example:**
 
 ```typescript
+index.enableBQ();
 const results = index.searchBQ(query, 10);
 ```
 
@@ -592,12 +593,12 @@ dimensions(): number
 
 ## Utility Methods
 
-### vectorCount()
+### Total vector count
 
 Total vectors including deleted.
 
 ```typescript
-vectorCount(): number
+const total = index.liveCount() + index.deletedCount();
 ```
 
 ---
@@ -646,8 +647,9 @@ hasBQ(): boolean
 
 Enable binary quantization on this index. **(v0.6.0)**
 
-Binary quantization reduces memory usage by 32x (from 32 bits to 1 bit per dimension)
-while maintaining ~85-95% recall. BQ is required for `searchBQ()` and `searchBQRescored()`.
+Binary codes use 1 bit per dimension, 32x smaller than F32 payloads. The float
+index retains its F32 vectors for rescoring; enabling BQ adds a code cache.
+BQ must be enabled before `searchBQ()` and `searchBQRescored()`.
 
 ```typescript
 enableBQ(): void
@@ -655,6 +657,7 @@ enableBQ(): void
 
 **Requirements:**
 - Dimensions must be divisible by 8
+- The index must be HNSW with float storage; packed binary storage is rejected
 
 **Example:**
 
@@ -679,7 +682,7 @@ EdgeVec methods may throw errors for invalid operations:
 
 ```typescript
 try {
-    const results = index.searchFiltered(query, 'invalid filter syntax', 10);
+    const results = index.searchWithFilter(query, 'invalid filter syntax', 10);
 } catch (e) {
     console.error('Search failed:', e.message);
 }
